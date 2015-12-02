@@ -701,7 +701,7 @@ static int sw_chip_id_detect(struct sw_device *sw, int now_number)
         while (!(sw->info[now_number].id_value[0])) {                
                 if(sw->info[now_number].same_flag) {
                         same_number = get_device_same_addr(sw, now_number + 1);
-                        while((same_number != now_number) && (same_number != -1) &&
+                        while((same_number != now_number) && (sw->info[same_number].is_support==1) && (same_number != -1) &&
                               (sw->info[same_number].id_value[0])) {
                                 result = sw_chip_id_gain(sw, same_number); 
                                 if(result) {
