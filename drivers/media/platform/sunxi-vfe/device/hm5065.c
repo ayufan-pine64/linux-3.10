@@ -3004,8 +3004,8 @@ static int sensor_read(struct v4l2_subdev *sd, unsigned short reg,
 	int ret=0;
 	int cnt=0;
 	
-  struct i2c_client *client = v4l2_get_subdevdata(sd);
-  ret = cci_read_a16_d8(client,reg,value);
+//  struct i2c_client *client = v4l2_get_subdevdata(sd);
+  ret = cci_read_a16_d8(sd,reg,value);
   while(ret!=0&&cnt<2)
   {
   	ret = cci_read_a16_d8(sd,reg,value);
@@ -3023,12 +3023,12 @@ static int sensor_write(struct v4l2_subdev *sd, unsigned short reg,
 	int ret=0;
 	int cnt=0;
 	
-  struct i2c_client *client = v4l2_get_subdevdata(sd);
+//  struct i2c_client *client = v4l2_get_subdevdata(sd);
   
   ret = cci_write_a16_d8(sd,reg,value);
   while(ret!=0&&cnt<2)
   {
-  	ret = cci_write_a16_d8(client,reg,value);
+  	ret = cci_write_a16_d8(sd,reg,value);
   	cnt++;
   }
   if(cnt>0)
