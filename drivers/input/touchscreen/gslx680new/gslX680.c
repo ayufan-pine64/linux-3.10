@@ -76,7 +76,7 @@
 #include "gsl1680e_t1_v2.h"
 #include "gsl1680e_a86.h"
 #include "A86_GSL3676B_8001280_OGS_DZ_80A22.h"
-
+#include "gsl2681_a9005qd.h"
 
 struct gslX680_fw_array {
 	const char* name;
@@ -98,6 +98,7 @@ struct gslX680_fw_array {
 	{"gsl_t1_v2"  ,  ARRAY_SIZE(GSL1680E_FW_T1_V2),GSL1680E_FW_T1_V2},
 	{"gsl_a86"  ,  ARRAY_SIZE(GSL1680E_FW_A86),GSL1680E_FW_A86},
 	{"gsl_a86_ogs"  ,  ARRAY_SIZE(A86_GSL3676B_8001280_OGS_DZ_80A22),A86_GSL3676B_8001280_OGS_DZ_80A22},
+	{"gsl_fw_A9005"  ,  ARRAY_SIZE(GSL2681_FW_A9005QD),GSL2681_FW_A9005QD},
 };
 
 unsigned int *gslX680_config_data[16] = {
@@ -116,6 +117,7 @@ unsigned int *gslX680_config_data[16] = {
     gsl_config_data_id_t1_v2,
     gsl_config_data_id_a86,
     gsl_config_data_id_A86_GSL3676B_8001280_OGS_DZ_80A22,
+	gsl_config_data_id_A9005QD,
 };
 
 #define FOR_TSLIB_TEST
