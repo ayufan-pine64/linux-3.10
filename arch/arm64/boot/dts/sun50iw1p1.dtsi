@@ -46,6 +46,9 @@
 		lcd0 = &lcd0;
 		hdmi = &hdmi;
 		pwm = &pwm;
+		pwm0 = &pwm0;
+		s_pwm = &s_pwm;
+		spwm0 = &spwm0;
 		boot_disp = &boot_disp;
 	};
 
@@ -991,10 +994,77 @@
 		};
 
 		pwm: pwm@01c21400 {
-			compatible = "allwinner,sunxi-pwm0";
+			compatible = "allwinner,sunxi-pwm";
 			reg = <0x0 0x01c21400 0x0 0x3c>;
 			pwm-number = <1>;
+			pwm-base = <0x0>;
+			pwms = <&pwm0>;
+		};
+
+		pwm0: pwm0@01c21400 {
+			compatible = "allwinner,sunxi-pwm0";
 			pinctrl-names = "active", "sleep";
+			reg_base = <0x01c21400>;
+			reg_busy_offset = <0x00>;
+			reg_busy_shift = <28>;
+			reg_enable_offset = <0x00>;
+			reg_enable_shift = <4>;
+			reg_clk_gating_offset = <0x00>;
+			reg_clk_gating_shift = <6>;
+			reg_bypass_offset = <0x00>;
+			reg_bypass_shift = <9>;
+			reg_pulse_start_offset = <0x00>;
+			reg_pulse_start_shift = <8>;
+			reg_mode_offset = <0x00>;
+			reg_mode_shift = <7>;
+			reg_polarity_offset = <0x00>;
+			reg_polarity_shift = <5>;
+			reg_period_offset = <0x04>;
+			reg_period_shift = <16>;
+			reg_period_width = <16>;
+			reg_active_offset = <0x04>;
+			reg_active_shift = <0>;
+			reg_active_width = <16>;
+			reg_prescal_offset = <0x00>;
+			reg_prescal_shift = <0>;
+			reg_prescal_width = <4>;
+		};
+
+		s_pwm: s_pwm@1f03800 {
+			compatible = "allwinner,sunxi-s_pwm";
+			reg = <0x0 0x01f03800 0x0 0x3c>;
+			pwm-number = <1>;
+			pwm-base = <0x10>;
+			pwms = <&spwm0>;
+		};
+
+		spwm0: spwm0@0x01f03800 {
+			compatible = "allwinner,sunxi-pwm16";
+			pinctrl-names = "active", "sleep";
+			reg_base = <0x01f03800>;
+			reg_busy_offset = <0x00>;
+			reg_busy_shift = <28>;
+			reg_enable_offset = <0x00>;
+			reg_enable_shift = <4>;
+			reg_clk_gating_offset = <0x00>;
+			reg_clk_gating_shift = <6>;
+			reg_bypass_offset = <0x00>;
+			reg_bypass_shift = <9>;
+			reg_pulse_start_offset = <0x00>;
+			reg_pulse_start_shift = <8>;
+			reg_mode_offset = <0x00>;
+			reg_mode_shift = <7>;
+			reg_polarity_offset = <0x00>;
+			reg_polarity_shift = <5>;
+			reg_period_offset = <0x04>;
+			reg_period_shift = <16>;
+			reg_period_width = <16>;
+			reg_active_offset = <0x04>;
+			reg_active_shift = <0>;
+			reg_active_width = <16>;
+			reg_prescal_offset = <0x00>;
+			reg_prescal_shift = <0>;
+			reg_prescal_width = <4>;
 		};
 
 		boot_disp: boot_disp {
