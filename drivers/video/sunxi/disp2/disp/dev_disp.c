@@ -10,12 +10,13 @@
  * published by the Free Software Foundation.
 */
 
+#include <linux/uaccess.h>
 #include "dev_disp.h"
 #include <linux/pm_runtime.h>
 #if defined(CONFIG_DEVFREQ_DRAM_FREQ_WITH_SOFT_NOTIFY)
 #include <linux/sunxi_dramfreq.h>
 #endif
-
+#define HDMI_DEBUG
 disp_drv_info g_disp_drv;
 
 #define MY_BYTE_ALIGN(x) ( ( (x + (4*1024-1)) >> 12) << 12)             /* alloc based on 4K byte */
@@ -1057,6 +1058,58 @@ ssize_t disp_write(struct file *file, const char __user *buf, size_t count, loff
 {
 	return 0;
 }
+#ifdef HDMI_DEBUG
+static void itoa(int value, char *string)
+{
+	int power,j;
+	j = value;
+	for(power = 1;j >= 10;j /= 10)
+	{
+		power*=10;
+	}
+	for(;power > 0;power /= 10)
+	{
+		*string ++ = '0' + value/power;
+		value %= power;
+	}
+	*string = '\0';
+}
+
+
+static ssize_t hdmi_file_set(const char *path_name,int mode)
+{
+	struct file *file = NULL;
+	mm_segment_t fs;
+    loff_t pos;
+	char hdmi_mode[4]= {0};
+	int ret = -1;
+	itoa(mode,hdmi_mode);
+
+    file = filp_open(path_name,O_WRONLY|O_CREAT|O_TRUNC,0644);
+	if(IS_ERR(file))
+		goto fail0;
+
+	fs = get_fs();
+	set_fs(KERNEL_DS);
+	pos = 0;
+	ret = vfs_write(file,hdmi_mode,sizeof(hdmi_mode),&pos);
+
+	if(ret < 0)
+		goto fail1;
+	
+	filp_close(file,NULL);
+	set_fs(fs);
+
+	return 0;
+fail1:
+	pr_warn("[DISP] write %s failed \n",path_name);
+	filp_close(file,NULL);
+	return -1;
+fail0:
+	printk("[DISP] open %s failed \n",path_name);
+	return -1;
+}
+#endif
 
 static int disp_probe(struct platform_device *pdev)
 {
@@ -1524,6 +1577,7 @@ long disp_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 {
 	unsigned long karg[4];
 	unsigned long ubuffer[4] = {0};
+	char path_name[48] = "/mnt/private/hdmi.txt";
 	s32 ret = 0;
 	int num_screens = 2;
 	struct disp_manager *mgr = NULL;
@@ -1531,7 +1585,7 @@ long disp_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 	struct disp_enhance *enhance = NULL;
 	struct disp_smbl *smbl = NULL;
 	struct disp_capture *cptr = NULL;
-
+	
 	num_screens = bsp_disp_feat_get_num_screens();
 
 	if (copy_from_user((void*)karg,(void __user*)arg,4*sizeof(unsigned long))) {
@@ -1671,8 +1725,18 @@ long disp_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 		/* if the whhole display device have already enter blank status,
 		 * DISP_DEVICE_SWITCH request will not be responsed.
 		 */
-		if (!(suspend_status & DISPLAY_BLANK))
+
+		if (!(suspend_status & DISPLAY_BLANK)){
 			ret = bsp_disp_device_switch(ubuffer[0], (enum disp_output_type)ubuffer[1], (enum disp_output_type)ubuffer[2]);
+#ifdef HDMI_DEBUG
+			if(0 > hdmi_file_set(path_name,ubuffer[2]))
+			{
+				printk("hdmi mode save failed!\n");
+			}else{
+				printk("hdmi mode save success!\n");
+			}
+		}
+#endif
 		suspend_output_type[ubuffer[0]] = ubuffer[1];
 	#if defined(SUPPORT_TV) && defined(CONFIG_ARCH_SUN8IW7)
 		bsp_disp_tv_set_hpd(1);
