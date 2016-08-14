@@ -105,6 +105,7 @@ void hdmi_core_exit(void)
 
 void hdmi_core_set_base_addr(uintptr_t base_addr)
 {
+    printk(KERN_INFO "HDMI base address: %p\n", base_addr);
 	bsp_hdmi_set_addr(base_addr);
 }
 
