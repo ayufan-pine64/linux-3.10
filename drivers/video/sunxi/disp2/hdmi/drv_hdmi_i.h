@@ -65,6 +65,9 @@ typedef struct
 
 extern hdmi_info_t ghdmi;
 extern struct disp_video_timings video_timing[];
+int register_sunxi_hdmi_notifier(struct notifier_block *nb);
+int unregister_sunxi_hdmi_notifier(struct notifier_block *nb);
+extern int sunxi_hdmi_notifier_call_chain(unsigned long val);
 
 extern s32 hdmi_i2c_add_driver(void);
 extern s32 hdmi_i2c_del_driver(void);

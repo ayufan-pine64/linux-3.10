@@ -1,4 +1,5 @@
 #include "hdmi_core.h"
+#include "drv_hdmi_i.h"
 
 static s32		hdmi_state = HDMI_State_Idle;
 static u32		video_on = 0;
@@ -151,6 +152,7 @@ s32 hdmi_core_loop(void)
 			audio_on = 0;
 			if (0 == (hdmi_hpd_mask & 0x100))
 				hdmi_hpd_event();
+			sunxi_hdmi_notifier_call_chain(hdmi_state);
 		}
 
 		if ((times++) >= 10) {
@@ -172,6 +174,8 @@ s32 hdmi_core_loop(void)
 			if (HPD) {
 				hdmi_state = HDMI_State_EDID_Parse;
 				__inf("plugin\n");
+				sunxi_hdmi_notifier_call_chain(hdmi_state);
+
 			} else {
 				return 0;
 			}
@@ -189,7 +193,7 @@ s32 hdmi_core_loop(void)
 
 			if (video_enable)
 				hdmi_core_set_video_enable(true);
-
+			sunxi_hdmi_notifier_call_chain(hdmi_state);
 		case HDMI_State_HPD_Done:
 			if (video_on && hdcp_enable)
 				bsp_hdmi_hdl();
@@ -548,7 +552,6 @@ s32 hdmi_core_enter_lp(void)
 s32 hdmi_core_exit_lp(void)
 {
 	bsp_hdmi_init();
-
 	return 0;
 }
 
