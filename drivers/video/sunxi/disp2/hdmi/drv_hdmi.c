@@ -35,6 +35,7 @@ static struct cdev *my_cdev;
 static dev_t devid ;
 static struct class *hdmi_class;
 hdmi_info_t ghdmi;
+
 static BLOCKING_NOTIFIER_HEAD(sunxi_hdmi_notifier_list);
 
 int register_sunxi_hdmi_notifier(struct notifier_block *nb)

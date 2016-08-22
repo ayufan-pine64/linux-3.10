@@ -24,6 +24,9 @@ static u32 hdmi_detect_time = 200;//ms
 
 static s32 video_config(u32 vic);
 
+uintptr_t hdmi_base_addr;
+EXPORT_SYMBOL(hdmi_base_addr);
+
 struct disp_video_timings video_timing[] =
 {
 	//VIC				   PCLK    AVI_PR  X      Y      HT      HBP   HFP   HST    VT     VBP  VFP  VST h_pol v_pol int vac   trd
@@ -107,6 +110,7 @@ void hdmi_core_set_base_addr(uintptr_t base_addr)
 {
     printk(KERN_INFO "HDMI base address: %p\n", base_addr);
 	bsp_hdmi_set_addr(base_addr);
+	hdmi_base_addr = base_addr;
 }
 
 static s32 main_Hpd_Check(void)

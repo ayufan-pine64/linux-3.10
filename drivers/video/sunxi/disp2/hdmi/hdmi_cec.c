@@ -50,6 +50,7 @@
 #include "hdmi_edid.h"
 #include "drv_hdmi_i.h"
 #include "hdmi_bsp.h"
+#include "hdmi_core.h"
  
 #define MAX_MESSAGE_LEN         17
 
@@ -116,18 +117,17 @@ static int rx_reg[16] = {HDMI_CEC_RX_DATA0, HDMI_CEC_RX_DATA1, HDMI_CEC_RX_DATA2
 
 
 /* FIXME : get base address from resource */
-unsigned long long hdmi_base_addr = 0xffffff8001580000;
 
 void hdmi_writel(u32 value, unsigned int reg)
 {
-    __raw_writel(value, hdmi_base_addr + reg);
+    __raw_writel(value, (unsigned long long)hdmi_base_addr + reg);
 }
 
 u32 hdmi_readl(unsigned int reg)
 {
     u32 value;
 
-    value = __raw_readl(hdmi_base_addr + reg);
+    value = __raw_readl((unsigned long long)hdmi_base_addr + reg);
     return value;
 }
 
@@ -137,14 +137,14 @@ u8 hdmi_readb(unsigned int reg)
 
     /* unlock read access */
     hdmi_writel(0x54524545, 0x10010);
-    value = __raw_readb(hdmi_base_addr + reg);
+    value = __raw_readb((unsigned long long)hdmi_base_addr + reg);
     //hdmi_writel(0x57415452, 0x10010);
     return value;
 }
 
 void hdmi_writeb(u8 value, unsigned int reg)
 {
-    __raw_writeb(value, hdmi_base_addr + reg);
+    __raw_writeb(value, (unsigned long long)hdmi_base_addr + reg);
 }
 
 
@@ -814,14 +814,12 @@ const struct file_operations hdmi_cec_fops = {
 
 static struct task_struct * cec_task = NULL;
 
-static void hdmi_delay_ms(unsigned long ms)
-{
-    u32 timeout = ms*HZ/1000;
-    set_current_state(TASK_INTERRUPTIBLE);
-    schedule_timeout(timeout);
-}
-
-extern int (*bsp_hdmi_cec_get_simple_msg2)(unsigned char *msg) = 0xffffffc000438dd0;
+// static void hdmi_delay_ms(unsigned long ms)
+// {
+//     u32 timeout = ms*HZ/1000;
+//     set_current_state(TASK_INTERRUPTIBLE);
+//     schedule_timeout(timeout);
+// }
 
 static int cec_thread(void *parg)
 {

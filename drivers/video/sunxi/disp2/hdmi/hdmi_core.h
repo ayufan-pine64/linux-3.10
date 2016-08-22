@@ -98,5 +98,7 @@ extern int hdmi_clk_enable_prepare(void);
 extern int hdmi_clk_disable_prepare(void);
 extern unsigned int hdmi_get_soc_version(void);
 
+extern uintptr_t hdmi_base_addr;
+
 #endif
 
