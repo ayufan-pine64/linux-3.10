@@ -9,4 +9,4 @@ nand-objs += nand_interface.o \
 	nfd/nand_test.o \
 	nfd/nand_osal_for_linux.o \
 	nfd/nand_lib_cfg.o \
-	libnand_sun50iw1p1.a
+	libnand_sun50iw1p1
