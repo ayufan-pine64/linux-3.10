@@ -767,6 +767,7 @@ s32 hdmi_init(struct platform_device *pdev)
 	if ((1 == ret) && (1 == value)) {
 		hdmi_cec_support = true;
 	}
+	hdmi_core_cec_enable(hdmi_cec_support);
 	printk("[HDMI] cec support = %d\n", hdmi_cec_support);
 
 	hdmi_core_initial(boot_hdmi);
