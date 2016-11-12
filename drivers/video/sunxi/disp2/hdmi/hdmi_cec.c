@@ -247,12 +247,12 @@ static int sunxi_hdmi_notify(struct notifier_block *nb,
       break;
     case 0x04: // Plug
       pr_info("[CEC]HDMI link connected\n");
-      hdmi_cec_message(MESSAGE_TYPE_CONNECTED, NULL, 0);
       break;
     case 0x05: // reinit done
       pr_info("[CEC]HDMI reinitialized\n");
       hdmi_cec_configure();
       hdmi_cec_start_receiving();
+      hdmi_cec_message(MESSAGE_TYPE_CONNECTED, NULL, 0);
       break;
     }
     return NOTIFY_DONE;
