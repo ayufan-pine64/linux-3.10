@@ -639,14 +639,28 @@ static int hdmi_cec_thread(void *parg)
 static int __init hdmi_cec_init(void)
 {
     int err = 0;
+    int value = 0;
     struct device *temp_class;
 
-    if(!hdmi_base_addr) {
+    if (!hdmi_base_addr) {
       err = -EBUSY;
       goto out;
     }
 
-    printk(KERN_INFO "HDMI CEC base address: %p\n", hdmi_base_addr);
+    err = disp_sys_script_get_item("hdmi", "hdmi_cec_support", &value, 1);
+    if (err != 1) {
+      err = -EBUSY;
+      goto out;
+    }
+
+    printk(KERN_INFO "HDMI base address: %p\n", hdmi_base_addr);
+    if (value != 2) {
+      printk(KERN_INFO "HDMI CEC experimental driver disabled (%d).\n", value);
+      err = -EBUSY;
+      goto out;
+    }
+
+    printk(KERN_INFO "HDMI CEC experimental driver enabled.\n");
 
     hdmi_cec_major = register_chrdev(hdmi_cec_major, "sunxi_hdmi_cec", &hdmi_cec_fops);
     if (hdmi_cec_major < 0) {
