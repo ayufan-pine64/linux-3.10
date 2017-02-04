@@ -64,10 +64,16 @@ config DEVFREQ_GOV_USERSPACE
 	  given at the initialization.
 
 config DEVFREQ_GOV_ADAPTIVE
-	depends on ARCH_SUN50I
+	depends on ARCH_SUN50I || ARCH_SUN8IW10 || ARCH_SUN8IW11
 	tristate "Adaptive"
 	help
 	  Sets the frequency according to dram master access or idle.
+
+config DEVFREQ_GOV_TEMPTRIGGER
+	depends on SUN50IW1P1_THERMAL
+	tristate "Temptrigger"
+	help
+	  Sets the frequency according to temperature control.
 
 comment "DEVFREQ Drivers"
 
@@ -86,7 +92,9 @@ config ARM_EXYNOS4_BUS_DEVFREQ
 
 config ARM_SUNXI_DRAM_DEVFREQ
 	bool "ARM Sunxi Dram DEVFREQ Driver"
-	depends on ARCH_SUN50I && PM_OPP
+	select ARCH_HAS_OPP
+	select PM_OPP
+	depends on ARCH_SUN50I || ARCH_SUN8IW10 || ARCH_SUN8IW11
 	select DEVFREQ_GOV_ADAPTIVE
 	help
 	  DRAM Frequency scaling allows you to change the clock speed of
@@ -98,7 +106,8 @@ config ARM_SUNXI_DRAM_DEVFREQ
 config DEVFREQ_DRAM_FREQ_IN_VSYNC
 	bool "Change dram frequency in display vsync"
 	depends on ARM_SUNXI_DRAM_DEVFREQ
-	depends on ARCH_SUN50I
+	depends on ARCH_SUN50I || ARCH_SUN8IW10 || ARCH_SUN8IW11
+	depends on !EINK_PANEL_USED
 	help
 	  This will allow dram frequency changed in display vsync.
 

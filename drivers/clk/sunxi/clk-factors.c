@@ -459,10 +459,13 @@ static const struct clk_ops clk_factors_ops = {
 	.round_rate = sunxi_clk_factors_round_rate,
 	.set_rate = sunxi_clk_factors_set_rate,
 };
+
 void sunxi_clk_get_factors_ops(struct clk_ops* ops)
 {
 	memcpy(ops,&clk_factors_ops,sizeof(clk_factors_ops));
 }
+
+
 /**
  * clk_register_factors - register a factors clock with
  * the clock framework
@@ -521,6 +524,8 @@ struct clk *sunxi_clk_register_factors(struct device *dev, void __iomem *base,
 
 	return clk;
 }
+
+
 int sunxi_clk_get_common_factors(struct sunxi_clk_factors_config* f_config, struct clk_factors_value *factor,
 				struct sunxi_clk_factor_freq table[], unsigned long index, unsigned long tbl_size)
 {
@@ -532,15 +537,17 @@ int sunxi_clk_get_common_factors(struct sunxi_clk_factors_config* f_config, stru
 	factor->factorp = (table[index].factor>>f_config->pshift)&((1<<(f_config->pwidth))-1);
 	factor->factord1 = (table[index].factor>>f_config->d1shift)&((1<<(f_config->d1width))-1);
 	factor->factord2 = (table[index].factor>>f_config->d2shift)&((1<<(f_config->d2width))-1);
-	if(f_config->frac)
-	{
+
+	if (f_config->frac) {
 		factor->frac_mode = (table[index].factor>>f_config->modeshift)&1;
 		factor->frac_freq = (table[index].factor>>f_config->outshift)&1;
 	}
+
 	return 0;
 }
 
-static int sunxi_clk_freq_search(struct sunxi_clk_factor_freq tbl[], unsigned long freq, int low, int high)
+static int sunxi_clk_freq_search(struct sunxi_clk_factor_freq tbl[],
+				unsigned long freq, int low, int high)
 {
 	int mid;
 	unsigned long checkfreq;
@@ -556,35 +563,51 @@ static int sunxi_clk_freq_search(struct sunxi_clk_factor_freq tbl[], unsigned lo
 	else
 		return sunxi_clk_freq_search(tbl, freq, mid + 1,high);
 }
-static int sunxi_clk_freq_find(struct sunxi_clk_factor_freq tbl[], unsigned long n, unsigned long freq)
+
+static int sunxi_clk_freq_find(struct sunxi_clk_factor_freq tbl[],
+				unsigned long n, unsigned long freq)
 {
 	int delta1, delta2;
 	int i = sunxi_clk_freq_search(tbl, freq, 0, n-1);
-	if(i != n-1)
-	{
-		delta1 = (freq > tbl[i].freq/1000000)?(freq -tbl[i].freq/1000000):(tbl[i].freq/1000000-freq);
-		delta2 = (freq > tbl[i+1].freq/1000000)?(freq -tbl[i+1].freq/1000000):(tbl[i+1].freq/1000000-freq);
+
+	if (i != n-1) {
+
+		delta1 = (freq > tbl[i].freq / 1000000)
+			? (freq - tbl[i].freq / 1000000)
+			: (tbl[i].freq / 1000000 - freq);
+
+		delta2 = (freq > tbl[i+1].freq / 1000000)
+			? (freq - tbl[i+1].freq / 1000000)
+			: (tbl[i+1].freq / 1000000 - freq);
+
 		if(delta2 < delta1)
 			i++;
 	}
+
 	return i;
 }
-int sunxi_clk_get_common_factors_search(struct sunxi_clk_factors_config* f_config, struct clk_factors_value *factor,
-				struct sunxi_clk_factor_freq table[], unsigned long index, unsigned long tbl_count)
+
+int sunxi_clk_com_ftr_sr(struct sunxi_clk_factors_config *f_config,
+				struct clk_factors_value *factor,
+				struct sunxi_clk_factor_freq table[],
+				unsigned long index, unsigned long tbl_count)
 {
-	int i = sunxi_clk_freq_find(table,tbl_count,index);
+	int i = sunxi_clk_freq_find(table, tbl_count, index);
+
 	if(i >= tbl_count)
 		return -1;
-	factor->factorn = (table[i].factor>>f_config->nshift)&((1<<(f_config->nwidth))-1);
+
+	factor->factorn = (table[i].factor >> f_config->nshift)&((1<<(f_config->nwidth))-1);
 	factor->factork = (table[i].factor>>f_config->kshift)&((1<<(f_config->kwidth))-1);
 	factor->factorm = (table[i].factor>>f_config->mshift)&((1<<(f_config->mwidth))-1);
 	factor->factorp = (table[i].factor>>f_config->pshift)&((1<<(f_config->pwidth))-1);
 	factor->factord1 = (table[i].factor>>f_config->d1shift)&((1<<(f_config->d1width))-1);
 	factor->factord2 = (table[i].factor>>f_config->d2shift)&((1<<(f_config->d2width))-1);
-	if(f_config->frac)
-	{
+
+	if (f_config->frac) {
 		factor->frac_mode = (table[i].factor>>f_config->modeshift)&1;
 		factor->frac_freq = (table[i].factor>>f_config->outshift)&1;
 	}
+
 	return 0;
 }

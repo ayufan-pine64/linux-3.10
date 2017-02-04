@@ -13,7 +13,10 @@
 #include <linux/clk-provider.h>
 #include <linux/clkdev.h>
 #include <linux/io.h>
+#ifdef CONFIG_ARM64
 #define IO_ADDRESS(x)            (void __iomem *)(((x) & 0x0fffffff) + (((x) >> 4) & 0x0f000000) + 0xf0000000)
+#endif
+
 //#include <mach/hardware.h>
 #include "clk-factors.h"
 /* register list */
@@ -104,6 +107,7 @@
 #define CPUS_APB0_RST       0x00B0
 #define CPUS_CLK_MAX_REG    0x00B0
 #define LOSC_OUT_GATE       0x01F00060
+#define ADDA_PR_CFG_REG     0x1C0
 
 #define F_N8X7_M0X4(nv,mv) FACTOR_ALL(nv,8,7,0,0,0,mv,0,4,0,0,0,0,0,0,0,0,0)
 #define F_N8X5_K4X2(nv,kv) FACTOR_ALL(nv,8,5,kv,4,2,0,0,0,0,0,0,0,0,0,0,0,0)

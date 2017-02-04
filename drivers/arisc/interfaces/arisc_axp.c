@@ -125,7 +125,8 @@ int arisc_axp_get_chip_id(unsigned char *chip_id)
 	/* FIXME: if the runtime sever enable the mmu & dcache,
 	 * should not use flush cache here.
 	 */
-	result = invoke_scp_fn_smc(ARM_SVC_ARISC_AXP_GET_CHIP_ID, virt_to_phys(chip_id), 0, 0);
+	result = invoke_scp_fn_smc(ARM_SVC_ARISC_AXP_GET_CHIP_ID,
+			virt_to_phys(chip_id), 0, 0);
 
 	return result;
 }
@@ -144,19 +145,23 @@ int arisc_set_led_bln(u32 led_rgb, u32 led_onms, u32 led_offms, u32 led_darkms)
 	/* FIXME: if the runtime sever enable the mmu & dcache,
 	 * should not use flush cache here.
 	 */
-	result = invoke_scp_fn_smc(ARM_SVC_ARISC_SET_LED_BLN, virt_to_phys(paras), 0, 0);
+	result = invoke_scp_fn_smc(ARM_SVC_ARISC_SET_LED_BLN,
+			virt_to_phys(paras), 0, 0);
 
 	return result;
 
 }
 EXPORT_SYMBOL(arisc_set_led_bln);
 
-#if (defined CONFIG_ARCH_SUN8IW5P1) || (defined CONFIG_ARCH_SUN50IW1P1)
+#if (defined CONFIG_ARCH_SUN8IW5P1) || \
+	(defined CONFIG_ARCH_SUN50IW1P1) || \
+	(defined CONFIG_ARCH_SUN50IW2P1)
 int arisc_adjust_pmu_chgcur(unsigned int max_chgcur, unsigned int chg_ic_temp)
 {
 	int result;
 
-	result = invoke_scp_fn_smc(ARM_SVC_ARISC_AXP_SET_PARAS, max_chgcur, chg_ic_temp, 1);
+	result = invoke_scp_fn_smc(ARM_SVC_ARISC_AXP_SET_PARAS, max_chgcur,
+			chg_ic_temp, 1);
 
 	return result;
 }
@@ -167,7 +172,8 @@ int arisc_set_pwr_tree(u32 *pwr_tree)
 {
 	int result;
 
-	result = invoke_scp_fn_smc(ARM_SVC_ARISC_SET_PWR_TREE, virt_to_phys(pwr_tree), 0, 0);
+	result = invoke_scp_fn_smc(ARM_SVC_ARISC_SET_PWR_TREE,
+			virt_to_phys(pwr_tree), 0, 0);
 
 	return result;
 }
@@ -217,7 +223,8 @@ unsigned int arisc_pmu_get_voltage(u32 type)
 {
 	u32 voltage;
 
-	invoke_scp_fn_smc(ARM_SVC_ARISC_GET_PMU_VOLT, type, virt_to_phys(&voltage), 0);
+	invoke_scp_fn_smc(ARM_SVC_ARISC_GET_PMU_VOLT, type,
+			virt_to_phys(&voltage), 0);
 
 	return voltage;
 }

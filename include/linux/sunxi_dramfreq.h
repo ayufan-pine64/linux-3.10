@@ -21,6 +21,13 @@
 #define MC_WORK_MODE                (0x000)
 #define MC_MDFSCR                   (0x100)
 #define MC_MDFSMRMR                 (0x108)
+#define MDFS_IRQ_STATUS0            (0x114)
+#define MDFS_IRQ_STATUS1            (0x118)
+#define MDFS_IRQ_MASK_STATUS0       (0x11C)
+#define MDFS_IRQ_MASK_STATUS1       (0x120)
+#define MDFS_BWC_PRD                (0x124)
+#define MDFS_MASTER_ENABLE          (0x134)
+#define MDFS_MASTER_STATUS          (0x138)
 
 #define PTR2                        (0x04c)
 #define RFSHTMG                     (0x090)
@@ -32,12 +39,35 @@
 #define CCM_PLL_DDR1_REG            (0x4C)
 #define CCM_DRAM_CFG_REG            (0xF4)
 
+#if defined(CONFIG_ARCH_SUN50I)
 enum DRAM_KEY_MASTER {
 	MASTER_GPU,
 	MASTER_CSI,
 	MASTER_DE,
 	MASTER_MAX,
 };
+
+#elif defined(CONFIG_ARCH_SUN8IW10)
+enum DRAM_KEY_MASTER {
+#ifdef CONFIG_EINK_PANEL_USED
+	MASTER_EINK0,
+	MASTER_EDMA,
+	MASTER_EINK1,
+#else
+	MASTER_DE,
+#endif
+	MASTER_CSI,
+	MASTER_MAX,
+};
+
+#elif defined(CONFIG_ARCH_SUN8IW11)
+enum DRAM_KEY_MASTER {
+	MASTER_GPU,
+	MASTER_CSI,
+	MASTER_DE,
+	MASTER_MAX,
+};
+#endif
 
 enum DRAM_FREQ_LEVEL {
 	LV_0,
@@ -120,10 +150,11 @@ struct sunxi_dramfreq {
 	struct clk *clk_pll_ddr0;
 	struct clk *clk_pll_ddr1;
 
-	int (*governor_state_update)(enum GOVERNOR_STATE);
+	int (*governor_state_update)(char *name, enum GOVERNOR_STATE);
 };
 
 extern struct sunxi_dramfreq *dramfreq;
+extern unsigned long dramfreq_get(void);
 
 #ifdef CONFIG_DEVFREQ_DRAM_FREQ_WITH_SOFT_NOTIFY
 extern int dramfreq_master_access(enum DRAM_KEY_MASTER master, bool access);

@@ -488,7 +488,8 @@ static int ls_init_platform_resource(enum input_sensor_type *ls_type)
 					"ignore firstly !!!!!!!\n", __func__, data->ldo);
 		}
 		regulator_set_voltage(ldo, 3000000, 3000000);
-		regulator_enable(ldo);
+		if (0 != regulator_enable(ldo))
+			pr_err("%s: regulator_enable error!\n", __func__);
 		regulator_put(ldo);
 		usleep_range(10000, 15000);
 	}
@@ -541,7 +542,6 @@ static int ls_fetch_sysconfig_para(enum input_sensor_type *ls_type)
 	return ret;
 
 devicetree_get_item_err:
-	pr_notice("=========script_get_err============\n");
 	ret = -1;
 	return ret;
 
@@ -596,48 +596,39 @@ exit:
  */
 static int motor_fetch_sysconfig_para(enum input_sensor_type *motor_type)
 {
-	script_item_u	val;
-	script_item_value_type_e  type;
 	struct motor_config_info *data = container_of(motor_type,
 					struct motor_config_info, input_type);
+	struct device_node *np = NULL;
+	int ret = -1;
 
-	type = script_get_item("motor_para", "motor_used", &val);
-	if (SCIRPT_ITEM_VALUE_TYPE_INT != type) {
-		pr_err("%s script_parser_fetch \"motor_para\" motor_used = %d\n",
-				__FUNCTION__, val.val);
-		goto script_get_err;
-	}
-	data->motor_used = val.val;
-
-	if(!data->motor_used) {
-		pr_err("%s motor is not used in config\n", __FUNCTION__);
-		goto script_get_err;
+	np = of_find_node_by_name(NULL, "motor_para");
+	if (!np) {
+		pr_err("ERROR! get motor_para failed, func:%s, line:%d\n",
+			__func__, __LINE__);
+		return -1;
 	}
 
-	type = script_get_item("motor_para", "motor_shake", &val);
-	if(SCIRPT_ITEM_VALUE_TYPE_PIO != type) {
-		pr_err("no motor_shake, ignore it!");
+	if (!of_device_is_available(np)) {
+		pr_err("%s: motor_para is not used\n", __func__);
+		return -1;
 	} else {
-		data->motor_gpio = val.gpio;
-		data->vibe_off = val.gpio.data;
-	}
+	     data->motor_used = 1;
+		}
 
-	type = script_get_item("motor_para", "motor_ldo", &val);
-	if (SCIRPT_ITEM_VALUE_TYPE_STR != type)
-		pr_err("no ldo for moto, ignore it\n");
-	else
-		data->ldo = val.str;
+	data->motor_gpio.gpio = of_get_named_gpio_flags(np, "motor_shake", 0,
+				(enum of_gpio_flags *)(&(data->motor_gpio)));
+	if (!gpio_is_valid(data->motor_gpio.gpio))
+		pr_err("%s: motor_shake is invalid\n", __func__);
 
-	type = script_get_item("motor_para", "motor_ldo_voltage", &val);
-	if (SCIRPT_ITEM_VALUE_TYPE_INT != type) {
-		pr_err("no ldo moto voltage config, ignore it\n");
-	} else
-		data->ldo_voltage = val.val;
+	ret = of_property_read_string(np, "motor_ldo", &data->ldo);
+	if (ret)
+		pr_err("get motor_ldo is fail, %d\n", ret);
+
+	ret = of_property_read_u32(np, "motor_ldo_voltage", &data->ldo_voltage);
+	if (ret)
+		pr_err("get motor_ldo_voltage is fail, %d\n", ret);
 
 	return 0;
-script_get_err:
-	pr_notice("=========script_get_err============\n");
-	return -1;
 }
 
 /******************************** MOTOR END ***********************************/
@@ -698,7 +689,8 @@ int input_set_power_enable(enum input_sensor_type *input_type, u32 enable)
 	}
 	if(ldo) {
 		if(enable){ 
-			regulator_enable(ldo);
+			if (0 != regulator_enable(ldo))
+				pr_err("%s: enable ldo error!\n", __func__);
 		} else {
 			if (regulator_is_enabled(ldo))
 				regulator_disable(ldo);		

@@ -1120,6 +1120,7 @@ static int sunxi_i2c_probe(struct platform_device *pdev)
 	struct resource *mem_res = NULL;
 	struct sunxi_i2c_platform_data *pdata = NULL;
 	int ret, irq;
+	unsigned long int_flag = IRQF_DISABLED;
 
 	if (np == NULL) {
 		I2C_ERR("I2C failed to get of node\n");
@@ -1206,7 +1207,14 @@ static int sunxi_i2c_probe(struct platform_device *pdev)
 #endif
 
 	i2c->adap.algo = &sunxi_i2c_algorithm;
-	ret = request_irq(irq, sunxi_i2c_handler, IRQF_DISABLED, i2c->adap.name, i2c);
+
+#ifndef CONFIG_SUNXI_ARISC
+	/* SUNXI_ARISC will only use twi0, enable gic interrupt when suspend */
+	if (0 == i2c->adap.nr)
+		int_flag |= IRQF_NO_SUSPEND;
+#endif
+
+	ret = request_irq(irq, sunxi_i2c_handler, int_flag, i2c->adap.name, i2c);
 	if (ret) {
 		I2C_ERR("[i2c%d] requeset irq failed!\n", i2c->bus_num);
 		goto ereqirq;
@@ -1309,6 +1317,12 @@ static int sunxi_i2c_suspend(struct device *dev)
 	struct sunxi_i2c *i2c = platform_get_drvdata(pdev);
 	int count = 10;
 
+#ifndef CONFIG_SUNXI_ARISC
+	/* SUNXI_ARISC will only use twi0 */
+	if (0 == i2c->adap.nr)
+		return 0;
+#endif
+
 	while ((i2c->status != I2C_XFER_IDLE) && (count-- > 0)) {
 		I2C_ERR("[i2c%d] suspend while xfer,dev addr = 0x%x\n",
 			i2c->adap.nr, i2c->msg? i2c->msg->addr : 0xff);
@@ -1326,7 +1340,7 @@ static int sunxi_i2c_suspend(struct device *dev)
 	twi_select_gpio_state(i2c->pctrl, PINCTRL_STATE_SLEEP, i2c->bus_num);
 	twi_regulator_disable(dev->platform_data);
 
-	I2C_DBG("[i2c%d] suspend okay.. \n", i2c->bus_num);
+	I2C_DBG("[i2c%d] suspend okay..\n", i2c->bus_num);
 #endif
 	return 0;
 }
@@ -1336,6 +1350,12 @@ static int sunxi_i2c_resume(struct device *dev)
 #ifdef CONFIG_EVB_PLATFORM
 	struct platform_device *pdev = to_platform_device(dev);
 	struct sunxi_i2c *i2c = platform_get_drvdata(pdev);
+
+#ifndef CONFIG_SUNXI_ARISC
+	/* SUNXI_ARISC will only use twi0 */
+	if (0 == i2c->adap.nr)
+		return 0;
+#endif
 
 	i2c->suspended = 0;
 
@@ -1349,7 +1369,7 @@ static int sunxi_i2c_resume(struct device *dev)
 
 	twi_soft_reset(i2c->base_addr);
 
-	I2C_DBG("[i2c%d] resume okay.. \n", i2c->bus_num);
+	I2C_DBG("[i2c%d] resume okay..\n", i2c->bus_num);
 #endif
 	return 0;
 }

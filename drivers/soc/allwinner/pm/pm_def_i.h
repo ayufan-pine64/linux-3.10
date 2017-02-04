@@ -10,6 +10,6 @@
  */
 #ifndef IO_ADDRESS
 #define IO_ADDRESS(x)  ((x) + 0xf0000000)
-#endif 
+#endif
 
 #endif /*_PM_DEF_I_H*/

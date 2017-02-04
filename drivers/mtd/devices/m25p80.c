@@ -721,6 +721,9 @@ static const struct spi_device_id m25p_ids[] = {
 	{ "at26df161a", INFO(0x1f4601, 0, 64 * 1024, 32, SECT_4K) },
 	{ "at26df321",  INFO(0x1f4700, 0, 64 * 1024, 64, SECT_4K) },
 
+	/* ISSI */
+	{ "ic25lp064a", INFO(0x9d6017, 0, 64 * 1024, 128, SECT_4K) },
+
 	{ "at45db081d", INFO(0x1f2500, 0, 64 * 1024, 16, SECT_4K) },
 
 	/* EON -- en25xxx */

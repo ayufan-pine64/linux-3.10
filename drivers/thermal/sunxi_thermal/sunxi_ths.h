@@ -2,7 +2,7 @@
 #define SUNXI_THS_H
 
 #define MAX_CHN (4)
-#define THERMAL_DATA_DELAY	(500)
+#define THERMAL_DATA_DELAY	(5000)
 
 #define SUNXI_THS_NAME "sunxi_ths_sensor"
 #define SUNXI_THS_COMBINE_NAME "sunxi_ths_combine_sensor"

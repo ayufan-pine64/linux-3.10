@@ -1,57 +1,88 @@
 /*
- * arch/arm/mach-omap1/include/mach/memory.h
+ * arch/arm/mach-sunxi/include/mach/memory.h
+ *
+ * Copyright(c) 2013-2015 Allwinnertech Co., Ltd.
+ *      http://www.allwinnertech.com
+ *
+ * Author: liugang <liugang@allwinnertech.com>
+ *	   Sugar <shuge@allwinnertech.com>
+ *
+ * sunxi memory header file
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.
  */
 
-#ifndef __ASM_ARCH_MEMORY_H
-#define __ASM_ARCH_MEMORY_H
+#ifndef __SUNXI_MEMORY_H
+#define __SUNXI_MEMORY_H
 
 /*
- * Physical DRAM offset.
+ * About: PLAT_PHYS_OFFSET & PLAT_MEM_SIZE
+ * Here, I just set a default value. You can use the context of subdirectory
+ * to cover it, such as:
+ *	#include "xxx/memory.h"
+ *
  */
-#define PLAT_PHYS_OFFSET		UL(0x10000000)
-
-/*
- * Bus address is physical address, except for OMAP-1510 Local Bus.
- * OMAP-1510 bus address is translated into a Local Bus address if the
- * OMAP bus type is lbus. We do the address translation based on the
- * device overriding the defaults used in the dma-mapping API.
- * Note that the is_lbus_device() test is not very efficient on 1510
- * because of the strncmp().
- */
-#if defined(CONFIG_ARCH_OMAP15XX) && !defined(__ASSEMBLER__)
-#include <mach/soc.h>
-
-/*
- * OMAP-1510 Local Bus address offset
- */
-#define OMAP1510_LB_OFFSET	UL(0x30000000)
-
-#define virt_to_lbus(x)		((x) - PAGE_OFFSET + OMAP1510_LB_OFFSET)
-#define lbus_to_virt(x)		((x) - OMAP1510_LB_OFFSET + PAGE_OFFSET)
-#define is_lbus_device(dev)	(cpu_is_omap15xx() && dev && (strncmp(dev_name(dev), "ohci", 4) == 0))
-
-#define __arch_pfn_to_dma(dev, pfn)	\
-	({ dma_addr_t __dma = __pfn_to_phys(pfn); \
-	   if (is_lbus_device(dev)) \
-		__dma = __dma - PHYS_OFFSET + OMAP1510_LB_OFFSET; \
-	   __dma; })
-
-#define __arch_dma_to_pfn(dev, addr)	\
-	({ dma_addr_t __dma = addr;				\
-	   if (is_lbus_device(dev))				\
-		__dma += PHYS_OFFSET - OMAP1510_LB_OFFSET;	\
-	   __phys_to_pfn(__dma);				\
-	})
-
-#define __arch_dma_to_virt(dev, addr)	({ (void *) (is_lbus_device(dev) ? \
-						lbus_to_virt(addr) : \
-						__phys_to_virt(addr)); })
-
-#define __arch_virt_to_dma(dev, addr)	({ unsigned long __addr = (unsigned long)(addr); \
-					   (dma_addr_t) (is_lbus_device(dev) ? \
-						virt_to_lbus(__addr) : \
-						__virt_to_phys(__addr)); })
-
-#endif	/* CONFIG_ARCH_OMAP15XX */
-
+#if !defined(PLAT_PHYS_OFFSET)
+#define PLAT_PHYS_OFFSET         UL(0x40000000)
 #endif
+
+#if !defined(PLAT_MEM_SIZE)
+#define PLAT_MEM_SIZE            SZ_2G		/* Default memory size */
+#endif
+
+/*
+ * NOTE: CMA reserved area: (CONFIG_CMA_RESERVE_BASE ~ CONFIG_CMA_RESERVE_BASE + CONFIG_CMA_SIZE_MBYTES),
+ *   which is reserved in the function of dma_contiguous_reserve, drivers/base/dma-contiguous.c.
+ *   Please DO NOT conflict with it when you reserved your own areas.
+ *
+ *   We need to restrict CMA area in the front 256M, because VE only support these address.
+ */
+
+
+
+#define __sram	__section(.sram.text)
+#define __sramdata __section(.sram.data)
+
+/* For assembly routines */
+#define __SRAM		.section	".sram.text","ax"
+#define __SRAMDATA	.section	".sram.text","aw"
+
+#ifndef SRAM_DDRFREQ_OFFSET
+#define SRAM_DDRFREQ_OFFSET 0xF0000000
+#endif
+
+#define SUNXI_DDRFREQ_SRAM_SECTION(OFFSET, align) 		\
+	. = ALIGN(align);					\
+	__sram_start = .;					\
+	.sram.text OFFSET : AT(__sram_start) {			\
+		__sram_text_start = .;				\
+		. = ALIGN(align);				\
+		*(.sram.text)					\
+		__sram_text_end = .;				\
+	}							\
+	.sram.data OFFSET + SIZEOF(.sram.text) :		\
+		AT(__sram_start + SIZEOF(.sram.text)) {		\
+		__sram_data_start = .;				\
+		. = ALIGN(align);				\
+		*(.sram.data)					\
+		__sram_data_end = .;				\
+	}							\
+	. = __sram_start + SIZEOF(.sram.text) +			\
+			SIZEOF(.sram.data);			\
+	__sram_end = .;
+
+#define SUNXI_SRAM_SECTION	\
+	SUNXI_DDRFREQ_SRAM_SECTION(SRAM_DDRFREQ_OFFSET, 4)
+
+#endif /* __SUNXI_MEMORY_H */

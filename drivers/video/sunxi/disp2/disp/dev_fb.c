@@ -128,7 +128,9 @@ static int Fb_map_video_memory(struct fb_info *info)
 {
 	info->screen_base = (char __iomem *)disp_malloc(info->fix.smem_len, (u32 *)(&info->fix.smem_start));
 	if (info->screen_base)	{
-		__inf("Fb_map_video_memory(reserve), pa=0x%p size:0x%x\n",(void*)info->fix.smem_start, (unsigned int)info->fix.smem_len);
+		__inf("%s(reserve),va=0x%p, pa=0x%p size:0x%x\n", __func__,
+		    info->screen_base, (void *)info->fix.smem_start,
+		    info->fix.smem_len);
 		memset((void* __force)info->screen_base,0x0,info->fix.smem_len);
 
 		g_fb_addr.fb_paddr = (uintptr_t)info->fix.smem_start;
@@ -146,7 +148,18 @@ static int Fb_map_video_memory(struct fb_info *info)
 
 static inline void Fb_unmap_video_memory(struct fb_info *info)
 {
+	if (!info->screen_base) {
+		__wrn("%s: screen_base is null\n", __func__);
+		return;
+	}
+	__inf("%s: screen_base=0x%p, smem=0x%p, len=0x%x\n", __func__,
+	    info->screen_base, (void *)info->fix.smem_start,
+	    info->fix.smem_len);
 	disp_free((void * __force)info->screen_base, (void*)info->fix.smem_start, info->fix.smem_len);
+	info->screen_base = 0;
+	info->fix.smem_start = 0;
+	g_fb_addr.fb_paddr = 0;
+	g_fb_addr.fb_size = 0;
 }
 
 static void *Fb_map_kernel(unsigned long phys_addr, unsigned long size)
@@ -166,6 +179,29 @@ static void *Fb_map_kernel(unsigned long phys_addr, unsigned long size)
 		*(tmp++) = cur_page++;
 
 	pgprot = pgprot_noncached(PAGE_KERNEL);
+	vaddr = vmap(pages, npages, VM_MAP, pgprot);
+
+	vfree(pages);
+	return vaddr;
+}
+
+static void *Fb_map_kernel_cache(unsigned long phys_addr, unsigned long size)
+{
+	int npages = PAGE_ALIGN(size) / PAGE_SIZE;
+	struct page **pages = vmalloc(sizeof(struct page *) * npages);
+	struct page **tmp = pages;
+	struct page *cur_page = phys_to_page(phys_addr);
+	pgprot_t pgprot;
+	void *vaddr = NULL;
+	int i;
+
+	if (!pages)
+		return NULL;
+
+	for (i = 0; i < npages; i++)
+		*(tmp++) = cur_page++;
+
+	pgprot = PAGE_KERNEL;
 	vaddr = vmap(pages, npages, VM_MAP, pgprot);
 
 	vfree(pages);
@@ -677,7 +713,8 @@ static int vsync_proc(u32 disp)
 	char buf[64];
 	char *envp[2];
 
-	snprintf(buf, sizeof(buf), "VSYNC%d=%llu",disp, ktime_to_ns(g_fbi.vsync_timestamp[disp]));
+	snprintf(buf, sizeof(buf), "VSYNC%d=%llu", disp,
+	    ktime_to_ns(g_fbi.vsync_timestamp[disp]));
 	envp[0] = buf;
 	envp[1] = NULL;
 	kobject_uevent_env(&g_fbi.dev->kobj, KOBJ_CHANGE, envp);
@@ -821,6 +858,57 @@ static int sunxi_fb_ioctl(struct fb_info *info, unsigned int cmd,unsigned long a
 		break;
 	}
 
+	case FBIO_FREE:
+	{
+		int fb_id = 0; /* fb0 */
+		struct fb_info *fbinfo = g_fbi.fbinfo[fb_id];
+
+		if ((!g_fbi.fb_enable[fb_id])
+		    || (fbinfo != info)) {
+			__wrn("%s, fb%d already release ? "
+			    " or fb_info mismatch: fbinfo=0x%p, info=0x%p\n",
+			    __func__, fb_id, fbinfo, info);
+			return -1;
+		}
+
+		__inf("### FBIO_FREE ###\n");
+
+		Fb_unmap_video_memory(fbinfo);
+
+		/* unbound fb0 from layer(1,0)  */
+		g_fbi.layer_hdl[fb_id][0] = 0;
+		g_fbi.layer_hdl[fb_id][1] = 0;
+		g_fbi.fb_mode[fb_id] = 0;
+		g_fbi.fb_enable[fb_id] = 0;
+		break;
+	}
+
+	case FBIO_ALLOC:
+	{
+		int fb_id = 0; /* fb0 */
+		struct fb_info *fbinfo = g_fbi.fbinfo[fb_id];
+
+		if (g_fbi.fb_enable[fb_id]
+		    || (fbinfo != info)) {
+			__wrn("%s, fb%d already enable ?"
+			    " or fb_info mismatch: fbinfo=0x%p, info=0x%p\n",
+			    __func__, fb_id, fbinfo, info);
+			return -1;
+		}
+
+		__inf("### FBIO_ALLOC ###\n");
+
+		/* fb0 bound to layer(1,0)  */
+		g_fbi.layer_hdl[fb_id][0] = 1;
+		g_fbi.layer_hdl[fb_id][1] = 0;
+
+		Fb_map_video_memory(fbinfo);
+
+		g_fbi.fb_mode[fb_id] = g_fbi.fb_para[fb_id].fb_mode;
+		g_fbi.fb_enable[fb_id] = 1;
+		break;
+	}
+
 	default:
 		break;
 	}
@@ -848,6 +936,149 @@ static struct fb_ops dispfb_ops =
 
 };
 
+static int Fb_copy_boot_fb(u32 sel, struct fb_info *info)
+{
+	enum {
+		BOOT_FB_ADDR = 0,
+		BOOT_FB_WIDTH,
+		BOOT_FB_HEIGHT,
+		BOOT_FB_BPP,
+		BOOT_FB_STRIDE,
+		BOOT_FB_CROP_L,
+		BOOT_FB_CROP_T,
+		BOOT_FB_CROP_R,
+		BOOT_FB_CROP_B,
+	};
+
+	char *boot_fb_str = NULL;
+	char *src_phy_addr = NULL;
+	char *src_addr = NULL;
+	char *src_addr_b = NULL;
+	char *src_addr_e = NULL;
+	int src_width = 0;
+	int src_height = 0;
+	int src_bpp = 0;
+	int src_stride = 0;
+	int src_cp_btyes = 0;
+	int src_crop_l = 0;
+	int src_crop_t = 0;
+	int src_crop_r = 0;
+	int src_crop_b = 0;
+
+	char *dst_addr = NULL;
+	int dst_width = 0;
+	int dst_height = 0;
+	int dst_bpp = 0;
+	int dst_stride = 0;
+
+	if (NULL == info) {
+		__wrn("%s,%d: null pointer\n", __func__, __LINE__);
+		return -1;
+	}
+
+	boot_fb_str = (char *)disp_boot_para_parse_str("boot_fb0");
+	if (NULL != boot_fb_str) {
+		int i = 0;
+		char boot_fb[128] = {0};
+		int len = strlen(boot_fb_str);
+		if (sizeof(boot_fb) - 1 < len) {
+			__wrn("need bigger array size[%d] for boot_fb\n", len);
+			return -1;
+		}
+		memcpy((void *)boot_fb, (void *)boot_fb_str, len);
+		boot_fb[len] = '\0';
+		boot_fb_str = boot_fb;
+		for (i = 0;; ++i) {
+			char *p = strstr(boot_fb_str, ",");
+			if (NULL != p)
+				*p = '\0';
+			if (BOOT_FB_ADDR == i) {
+				sscanf(boot_fb_str, "%lx", (long unsigned int *)&src_phy_addr);
+			} else if (BOOT_FB_WIDTH == i) {
+				sscanf(boot_fb_str, "%x", &src_width);
+			} else if (BOOT_FB_HEIGHT == i) {
+				sscanf(boot_fb_str, "%x", &src_height);
+			} else if (BOOT_FB_BPP == i) {
+				sscanf(boot_fb_str, "%x", &src_bpp);
+			} else if (BOOT_FB_STRIDE == i) {
+				sscanf(boot_fb_str, "%x", &src_stride);
+			} else if (BOOT_FB_CROP_L == i) {
+				sscanf(boot_fb_str, "%x", &src_crop_l);
+			} else if (BOOT_FB_CROP_T == i) {
+				sscanf(boot_fb_str, "%x", &src_crop_t);
+			} else if (BOOT_FB_CROP_R == i) {
+				sscanf(boot_fb_str, "%x", &src_crop_r);
+			} else if (BOOT_FB_CROP_B == i) {
+				sscanf(boot_fb_str, "%x", &src_crop_b);
+			} else {
+				break;
+			}
+			if (NULL == p)
+				break;
+			boot_fb_str = p + 1;
+		}
+	} else {
+		__wrn("no boot_fb0\n");
+		return -1;
+	}
+
+	dst_addr = (char *)(info->screen_base);
+	dst_width = info->var.xres;
+	dst_height = info->var.yres;
+	dst_bpp = info->var.bits_per_pixel;
+	dst_stride = info->fix.line_length;
+
+	if ((NULL == src_phy_addr)
+		|| (NULL == dst_addr)
+		|| (0 == src_width)
+		|| (src_width != dst_width)
+		|| (0 == src_height)
+		|| (src_height != dst_height)
+		|| (0 == src_bpp)
+		|| (src_bpp != dst_bpp)
+		|| (0 == src_stride)
+		|| (0 == dst_stride)) {
+		__wrn("wrong para: src[phy_addr=%p,w=%d,h=%d,bpp=%d,stride=%d], "
+			"dst[addr=%p,w=%d,h=%d,bpp=%d,stride=%d]\n",
+			src_phy_addr, src_width, src_height, src_bpp, src_stride,
+			dst_addr, dst_width, dst_height, dst_bpp, dst_stride);
+		return -1;
+	}
+
+	src_addr = (char *)Fb_map_kernel_cache(
+			(unsigned long)src_phy_addr, src_stride * src_height);
+	if (NULL == src_addr) {
+		__wrn("Fb_map_kernel_cache for src_addr failed\n");
+		return -1;
+	}
+
+	if ((0 <= src_crop_l)
+		&& (src_crop_r > src_crop_l)
+		&& (src_crop_r <= src_width)
+		&& (0 <= src_crop_t)
+		&&(src_crop_b > src_crop_t)
+		&&(src_crop_b <= src_height)) {
+		src_addr_b = src_addr + (src_stride * src_crop_t + (src_crop_l * src_bpp >> 3));
+		src_width = src_crop_r - src_crop_l;
+		src_height = src_crop_b - src_crop_t;
+		src_cp_btyes = src_width * src_bpp >> 3;
+		dst_addr += (src_stride * src_crop_t + (src_crop_l * dst_bpp >> 3));
+	} else {
+		src_addr_b = src_addr;
+		src_cp_btyes = src_stride;
+	}
+
+	src_addr_e = src_addr_b + src_stride * src_height;
+	for (; src_addr_b != src_addr_e; src_addr_b += src_stride) {
+		memcpy((void *)dst_addr, (void *)src_addr_b, src_cp_btyes);
+		dst_addr += dst_stride;
+	}
+
+	Fb_unmap_kernel(src_addr);
+
+	return 0;
+}
+
 static int Fb_map_kernel_logo(u32 sel, struct fb_info *info)
 {
 	void *vaddr = NULL;
@@ -868,7 +1099,7 @@ static int Fb_map_kernel_logo(u32 sel, struct fb_info *info)
 	paddr = bootlogo_addr;
 	if (0 == paddr) {
 		__inf("Fb_map_kernel_logo failed!");
-		return -1;
+		return Fb_copy_boot_fb(sel, info);
 	}
 
 	/* parser bmp header */
@@ -1150,6 +1381,29 @@ static s32 fb_parse_bootlogo_base(phys_addr_t *fb_base, int * fb_size)
 	return 0;
 }
 
+unsigned long fb_get_address_info(u32 fb_id, u32 phy_virt_flag)
+{
+	struct fb_info *info = NULL;
+	unsigned long phy_addr = 0;
+	unsigned long virt_addr = 0;
+
+	if (fb_id >= FB_MAX) {
+		return 0;
+	}
+
+	info = g_fbi.fbinfo[fb_id];
+	phy_addr = info->fix.smem_start;
+	virt_addr = (unsigned long)info->screen_base;
+
+	if (0 == phy_virt_flag) {
+		//get virtual address
+		return virt_addr;
+	} else {
+		//get phy address
+		return phy_addr;
+	}
+}
+
 s32 fb_init(struct platform_device *pdev)
 {
 	struct disp_fb_create_info fb_para;
@@ -1249,11 +1503,17 @@ s32 fb_init(struct platform_device *pdev)
 				fb_para.width = g_disp_drv.disp_init.fb_width[i];
 				fb_para.height = g_disp_drv.disp_init.fb_height[i];
 			}
+
 			fb_para.output_width = bsp_disp_get_screen_width_from_output_type(screen_id,
 				    g_disp_drv.disp_init.output_type[screen_id], g_disp_drv.disp_init.output_mode[screen_id]);
 			fb_para.output_height = bsp_disp_get_screen_height_from_output_type(screen_id,
 				    g_disp_drv.disp_init.output_type[screen_id], g_disp_drv.disp_init.output_mode[screen_id]);
 			fb_para.fb_mode = screen_id;
+
+			#if defined(SUPPORT_EINK) && defined(CONFIG_EINK_PANEL_USED)
+			fb_para.output_width = fb_para.width;
+			fb_para.output_height = fb_para.height;
+			#endif
 
 			display_fb_request(i, &fb_para);
 #if defined(CONFIG_DISP2_SUNXI_BOOT_COLORBAR)

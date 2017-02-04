@@ -397,17 +397,12 @@ static struct LCM_setting_table LCM_LT080B21BA94_setting[] = {   //N86 jingjia s
 
 static void LCD_panel_init(u32 sel)
 {
-        printk(KERN_ERR"LCD_panel_init\n");
 	u32 i;
-	script_item_u   val;
-  script_item_value_type_e	type;
-  printk("inet_dsi_panel init\n");
-  type = script_get_item("lcd0","lcd_model_name", &val);
-  if (SCIRPT_ITEM_VALUE_TYPE_STR != type) {  	
-	  printk("fetch lcd_model_name from sys_config failed\n");
-	} else {
-		printk("lcd_model_name = %s\n",val.str);
-	}
+	char lcd_model_name[32];
+	printk("LCD_panel_init\n");
+	printk("inet_dsi_panel init\n");
+	disp_sys_script_get_item("lcd0", "lcd_model_name", (int*)lcd_model_name, 2);
+	printk("lcd_model_name = %s\n",lcd_model_name);
 	
 	sunxi_lcd_dsi_clk_enable(sel);
 	sunxi_lcd_delay_ms(20);
@@ -415,8 +410,8 @@ static void LCD_panel_init(u32 sel)
 	sunxi_lcd_delay_ms(10);
 	
 	for(i=0;;i++)
-	{			
-		if(!strcmp("LT080B21BA94",val.str)) {  
+	{
+		if(!strcmp("LT080B21BA94",lcd_model_name)) {
 			if(LCM_LT080B21BA94_setting[i].count == REGFLAG_END_OF_TABLE)
 				break;
 			else if (LCM_LT080B21BA94_setting[i].count == REGFLAG_DELAY)

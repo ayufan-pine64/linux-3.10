@@ -7,4 +7,3 @@ void standby_delay(int cycle);
 void standby_delay_cycle(int cycle);
 
 #endif /*_MEM_DIVLIBC_H*/
-

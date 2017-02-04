@@ -1126,12 +1126,18 @@ static const struct i2c_device_id bma250_id[] = {
 
 MODULE_DEVICE_TABLE(i2c, bma250_id);
 
+static const struct of_device_id bma250_of_match[] = {
+	{.compatible = "bosch,bma250"},
+	{},
+};
+MODULE_DEVICE_TABLE(of, bma250_of_match);
+
 static struct i2c_driver bma250_driver = {
 	.class = I2C_CLASS_HWMON,
 	.driver = {
 		.owner	= THIS_MODULE,
 		.name	= SENSOR_NAME,
-		.of_match_table = "allwinner,bma250",
+		.of_match_table = bma250_of_match,
 	},
 	.id_table	= bma250_id,
 	.probe		= bma250_probe,

@@ -6,6 +6,13 @@
 
 extern volatile __di_dev_t *di_dev;
 
+__u32 DI_VAtoPA(__u32 va)
+{
+	if((va) > 0x40000000)
+		return (va) - 0x40000000;
+	return (va);
+}
+
 //should initial some registers for memory-to-memory de-interlace used
 __s32 DI_Init(void)
 {
@@ -346,6 +353,7 @@ __s32 DI_Set_Di_Ctrl(__u8 en, __u8 mode, __u8 diagintp_en, __u8 tempdiff_en)
 	di_dev->di_diagintp.bits.th0 = 60;
 	di_dev->di_diagintp.bits.th1 = 0;
 	di_dev->di_diagintp.bits.th3 = 30;
+	di_dev->di_chromadiff.bits.chroma_diff_th = 31;
 #endif
 
 	return 0;

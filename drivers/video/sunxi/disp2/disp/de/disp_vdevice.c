@@ -11,6 +11,9 @@ struct disp_vdevice_private_data {
 	struct disp_vdevice_interface_para intf;
 
 	u32 irq_no;
+	u32                       frame_per_sec;
+	u32                       usec_per_line;
+	u32                       judge_line;
 
 	struct clk *clk;
 	struct clk *clk_parent;
@@ -130,7 +133,47 @@ static s32 vdevice_clk_disable(struct disp_device *vdevice)
 	return 0;
 }
 
-//FIXME
+static s32 vdevice_calc_judge_line(struct disp_device *vdevice)
+{
+	struct disp_vdevice_private_data *vdevicep =
+	    disp_vdevice_get_priv(vdevice);
+	int start_delay, usec_start_delay;
+	int usec_judge_point;
+
+	if ((NULL == vdevice) || (NULL == vdevicep)) {
+		DE_WRN("null  hdl!\n");
+		return DIS_FAIL;
+	}
+
+	/*
+	 * usec_per_line = 1 / fps / vt * 1000000
+	 *               = 1 / (pixel_clk / vt / ht) / vt * 1000000
+	 *               = ht / pixel_clk * 1000000
+	 */
+	vdevicep->frame_per_sec = vdevicep->video_info->pixel_clk
+	    / vdevicep->video_info->hor_total_time
+	    / vdevicep->video_info->ver_total_time
+	    * (vdevicep->video_info->b_interlace + 1)
+	    / (vdevicep->video_info->trd_mode + 1);
+	vdevicep->usec_per_line = vdevicep->video_info->hor_total_time
+	    * 1000000 / vdevicep->video_info->pixel_clk;
+
+	start_delay =
+	    disp_al_device_get_start_delay(vdevice->hwdev_index);
+	usec_start_delay = start_delay * vdevicep->usec_per_line;
+
+	if (usec_start_delay <= 200)
+		usec_judge_point = usec_start_delay * 3 / 7;
+	else if (usec_start_delay <= 400)
+		usec_judge_point = usec_start_delay / 2;
+	else
+		usec_judge_point = 200;
+	vdevicep->judge_line = usec_judge_point
+	    / vdevicep->usec_per_line;
+
+	return 0;
+}
+
 extern void sync_event_proc(u32 disp, bool timeout);
 #if defined(__LINUX_PLAT__)
 static s32 disp_vdevice_event_proc(int irq, void *parg)
@@ -139,26 +182,30 @@ static s32 disp_vdevice_event_proc(void *parg)
 #endif
 {
 	struct disp_device *vdevice = (struct disp_device*)parg;
+	struct disp_vdevice_private_data *vdevicep = NULL;
 	struct disp_manager *mgr = NULL;
-	u32 disp;
+	u32 hwdev_index;
 
 	if (NULL == vdevice)
 		return DISP_IRQ_RETURN;
+	vdevicep = disp_vdevice_get_priv(vdevice);
+	if (NULL == vdevicep)
+		return DISP_IRQ_RETURN;
 
-	disp = vdevice->disp;
+	hwdev_index = vdevice->hwdev_index;
 
-	if (disp_al_device_query_irq(disp)) {
-		int cur_line = disp_al_device_get_cur_line(disp);
-		int start_delay = disp_al_device_get_start_delay(disp);
+	if (disp_al_device_query_irq(hwdev_index)) {
+		int cur_line = disp_al_device_get_cur_line(hwdev_index);
+		int start_delay = disp_al_device_get_start_delay(hwdev_index);
 
 		mgr = vdevice->manager;
 		if (NULL == mgr)
 			return DISP_IRQ_RETURN;
 
-		if (cur_line <= (start_delay-4)) {
+		if (cur_line <= (start_delay - vdevicep->judge_line)) {
 			sync_event_proc(mgr->disp, false);
 		} else {
-			sync_event_proc(mgr->disp, false);
+			sync_event_proc(mgr->disp, true);
 		}
 	}
 
@@ -252,6 +299,7 @@ static s32 disp_vdevice_sw_enable(struct disp_device* vdevice)
 
 	mutex_lock(&vdevicep->mlock);
 	memcpy(&vdevice->timings, vdevicep->video_info, sizeof(struct disp_video_timings));
+	vdevice_calc_judge_line(vdevice);
 	if (mgr->sw_enable)
 		mgr->sw_enable(mgr);
 
@@ -464,6 +512,8 @@ static s32 disp_vdevice_tcon_enable(struct disp_device* vdevice)
 	vdevicep->func.get_interface_para((void*)&(vdevicep->intf));
 
 	memcpy(&vdevice->timings, vdevicep->video_info, sizeof(struct disp_video_timings));
+
+	vdevice_calc_judge_line(vdevice);
 	if (mgr->enable)
 		mgr->enable(mgr);
 
@@ -542,6 +592,7 @@ static s32 disp_vdevice_tcon_simple_enable(struct disp_device* vdevice)
 
 	memcpy(&vdevice->timings, vdevicep->video_info, sizeof(struct disp_video_timings));
 
+	vdevice_calc_judge_line(vdevice);
 	disp_al_vdevice_cfg(vdevice->disp, &vdevice->timings, &vdevicep->intf);
 	disp_al_vdevice_enable(vdevice->disp);
 
@@ -568,10 +619,32 @@ static s32 disp_vdevice_tcon_simple_disable(struct disp_device* vdevice)
 	return 0;
 }
 
+static s32 disp_vdevice_get_fps(struct disp_device *vdevice)
+{
+	struct disp_vdevice_private_data *vdevicep =
+	    disp_vdevice_get_priv(vdevice);
+
+	if ((NULL == vdevice) || (NULL == vdevicep)) {
+		DE_WRN("null  hdl!\n");
+		return 0;
+	}
+
+	return vdevicep->frame_per_sec;
+}
+
 struct disp_device* disp_vdevice_register(struct disp_vdevice_init_data *data)
 {
 	struct disp_device *vdevice;
 	struct disp_vdevice_private_data *vdevicep;
+
+	/* Take care about this, using data->disp to query output_types support may be wrong,
+	 * Cause timing controller which support lcd may not row in front.
+	 * For example: tcon0(support hdmi), tcon1(support lcd)
+	 */
+	if (!bsp_disp_feat_is_supported_output_types(data->disp, DISP_OUTPUT_TYPE_LCD)) {
+		DE_WRN("device %d not support vdevice!\n", data->disp);
+		return NULL;
+	}
 
 	vdevice = (struct disp_device *)kmalloc(sizeof(struct disp_device), GFP_KERNEL | __GFP_ZERO);
 	if (NULL == vdevice) {
@@ -592,6 +665,7 @@ struct disp_device* disp_vdevice_register(struct disp_vdevice_init_data *data)
 	memset(vdevice, 0, sizeof(struct disp_device));
 	memcpy(&vdevice->name, data->name, 32);
 	vdevice->disp = data->disp;
+	vdevice->hwdev_index = data->disp;
 	vdevice->fix_timing = data->fix_timing;
 	vdevice->type = data->type;
 	memcpy(&vdevicep->func, &data->func, sizeof(struct disp_device_func));
@@ -620,6 +694,7 @@ struct disp_device* disp_vdevice_register(struct disp_vdevice_init_data *data)
 	vdevice->suspend = disp_vdevice_suspend;
 	vdevice->resume = disp_vdevice_resume;
 	vdevice->detect = disp_vdevice_detect;
+	vdevice->get_fps = disp_vdevice_get_fps;
 
 	vdevice->priv_data = (void*)vdevicep;
 	vdevice->init(vdevice);

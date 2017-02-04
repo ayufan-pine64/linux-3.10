@@ -24,6 +24,11 @@ KBUILD_DEFCONFIG := defconfig
 
 KBUILD_CFLAGS	+= -mgeneral-regs-only
 KBUILD_CFLAGS	+= -fno-pic
+
+ifeq ($(CONFIG_CC_STACKPROTECTOR),y)
+KBUILD_CFLAGS	+=-fstack-protector
+endif
+
 ifeq ($(CONFIG_CPU_BIG_ENDIAN), y)
 KBUILD_CPPFLAGS	+= -mbig-endian
 AS		+= -EB

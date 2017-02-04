@@ -13,6 +13,11 @@
 #include <media/rc-map.h>
 #include "sunxi-ir-rx.h"
 
+#define MAX_ADDR_NUM (18)
+
+static u32 match_addr[MAX_ADDR_NUM];
+static u32 match_num;
+
 static struct rc_map_table sunxi_nec_scan[] = {
 	{ 0x00, 0xff },
 	{ 0x01, 0x01 },
@@ -272,28 +277,46 @@ static struct rc_map_table sunxi_nec_scan[] = {
 	{ 0xFF, 0xFF },
 };
 
+static u32 sunxi_key_mapping(u32 code)
+{
+	u32 i,temp;
+    u32 keycode;
+	temp = (code >> 8)&0xffff;
+	for(i = 0; i < match_num; i++){
+        if(match_addr[i] == temp) {
+            keycode = code & 0xff;
+            return keycode == 0 ? 0xff : keycode;
+        }
+	}
+
+	return KEY_RESERVED;
+}
+
 static struct rc_map_list sunxi_map = {
 	.map = {
 		.scan    = sunxi_nec_scan,
 		.size    = ARRAY_SIZE(sunxi_nec_scan),
+		.mapping = sunxi_key_mapping,
 		.rc_type = RC_TYPE_NEC,	/* Legacy IR type */
 		.name    = RC_MAP_SUNXI,
 	}
 };
 
-static void init_addr(u32 addr)
+static void init_addr(u32 *addr, u32 addr_num)
 {
-	u32 i = 0;
-	u32 add_mask = (addr & 0xffff)<<8;
-	for(i = 0; i < ARRAY_SIZE(sunxi_nec_scan); i++){
-		sunxi_nec_scan[i].scancode |= add_mask;
+	u32 *temp_addr = match_addr;
+	if(addr_num > MAX_ADDR_NUM)
+		addr_num = MAX_ADDR_NUM;
+	match_num = addr_num;
+	while(addr_num--){
+		*temp_addr++ = (*addr++)&0xffff;
 	}
 	return;
 }
 
-int init_rc_map_sunxi(u32 addr)
+int init_rc_map_sunxi(u32 *addr, u32 addr_num)
 {
-	init_addr(addr);
+	init_addr(addr,addr_num);
 	return rc_map_register(&sunxi_map);
 }
 

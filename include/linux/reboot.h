@@ -13,6 +13,9 @@
 enum reboot_mode {
 	REBOOT_COLD = 0,
 	REBOOT_WARM,
+	REBOOT_HARD,
+	REBOOT_SOFT,
+	REBOOT_GPIO,
 };
 
 extern int register_reboot_notifier(struct notifier_block *);
@@ -31,7 +34,7 @@ extern void machine_shutdown(void);
 struct pt_regs;
 extern void machine_crash_shutdown(struct pt_regs *);
 
-/* 
+/*
  * Architecture independent implemenations of sys_reboot commands.
  */
 

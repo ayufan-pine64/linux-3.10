@@ -18,7 +18,7 @@ struct sunxi_lcd_drv
   struct sunxi_disp_source_ops      src_ops;
 };
 
-#if !defined(SUPPORT_DSI)
+#ifndef SUPPORT_DSI
 typedef enum
 {
 	DSI_DCS_ENTER_IDLE_MODE                         =       0x39 ,                  //01
@@ -66,5 +66,17 @@ typedef enum
 
 extern int sunxi_disp_get_source_ops(struct sunxi_disp_source_ops *src_ops);
 int lcd_init(void);
+
+extern __lcd_panel_t default_eink;
+extern __lcd_panel_t default_panel;
+extern __lcd_panel_t lt070me05000_panel;
+extern __lcd_panel_t wtq05027d01_panel;
+extern __lcd_panel_t t27p06_panel;
+extern __lcd_panel_t dx0960be40a1_panel;
+extern __lcd_panel_t tft720x1280_panel;
+extern __lcd_panel_t S6D7AA0X01_panel;
+extern __lcd_panel_t inet_dsi_panel;
+extern __lcd_panel_t gg1p4062utsw_panel;
+extern __lcd_panel_t mb709_mipi_panel;
 
 #endif

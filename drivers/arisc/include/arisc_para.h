@@ -66,7 +66,11 @@ typedef struct arisc_cfg
 	struct core_cfg core;
 	struct dram_cfg dram;
 	struct dev_cfg suart;
+#if defined CONFIG_ARCH_SUN50IW2P1
+	struct dev_cfg stwi;
+#else
 	struct dev_cfg srsb;
+#endif
 	struct dev_cfg sjtag;
 	u32 power_regu_tree[VCC_MAX_INDEX];
 } arisc_cfg_t;

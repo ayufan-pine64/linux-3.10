@@ -217,7 +217,8 @@ static void adcdrc_config(struct snd_soc_codec *codec)
 
 static void adchpf_config(struct snd_soc_codec *codec)
 {
-
+	snd_soc_update_bits(codec, SUNXI_AC_DAPHHPFC, (0x7ff<<HPF_H_COEFFICIENT_SET), (0xff << HPF_H_COEFFICIENT_SET));
+	snd_soc_update_bits(codec, SUNXI_AC_DAPLHPFC, (0xffff<<HPF_L_COEFFICIENT_SET), (0xfac1 << HPF_L_COEFFICIENT_SET));
 }
 
 static void dacdrc_config(struct snd_soc_codec *codec)
@@ -229,38 +230,50 @@ static void dachpf_config(struct snd_soc_codec *codec)
 
 }
 
-static void adcdrc_enable(struct snd_soc_codec *codec,bool on)
+static void adcdrc_enable(struct snd_soc_codec *codec, bool on)
 {
 	if (on) {
 	} else {
 	}
 }
 
-static void dacdrc_enable(struct snd_soc_codec *codec,bool on)
+static void dacdrc_enable(struct snd_soc_codec *codec, bool on)
 {
 	if (on) {
 	} else {
 	}
 }
 
-static void adcagc_enable(struct snd_soc_codec *codec,bool on)
+static void adcagc_enable(struct snd_soc_codec *codec, bool on)
 {
 	if (on) {
 	} else {
 	}
 }
 
-static void dachpf_enable(struct snd_soc_codec *codec,bool on)
+static void dachpf_enable(struct snd_soc_codec *codec, bool on)
 {
 	if (on) {
 	} else {
 	}
 }
 
-static void adchpf_enable(struct snd_soc_codec *codec,bool on)
+static void adchpf_enable(struct snd_soc_codec *codec, bool on)
 {
 	if (on) {
+		snd_soc_update_bits(codec, SUNXI_MOD_CLK_ENA, (0x1<<HPF_AGC_MOD_CLK_EN), (0x01 << HPF_AGC_MOD_CLK_EN));
+		snd_soc_update_bits(codec, SUNXI_MOD_RST_CTL, (0x1<<HPF_AGC_MOD_RST_CTL), (0x01 << HPF_AGC_MOD_RST_CTL));
+		snd_soc_update_bits(codec, SUNXI_AC_ADC_DAPLCTRL, (0x1<<LEFT_HPF_EN), (0x01 << LEFT_HPF_EN));
+		snd_soc_update_bits(codec, SUNXI_AC_ADC_DAPRCTRL, (0x1<<RIGHT_HPF_EN), (0x01 << RIGHT_HPF_EN));
+		snd_soc_update_bits(codec, SUNXI_AGC_ENA, (0x1<<ADCL_AGC_ENA), (0x01 << ADCL_AGC_ENA));
+		snd_soc_update_bits(codec, SUNXI_AGC_ENA, (0x1<<ADCR_AGC_ENA), (0x01 << ADCR_AGC_ENA));
 	} else {
+		snd_soc_update_bits(codec, SUNXI_MOD_CLK_ENA, (0x1<<HPF_AGC_MOD_CLK_EN), (0x0 << HPF_AGC_MOD_CLK_EN));
+		snd_soc_update_bits(codec, SUNXI_MOD_RST_CTL, (0x1<<HPF_AGC_MOD_RST_CTL), (0x0 << HPF_AGC_MOD_RST_CTL));
+		snd_soc_update_bits(codec, SUNXI_AC_ADC_DAPLCTRL, (0x1<<LEFT_HPF_EN), (0x01 << LEFT_HPF_EN));
+		snd_soc_update_bits(codec, SUNXI_AC_ADC_DAPRCTRL, (0x1<<RIGHT_HPF_EN), (0x00 << RIGHT_HPF_EN));
+		snd_soc_update_bits(codec, SUNXI_AGC_ENA, (0x1<<ADCL_AGC_ENA), (0x00 << ADCL_AGC_ENA));
+		snd_soc_update_bits(codec, SUNXI_AGC_ENA, (0x1<<ADCR_AGC_ENA), (0x00 << ADCR_AGC_ENA));
 	}
 }
 
@@ -277,6 +290,9 @@ static int codec_init(struct sunxi_codec *sunxi_internal_codec)
 	snd_soc_update_bits(sunxi_internal_codec->codec, EARPIECE_CTRL1, (0x1f<<ESP_VOL), (sunxi_internal_codec->gain_config.earpiecevol<<ESP_VOL));
 	snd_soc_update_bits(sunxi_internal_codec->codec, MIC1_CTRL, (0x7<<MIC1BOOST), (sunxi_internal_codec->gain_config.maingain<<MIC1BOOST));
 	snd_soc_update_bits(sunxi_internal_codec->codec, MIC2_CTRL, (0x7<<MIC2BOOST), (sunxi_internal_codec->gain_config.headsetmicgain<<MIC2BOOST));
+
+	if (sunxi_internal_codec->hp_en)
+		clk_prepare_enable(sunxi_internal_codec->hp_en);
 
 	if (sunxi_internal_codec->hwconfig.adcagc_cfg)
 		adcagc_config(sunxi_internal_codec->codec);
@@ -574,13 +590,13 @@ static int ac_headphone_event(struct snd_soc_dapm_widget *w,
 	case SND_SOC_DAPM_POST_PMU:
 		/*open*/
 		//snd_soc_update_bits(codec, HP_PA_CTRL, (0xf<<HPOUTPUTENABLE), (0xf<<HPOUTPUTENABLE));
-		snd_soc_update_bits(codec, HP_CTRL, (0x1<<HPPA_EN), (0x1<<HPPA_EN));
+		//snd_soc_update_bits(codec, HP_CTRL, (0x1<<HPPA_EN), (0x1<<HPPA_EN));
 		msleep(10);
 		snd_soc_update_bits(codec, MIX_DAC_CTRL, (0x3<<LHPPAMUTE), (0x3<<LHPPAMUTE));
 		break;
 	case SND_SOC_DAPM_PRE_PMD:
 		/*close*/
-		snd_soc_update_bits(codec, HP_CTRL, (0x1<<HPPA_EN), (0x0<<HPPA_EN));
+		//snd_soc_update_bits(codec, HP_CTRL, (0x1<<HPPA_EN), (0x0<<HPPA_EN));
 		//snd_soc_update_bits(codec, HP_PA_CTRL, (0xf<<HPOUTPUTENABLE), (0x0<<HPOUTPUTENABLE));
 		snd_soc_update_bits(codec, MIX_DAC_CTRL, (0x3<<LHPPAMUTE), (0x0<<LHPPAMUTE));
 		break;
@@ -2230,7 +2246,7 @@ static const struct of_device_id sunxi_codec_of_match[] = {
 	{},
 };
 
-static int __init sunxi_internal_codec_probe(struct platform_device *pdev)
+static int sunxi_internal_codec_probe(struct platform_device *pdev)
 {
 	s32 ret = 0;
 	u32 temp_val;
@@ -2260,7 +2276,7 @@ static int __init sunxi_internal_codec_probe(struct platform_device *pdev)
 
 	/*voltage*/
 	sunxi_internal_codec->vol_supply.cpvdd =  regulator_get(NULL, "vcc-cpvdd");
-	if (!sunxi_internal_codec->vol_supply.cpvdd) {
+	if (IS_ERR(sunxi_internal_codec->vol_supply.cpvdd)) {
 		pr_err("get audio cpvdd failed\n");
 		ret = -EFAULT;
 		goto err1;
@@ -2273,7 +2289,7 @@ static int __init sunxi_internal_codec_probe(struct platform_device *pdev)
 	}
 
 	sunxi_internal_codec->vol_supply.avcc = regulator_get(NULL, "vcc-avcc");
-	if (!sunxi_internal_codec->vol_supply.avcc) {
+	if (IS_ERR(sunxi_internal_codec->vol_supply.avcc)) {
 		pr_err("[%s]:get audio avcc failed\n",__func__);
 		ret = -EFAULT;
 		goto err1;
@@ -2303,6 +2319,12 @@ static int __init sunxi_internal_codec_probe(struct platform_device *pdev)
 	if (IS_ERR(sunxi_internal_codec->srcclk)){
 		dev_err(&pdev->dev, "[audio-codec]Can't get src clocks\n");
 		ret = PTR_ERR(sunxi_internal_codec->srcclk);
+		goto err1;
+	}
+	sunxi_internal_codec->hp_en = of_clk_get(node,1);
+	if (IS_ERR(sunxi_internal_codec->hp_en)){
+		dev_err(&pdev->dev, "[audio-codec]Can't get hp_en clocks\n");
+		ret = PTR_ERR(sunxi_internal_codec->hp_en);
 		goto err1;
 	}
 	/*initial speaker gpio */
@@ -2519,9 +2541,11 @@ static void sunxi_internal_codec_shutdown(struct platform_device *pdev)
 {
 	struct sunxi_codec * sunxi_internal_codec = dev_get_drvdata(&pdev->dev);
 
-	snd_soc_update_bits(sunxi_internal_codec->codec, HP_CTRL, (0x1<<HPPA_EN), (0x0<<HPPA_EN));
+//	snd_soc_update_bits(sunxi_internal_codec->codec, HP_CTRL, (0x1<<HPPA_EN), (0x0<<HPPA_EN));
 	snd_soc_update_bits(sunxi_internal_codec->codec, MIX_DAC_CTRL, (0x3<<LHPPAMUTE), (0x0<<LHPPAMUTE));
 	snd_soc_update_bits(sunxi_internal_codec->codec, JACK_MIC_CTRL, (0x1<<HMICBIASEN), (0x0<<HMICBIASEN));
+	if (sunxi_internal_codec->hp_en)
+		clk_disable_unprepare(sunxi_internal_codec->hp_en);
 	if (spk_gpio.cfg)
 		gpio_set_value(spk_gpio.gpio, 0);
 }

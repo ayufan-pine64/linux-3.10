@@ -70,30 +70,30 @@ static int __sunxi_clk_periph_enable_shared(struct sunxi_clk_periph *periph)
 	unsigned long reg;
 	struct sunxi_clk_periph_gate *gate = &periph->gate;
 
-	if(!periph->com_gate->val)
-	{
+	if (!periph->com_gate->val) {
 		/* de-assert module */
-		if(gate->reset && !(periph->flags & CLK_IGNORE_AUTORESET) && IS_SHARE_RST_GATE(periph)) {
+		if (gate->reset && !(periph->flags & CLK_IGNORE_AUTORESET)
+				&& IS_SHARE_RST_GATE(periph)) {
 			reg = periph_readl(periph,gate->reset);
 			reg = SET_BITS(gate->rst_shift, 1, reg, 1);
 			periph_writel(periph,reg, gate->reset);
 		}
 		/* enable bus gating */
-		if(gate->bus && IS_SHARE_BUS_GATE(periph)) {
-			reg = periph_readl(periph,gate->bus);
+		if (gate->bus && IS_SHARE_BUS_GATE(periph)) {
+			reg = periph_readl(periph, gate->bus);
 			reg = SET_BITS(gate->bus_shift, 1, reg, 1);
-			periph_writel(periph,reg, gate->bus);
+			periph_writel(periph, reg, gate->bus);
 		}
 
 		/* enable module gating */
-		if(gate->enable&& IS_SHARE_MOD_GATE(periph)) {
+		if (gate->enable && IS_SHARE_MOD_GATE(periph)) {
 			reg = periph_readl(periph,gate->enable);
 			reg = SET_BITS(gate->enb_shift, 1, reg, 1);
 			periph_writel(periph,reg, gate->enable);
 		}
 
 		/* enable dram gating */
-		if(gate->dram&& IS_SHARE_MBUS_GATE(periph)) {
+		if (gate->dram && IS_SHARE_MBUS_GATE(periph)) {
 			reg = periph_readl(periph,gate->dram);
 			reg = SET_BITS(gate->ddr_shift, 1, reg, 1);
 			periph_writel(periph,reg, gate->dram);
@@ -556,36 +556,58 @@ static const struct clk_ops sunxi_clk_periph_ops = {
 	.enable = sunxi_clk_periph_enable,
 	.disable = sunxi_clk_periph_disable,
 };
+
 void sunxi_clk_get_periph_ops(struct clk_ops* ops)
 {
 	memcpy(ops,&sunxi_clk_periph_ops,sizeof(sunxi_clk_periph_ops));
 }
 
-struct clk *sunxi_clk_register_periph(const char *name,
-			const char **parent_names, int num_parents,unsigned long flags,
-			void __iomem  *base, struct sunxi_clk_periph *periph)
+struct clk *sunxi_clk_register_periph(struct periph_init_data *pd,
+					void __iomem  *base)
 {
 	struct clk *clk;
 	struct clk_init_data init;
+	struct sunxi_clk_periph *periph;
+
+	BUG_ON((pd == NULL) && (pd->periph == NULL));
+
 #ifdef __SUNXI_ALL_CLK_IGNORE_UNUSED__
-		flags |= CLK_IGNORE_UNUSED;
+	pd->flags |= CLK_IGNORE_UNUSED;
 #endif
-	init.name = name;
-	init.ops = periph->priv_clkops?periph->priv_clkops:&sunxi_clk_periph_ops;
-	init.flags = flags;
-	init.parent_names = parent_names;
-	init.num_parents = num_parents;
+
+	periph = pd->periph;
+	init.name = pd->name;
+
+	init.ops = periph->priv_clkops
+			? periph->priv_clkops
+			: (&sunxi_clk_periph_ops);
+
+	init.flags = pd->flags;
+	init.parent_names = pd->parent_names;
+	init.num_parents = pd->num_parents;
 
 	/* Data in .init is copied by clk_register(), so stack variable OK */
 	periph->hw.init = &init;
 	periph->flags = init.flags;
+
 	/* fix registers */
-	periph->mux.reg = periph->mux.reg ? (base + (unsigned long __force)periph->mux.reg) : NULL;
-	periph->divider.reg = periph->divider.reg ? (base + (unsigned long __force)periph->divider.reg) : NULL;
-	periph->gate.enable = periph->gate.enable ? (base + (unsigned long __force)periph->gate.enable) : NULL;
-	periph->gate.reset = periph->gate.reset ? (base + (unsigned long __force)periph->gate.reset) : NULL;
-	periph->gate.bus = periph->gate.bus ? (base + (unsigned long __force)periph->gate.bus) : NULL;
-	periph->gate.dram = periph->gate.dram ? (base + (unsigned long __force)periph->gate.dram) : NULL;
+	periph->mux.reg = periph->mux.reg ? (base
+			+ (unsigned long __force)periph->mux.reg) : NULL;
+
+	periph->divider.reg = periph->divider.reg ? (base
+			+ (unsigned long __force)periph->divider.reg) : NULL;
+
+	periph->gate.enable = periph->gate.enable ? (base
+			+ (unsigned long __force)periph->gate.enable) : NULL;
+
+	periph->gate.reset = periph->gate.reset ? (base
+			+ (unsigned long __force)periph->gate.reset) : NULL;
+
+	periph->gate.bus = periph->gate.bus ? (base
+			+ (unsigned long __force)periph->gate.bus) : NULL;
+
+	periph->gate.dram = periph->gate.dram ? (base
+			+ (unsigned long __force)periph->gate.dram) : NULL;
 
 	clk = clk_register(NULL, &periph->hw);
 	if (IS_ERR(clk))

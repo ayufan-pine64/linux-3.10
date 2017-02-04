@@ -23,65 +23,78 @@
 
 #if defined CONFIG_ARCH_SUN8IW1P1
 #include "mem_ccmu-sun8iw1p1.h"
-struct ccm_state{
-	__ccmu_reg_list_t	*ccm_reg;
-	__ccmu_reg_list_t	ccm_reg_backup;
-	
+struct ccm_state {
+	__ccmu_reg_list_t *ccm_reg;
+	__ccmu_reg_list_t ccm_reg_backup;
+
 };
 #elif defined CONFIG_ARCH_SUN8IW3P1
 #include "mem_ccmu-sun8iw3p1.h"
-struct ccm_state{
-	__ccmu_reg_list_t	*ccm_reg;
-	__ccmu_reg_list_t	ccm_reg_backup;
-	
+struct ccm_state {
+	__ccmu_reg_list_t *ccm_reg;
+	__ccmu_reg_list_t ccm_reg_backup;
+
 };
 #elif defined CONFIG_ARCH_SUN8IW5P1
 #include "mem_ccmu-sun8iw5p1.h"
-struct ccm_state{
-	__ccmu_reg_list_t	*ccm_reg;
-	__ccmu_reg_list_t	ccm_reg_backup;
-	
+struct ccm_state {
+	__ccmu_reg_list_t *ccm_reg;
+	__ccmu_reg_list_t ccm_reg_backup;
+
 };
 #elif defined CONFIG_ARCH_SUN8IW6P1
 #include "mem_ccmu-sun8iw6p1.h"
-struct ccm_state{
-	__ccmu_reg_list_t	*ccm_reg;
-	__ccmu_reg_list_t	ccm_reg_backup;
-	
+struct ccm_state {
+	__ccmu_reg_list_t *ccm_reg;
+	__ccmu_reg_list_t ccm_reg_backup;
+
 };
 #elif defined CONFIG_ARCH_SUN9IW1P1
 #include "mem_ccmu-sun9iw1p1.h"
-struct ccm_state{
-	__ccmu_reg_list_t		*ccm_reg;
-	__ccmu_reg_list_t		ccm_reg_backup;
-	__ccmu_mod_reg_list_t		*ccm_mod_reg;
-	__ccmu_mod_reg_list_t		ccm_mod_reg_backup;
-	
+struct ccm_state {
+	__ccmu_reg_list_t *ccm_reg;
+	__ccmu_reg_list_t ccm_reg_backup;
+	__ccmu_mod_reg_list_t *ccm_mod_reg;
+	__ccmu_mod_reg_list_t ccm_mod_reg_backup;
+
 };
 #elif defined CONFIG_ARCH_SUN8IW8P1
 #include "mem_ccmu-sun8iw8p1.h"
-struct ccm_state{
-	__ccmu_reg_list_t	*ccm_reg;
-	__ccmu_reg_list_t	ccm_reg_backup;
+struct ccm_state {
+	__ccmu_reg_list_t *ccm_reg;
+	__ccmu_reg_list_t ccm_reg_backup;
 
 };
 #elif defined CONFIG_ARCH_SUN8IW10P1
 #include "mem_ccmu-sun8iw10p1.h"
-struct ccm_state{
-	__ccmu_reg_list_t	*ccm_reg;
-	__ccmu_reg_list_t	ccm_reg_backup;
+struct ccm_state {
+	__ccmu_reg_list_t *ccm_reg;
+	__ccmu_reg_list_t ccm_reg_backup;
+
+};
+#elif defined CONFIG_ARCH_SUN8IW11P1
+#include "mem_ccmu-sun8iw11p1.h"
+struct ccm_state {
+	__ccmu_reg_list_t *ccm_reg;
+	__ccmu_reg_list_t ccm_reg_backup;
 
 };
 #elif defined CONFIG_ARCH_SUN50IW1P1
 #include "mem_ccmu-sun50iw1p1.h"
-struct ccm_state{
-	__ccmu_reg_list_t	*ccm_reg;
-	__ccmu_reg_list_t	ccm_reg_backup;
+struct ccm_state {
+	__ccmu_reg_list_t *ccm_reg;
+	__ccmu_reg_list_t ccm_reg_backup;
+
+};
+#elif defined CONFIG_ARCH_SUN50IW2P1
+#include "mem_ccmu-sun50iw2p1.h"
+struct ccm_state {
+	__ccmu_reg_list_t *ccm_reg;
+	__ccmu_reg_list_t ccm_reg_backup;
 
 };
 #else
 #error "please select a platform\n"
 #endif
 
-#endif  // #ifndef __MEM_CCMU_H__
-
+#endif				/* #ifndef __MEM_CCMU_H__ */

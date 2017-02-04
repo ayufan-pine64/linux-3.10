@@ -1,3 +1,1 @@
-ifneq ($(strip $(CONFIG_ARCH_SUNXI)),)
-obj-$(CONFIG_PM) += allwinner/
-endif
+obj-$(CONFIG_ARCH_SUNXI) += allwinner/

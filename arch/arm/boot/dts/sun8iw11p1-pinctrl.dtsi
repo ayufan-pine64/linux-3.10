@@ -7,7 +7,7 @@
 		pio: pinctrl@01c20800 {
 			compatible = "allwinner,sun8iw11p1-pinctrl";
 			reg = <0x0 0x01c20800 0x0 0x400>;
-			interrupts = <GIC_SPI 2 IRQ_TYPE_LEVEL_HIGH>;		/* gpio is IRQ34 on fpga (conflict with twi0) */
+			interrupts = <GIC_SPI 28 IRQ_TYPE_LEVEL_HIGH>;
 			device_type = "pio";
 			clocks = <&clk_pio>;
 			gpio-controller;
@@ -19,22 +19,39 @@
 			vdevice_pins_a: vdevice@0 {
 				allwinner,pins = "PB0", "PB1";
 				allwinner,function = "vdevice";
-				allwinner,muxsel = <3>;
+				allwinner,muxsel = <4>;
 				allwinner,drive = <1>;
+				allwinner,pull = <1>;
+				allwinner,data = <1>;
+			};
+
+			ir0_pins_a: ir0@0 {
+				allwinner,pins = "PB4";
+				allwinner,function = "ir0";
+				allwinner,muxsel = <2>;
+				allwinner,drive = <2>;
+				allwinner,pull = <1>;
+			};
+
+			ir1_pins_a: ir1@0 {
+				allwinner,pins = "PB23";
+				allwinner,function = "ir1";
+				allwinner,muxsel = <3>;
+				allwinner,drive = <2>;
 				allwinner,pull = <1>;
 			};
 
 			uart0_pins_a: uart0@0 {
-				allwinner,pins = "PF2", "PF4";
+				allwinner,pins = "PB22", "PB23";
 				allwinner,pname = "uart0_tx", "uart0_rx";
 				allwinner,function = "uart0";
-				allwinner,muxsel = <4>;
+				allwinner,muxsel = <2>;
 				allwinner,drive = <1>;
 				allwinner,pull = <1>;
 			};
 
 			uart0_pins_b: uart0@1 {
-				allwinner,pins = "PF2", "PF4";
+				allwinner,pins = "PB22", "PB23";
 				allwinner,function = "io_disabled";
 				allwinner,muxsel = <7>;
 				allwinner,drive = <1>;
@@ -59,7 +76,7 @@
 			};
 
 			uart2_pins_a: uart2@0 {
-				allwinner,pins = "PA3", "PA2", "PA1", "PA0";
+				allwinner,pins = "PA2", "PA3", "PA0", "PA1";
 				allwinner,pname = "uart2_tx", "uart2_rx", "uart2_rts", "uart2_cts";
 				allwinner,function = "uart2";
 				allwinner,muxsel = <4>;
@@ -121,7 +138,7 @@
 			uart5_pins_b: uart5@1 {
 				allwinner,pins = "PH6", "PH7";
 				allwinner,function = "io_disabled";
-				allwinner,muxsel = <7>;
+				allwinner,muxsel = <3>;
 				allwinner,drive = <1>;
 				allwinner,pull = <1>;
 			};
@@ -158,6 +175,23 @@
 				allwinner,muxsel = <7>;
 				allwinner,drive = <1>;
 				allwinner,pull = <1>;
+			};
+
+			can0_pins_a: can0@0 {
+				allwinner,pins = "PH20", "PH21";
+				allwinner,pname = "can0_tx", "can0_rx";
+				allwinner,function = "can0";
+				allwinner,muxsel = <4>;
+				allwinner,drive = <1>;
+				allwinner,pull = <0>;
+			};
+
+			can0_pins_b: can0@1 {
+				allwinner,pins = "PH20", "PH21";
+				allwinner,function = "io_disabled";
+				allwinner,muxsel = <7>;
+				allwinner,drive = <1>;
+				allwinner,pull = <0>;
 			};
 
 			twi0_pins_a: twi0@0 {
@@ -255,7 +289,7 @@
 			};
 
 			spi0_pins_b: spi0@1 {
-				allwinner,pins = "PC23", "PI14";
+				allwinner,pins = "PC23";
 				allwinner,pname = "spi0_cs0";
 				allwinner,function = "spi0";
 				allwinner,muxsel = <3>;
@@ -347,7 +381,7 @@
 				allwinner,pins = "PA5", "PA9";
 				allwinner,pname = "spi3_cs0", "spi3_cs1";
 				allwinner,function = "spi3";
-				allwinner,muxsel = <2>;
+				allwinner,muxsel = <3>;
 				allwinner,drive = <1>;
 				allwinner,pull = <1>;   // only CS should be pulled up
 			};
@@ -393,7 +427,7 @@
 			};
 
 			sdc2_pins_a: sdc2@0 {
-				allwinner,pins = "PC1","PC5", "PC6", "PC8", "PC9","PC10","PC11","PC12","PC13","PC14","PC15","PC16";
+				allwinner,pins = "PC5", "PC6","PC7", "PC8", "PC9","PC10","PC11","PC12","PC13","PC14","PC15","PC24";
 				allwinner,function = "sdc2";
 				allwinner,muxsel = <3>;
 				allwinner,drive = <2>;
@@ -401,7 +435,23 @@
 			};
 
 			sdc2_pins_b: sdc2@1 {
-			allwinner,pins = "PC1","PC5", "PC6", "PC8", "PC9","PC10","PC11","PC12","PC13","PC14","PC15","PC16";
+				allwinner,pins = "PC5", "PC6","PC7", "PC8", "PC9","PC10","PC11","PC12","PC13","PC14","PC15","PC24";
+				allwinner,function = "io_disabled";
+				allwinner,muxsel = <7>;
+				allwinner,drive = <1>;
+				allwinner,pull = <1>;
+			};
+
+			sdc3_pins_a: sdc3@0 {
+				allwinner,pins = "PI4", "PI5","PI6", "PI7", "PI8", "PI9";
+				allwinner,function = "sdc3";
+				allwinner,muxsel = <2>;
+				allwinner,drive = <2>;
+				allwinner,pull = <1>;
+			};
+
+			sdc3_pins_b: sdc3@1 {
+				allwinner,pins = "PI4", "PI5","PI6", "PI7", "PI8", "PI9";
 				allwinner,function = "io_disabled";
 				allwinner,muxsel = <7>;
 				allwinner,drive = <1>;
@@ -409,42 +459,42 @@
 			};
 
 			daudio0_pins_a: daudio0@0 {
-				allwinner,pins = "PG7", "PG6", "PG10", "PG9", "PG8";
-				allwinner,function = "pcm0";
+				allwinner,pins = "PB6", "PB7", "PB8", "PB12";
+				allwinner,function = "i2s0";
 				allwinner,muxsel = <2>;
 				allwinner,drive = <1>;
 				allwinner,pull = <0>;
 			};
 			daudio0_pins_b: daudio0_sleep@0 {
-				allwinner,pins = "PG7", "PG6", "PG10", "PG9", "PG8";
+				allwinner,pins = "PB6", "PB7", "PB8", "PB12";
 				allwinner,function = "io_disabled";
 				allwinner,muxsel = <7>;
 				allwinner,drive = <1>;
 				allwinner,pull = <0>;
 			};
 			daudio1_pins_a: daudio1@0 {
-				allwinner,pins = "PB15", "PB14", "PB13", "PB12";
-				allwinner,function = "pcm1";
-				allwinner,muxsel = <2>;
+				allwinner,pins = "PA14", "PA15", "PA16", "PA17";
+				allwinner,function = "i2s1";
+				allwinner,muxsel = <6>;
 				allwinner,drive = <1>;
 				allwinner,pull = <0>;
 			};
 			daudio1_pins_b: daudio1_sleep@0 {
-				allwinner,pins = "PB15", "PB14", "PB13", "PB12";
+				allwinner,pins = "PA14", "PA15", "PA16", "PA17";
 				allwinner,function = "io_disabled";
 				allwinner,muxsel = <7>;
 				allwinner,drive = <1>;
 				allwinner,pull = <0>;
 			};
 			spdif_pins_a: spdif@0 {
-				allwinner,pins = "PB3", "PB12", "PB13";
+				allwinner,pins = "PB12", "PB13";
 				allwinner,function = "spdif0";
 				allwinner,muxsel = <4>;
 				allwinner,drive = <1>;
 				allwinner,pull = <0>;
 			};
 			spdif_pins_b: spdif_sleep@0 {
-				allwinner,pins = "PB3", "PB12", "PB13";
+				allwinner,pins = "PB12", "PB13";
 				allwinner,function = "io_disabled";
 				allwinner,muxsel = <7>;
 				allwinner,drive = <1>;
@@ -461,7 +511,7 @@
 				allwinner,pull = <0>;
 				allwinner,data = <0>;
 			};
-			csi0_pins_b: csi0_sleep@0 {
+			csi0_pins_b: csi0@1 {
 				allwinner,pins = "PE0","PE2","PE3","PE4","PE5","PE6","PE7","PE8","PE9","PE10","PE11";
 				allwinner,pname = "csi0_pck","csi0_hsync","csi0_vsync","csi0_d0","csi0_d1","csi0_d2",
 								"csi0_d3","csi0_d4","csi0_d5","csi0_d6","csi0_d7";
@@ -482,7 +532,7 @@
 				allwinner,pull = <0>;
 				allwinner,data = <0>;
 			};
-			csi1_pins_b: csi1_sleep@0 {
+			csi1_pins_b: csi1@1 {
 				allwinner,pins = "PG0","PG2","PG3","PG4","PG5","PG6","PG7","PG8","PG9","PG10","PG11";
 				allwinner,pname = "csi1_pck","csi1_hsync","csi1_vsync","csi1_d0","csi1_d1","csi1_d2",
 								"csi1_d3","csi1_d4","csi1_d5","csi1_d6","csi1_d7";
@@ -494,7 +544,8 @@
 			};
 
 			scr_pins_a: smartcard@0 {
-				allwinner,pins = "PB1", "PB4", "PB5", "PB6","PB7";
+				allwinner,pins = "PH13", "PH14", "PH15", "PH16","PH17", "PH18", "PH19";
+				allwinner,pname = "smc_rst", "smc_vppen", "smc_vppp", "smc_det", "smc_vccen", "smc_sck", "smc_sda";
 				allwinner,function = "sim0";
 				allwinner,muxsel = <5>;
 				allwinner,drive = <1>;
@@ -502,7 +553,7 @@
 			};
 
 			nand0_pins_a: nand0@0 {
-				allwinner,pins = "PC0",      "PC1",       "PC2",       "PC4",       "PC6",      "PC7",      "PC8",      "PC9",      "PC10",     "PC11",     "PC12",     "PC13",     "PC14";
+				allwinner,pins = "PC0",      "PC1",       "PC2",       "PC5",       "PC8",      "PC9",      "PC10",     "PC11",     "PC12",     "PC13",     "PC14",     "PC15",     "PC24";
 				allwinner,pname= "nand0_we", "nand0_ale", "nand0_cle", "nand0_nre", "nand0_d0", "nand0_d1", "nand0_d2", "nand0_d3", "nand0_d4", "nand0_d5", "nand0_d6", "nand0_d7", "nand0_ndqs";
 				allwinner,function = "nand0";
 				allwinner,muxsel = <2>;
@@ -511,8 +562,8 @@
 			};
 
 			nand0_pins_b: nand0@1 {
-				allwinner,pins = "PC3",       "PC5";
-				allwinner,pname= "nand0_ce0", "nand0_rb0";
+				allwinner,pins = "PC3",       "PC4",       "PC6",       "PC7",       "PC16",      "PC17",      "PC18",      "PC19",      "PC20",      "PC21",      "PC22";
+				allwinner,pname= "nand0_ce1", "nand0_ce0", "nand0_rb0", "nand0_rb1", "nand0_nwp", "nand0_ce2", "nand0_ce3", "nand0_ce4", "nand0_ce5", "nand0_ce6", "nand0_ce7";
 				allwinner,function = "nand0";
 				allwinner,muxsel = <2>;
 				allwinner,drive = <1>;
@@ -520,7 +571,7 @@
 			};
 
 			nand0_pins_c: nand0@2 {
-				allwinner,pins ="PC0", "PC1", "PC2", "PC3", "PC4", "PC5", "PC6", "PC7", "PC8", "PC9", "PC10", "PC11", "PC12", "PC13", "PC14";
+				allwinner,pins ="PC0", "PC1", "PC2", "PC3", "PC4", "PC5", "PC6", "PC7", "PC8", "PC9", "PC10", "PC11", "PC12", "PC13", "PC14", "PC15", "PC16", "PC17", "PC18", "PC19", "PC20", "PC21", "PC22", "PC24";
 				allwinner,function = "io_disabled";
 				allwinner,muxsel = <7>;
 				allwinner,drive = <1>;
@@ -528,23 +579,66 @@
 			};
 
 			gmac_pins_a: gmac@0 {
-				allwinner,pins = "PD8", "PD9", "PD10", "PD11",
-						"PD12", "PD13", "PD14", "PD15",
-						"PD16", "PD17", "PD18", "PD19",
-						"PD20", "PD21", "PD22", "PD23";
+				allwinner,pins = "PA0", "PA1", "PA2", "PA3",
+						"PA4", "PA5", "PA6", "PA7",
+						"PA8", "PA9", "PA10", "PA11",
+						"PA11", "PA12", "PA13", "PA14",
+						"PA15", "PA16", "PA17";
 				allwinner,function = "gmac0";
-				allwinner,muxsel = <4>;
+				allwinner,muxsel = <5>;
 				allwinner,drive = <3>;
 				allwinner,pull = <0>;
 			};
-		};
 
-		axp_pio: pinctrl@0 {
-			compatible = "allwinner,axp-pinctrl";
-			gpio-controller;
-			#size-cells = <0>;
-			#gpio-cells = <6>;
-			device_type = "axp_pio";
+			emac_pins_a: emac@0 {
+				allwinner,pins = "PA0", "PA1", "PA2", "PA3",
+						"PA4", "PA5", "PA6", "PA7",
+						"PA8", "PA9", "PA10", "PA11",
+						"PA12", "PA13", "PA14", "PA15",
+						"PA16", "PA17";
+				allwinner,function = "emac0";
+				allwinner,muxsel = <2>;
+				allwinner,drive = <3>;
+				allwinner,pull = <0>;
+			};
+
+			emac_pins_b: emac@1 {
+				allwinner,pins = "PH8", "PH9", "PH10", "PH11",
+						"PH14", "PH15", "PH16", "PH17",
+						"PH18", "PH19", "PH20", "PH21",
+						"PH22", "PH23", "PH24", "PH25",
+						"PH26", "PH27";
+				allwinner,function = "emac0";
+				allwinner,muxsel = <2>;
+				allwinner,drive = <3>;
+				allwinner,pull = <0>;
+			};
+
+			ps20_pins_a: ps20@0 {
+				allwinner,pins = "PI20", "PI21";
+				allwinner,pname = "ps2_sck0", "ps2_sda0";
+				allwinner,function = "ps20";
+				allwinner,muxsel = <2>;
+				allwinner,drive = <1>;
+				allwinner,pull = <1>;
+			};
+			ps21_pins_a: ps21@0 {
+				allwinner,pins = "PH12", "PH13";
+				allwinner,pname = "ps2_sck1", "ps2_sda1";
+				allwinner,function = "ps21";
+				allwinner,muxsel = <4>;
+				allwinner,drive = <1>;
+				allwinner,pull = <1>;
+			};
+			ps21_pins_b: ps21@1 {
+				allwinner,pins = "PI14", "PI15";
+				allwinner,pname = "ps2_sck1", "ps2_sda1";
+				allwinner,function = "ps21";
+				allwinner,muxsel = <3>;
+				allwinner,drive = <1>;
+				allwinner,pull = <1>;
+			};
+
 		};
 	};
 };

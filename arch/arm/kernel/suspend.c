@@ -7,7 +7,6 @@
 #include <asm/suspend.h>
 #include <asm/tlbflush.h>
 
-extern int __cpu_suspend(unsigned long, int (*)(unsigned long));
 extern void cpu_resume_mmu(void);
 
 /*

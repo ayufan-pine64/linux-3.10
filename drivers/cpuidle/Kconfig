@@ -36,9 +36,9 @@ config DT_IDLE_STATES
 
 if CPU_IDLE
 
-menu "ARM64 CPU Idle Drivers"
-depends on ARM64
-source "drivers/cpuidle/Kconfig.arm64"
+menu "ARM CPU Idle Drivers"
+depends on ARM || ARM64
+source "drivers/cpuidle/Kconfig.arm"
 endmenu
 
 config CPU_IDLE_CALXEDA
@@ -46,5 +46,12 @@ config CPU_IDLE_CALXEDA
 	depends on ARCH_HIGHBANK
 	help
 	  Select this to enable cpuidle on Calxeda processors.
+
+config CPU_IDLE_SUNXI
+	bool "CPU Idle Driver for Sunxi processors"
+	depends on ARCH_SUN8IW11
+	select ARM_CPU_SUSPEND
+	help
+	  Select this to enable cpuidle on Sunxi processors.
 
 endif

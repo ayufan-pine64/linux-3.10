@@ -39,6 +39,7 @@ struct sw_uart_port {
 	unsigned char fcr;
 	unsigned char dll;
 	unsigned char dlh;
+	unsigned char rs485;
 	unsigned char msr_saved_flags;
 	unsigned int lsr_break_flag;
 	struct sw_uart_pdata *pdata;
@@ -50,7 +51,8 @@ struct sw_uart_port {
 	struct proc_dir_entry *proc_root;
 	struct proc_dir_entry *proc_info;
 
-	struct pinctrl		 *pctrl;
+	struct pinctrl *pctrl;
+	struct serial_rs485 rs485conf;
 };
 
 /* register offset define */
@@ -70,10 +72,12 @@ struct sw_uart_port {
 #define SUNXI_UART_TFL (0x80) 		/* transmit FIFO level */
 #define SUNXI_UART_RFL (0x84) 		/* RFL */
 #define SUNXI_UART_HALT (0xa4) 		/* halt tx register */
+#define SUNXI_UART_RS485 (0xc0)		/* RS485 control and status register */
 
 /* register bit field define */
 /* Interrupt Enable Register */
 #define SUNXI_UART_IER_PTIME (BIT(7))
+#define SUNXI_UART_IER_RS485 (BIT(4))
 #define SUNXI_UART_IER_MSI   (BIT(3))
 #define SUNXI_UART_IER_RLSI  (BIT(2))
 #define SUNXI_UART_IER_THRI  (BIT(1))
@@ -116,7 +120,10 @@ struct sw_uart_port {
  #define SUNXI_UART_LCR_WLEN7       (2)
  #define SUNXI_UART_LCR_WLEN8       (3)
 /* Modem Control Register */
-#define SUNXI_UART_MCR_SIRE       (BIT(6))
+#define SUNXI_UART_MCR_MODE_MASK  (BIT(7)|BIT(6))
+ #define SUNXI_UART_MCR_MODE_RS485 (2 << 6)
+ #define SUNXI_UART_MCR_MODE_SIRE  (1 << 6)
+ #define SUNXI_UART_MCR_MODE_UART  (0 << 6)
 #define SUNXI_UART_MCR_AFE        (BIT(5))
 #define SUNXI_UART_MCR_LOOP       (BIT(4))
 #define SUNXI_UART_MCR_RTS        (BIT(1))
@@ -152,27 +159,20 @@ struct sw_uart_port {
 #define SUNXI_UART_HALT_LCRUP     (BIT(2))
 #define SUNXI_UART_HALT_FORCECFG  (BIT(1))
 #define SUNXI_UART_HALT_HTX       (BIT(0))
+/* RS485 Control and Status Register */
+#define SUNXI_UART_RS485_RXBFA    (BIT(3))
+#define SUNXI_UART_RS485_RXAFA    (BIT(2))
 
 /* The global infor of UART channel. */
 
-#ifdef CONFIG_ARCH_SUN8IW1P1
+#if defined(CONFIG_ARCH_SUN8IW11)
+#define SUNXI_UART_NUM			8
+#endif
+#if defined(CONFIG_ARCH_SUN8IW10) || defined(CONFIG_ARCH_SUN50IW1)
 #define SUNXI_UART_NUM			6
 #endif
-#if defined(CONFIG_ARCH_SUN8IW6P1) || defined(CONFIG_ARCH_SUN8IW9)
-#define SUNXI_UART_NUM			5
-#endif
-#if defined(CONFIG_ARCH_SUN8IW3P1) || defined(CONFIG_ARCH_SUN8IW5P1) \
-		|| defined(CONFIG_ARCH_SUN8IW7)
+#if defined(CONFIG_ARCH_SUN50IW2)
 #define SUNXI_UART_NUM			4
-#endif
-#if defined(CONFIG_ARCH_SUN8IW8)
-#define SUNXI_UART_NUM			3
-#endif
-#if defined(CONFIG_ARCH_SUN9IW1P1)
-#define SUNXI_UART_NUM			6
-#endif
-#if defined(CONFIG_ARCH_SUN50I)
-#define SUNXI_UART_NUM			6
 #endif
 
 #ifndef SUNXI_UART_NUM

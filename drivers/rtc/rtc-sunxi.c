@@ -1,7 +1,10 @@
 /*
  * An RTC driver for Allwinner A10/A20/A64
  *
- * Copyright (c) 2013, Carlo Caione <carlo.caione@gmail.com>
+ *  Copyright (c) 2013, Carlo Caione <carlo.caione@gmail.com>
+ *
+ *  2015-11-25  Support sun8iw10 platform, and fixup get/set years
+ *		errors by Sugar<shuge@allwinnertech.com>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -34,173 +37,60 @@
 #include <linux/rtc.h>
 #include <linux/types.h>
 
-#define SUNXI_LOSC_CTRL				0x0000
-#define SUNXI_LOSC_CTRL_RTC_HMS_ACC		BIT(8)
-#define SUNXI_LOSC_CTRL_RTC_YMD_ACC		BIT(7)
-#define REG_LOSCCTRL_MAGIC			0x16aa0000
-#define REG_CLK32K_AUTO_SWT_EN			BIT(14)
-#define RTC_SOURCE_EXTERNAL			0x00000001
-#define EXT_LOSC_GSM				0x00000008
-#define SUNXI_ALARM_CONFIG                      0x0050
-#define SUNXI_ALRM_WAKEUP_OUTPUT_EN             BIT(0)
-
-/* alarm0 which based on seconds can power on system,
- * while alarm1 can't, so alarm1 is not used.
- */
-//#define SUNXI_ALARM1_USED
-
-#if (defined CONFIG_ARCH_SUN50IW1P1) || (defined CONFIG_ARCH_SUN8IW10P1)
-#define SUNXI_RTC_YMD				0x0010
-
-#define SUNXI_RTC_HMS				0x0014
-
-#ifdef SUNXI_ALARM1_USED
-#define SUNXI_ALRM_DHMS				0x0040
-
-#define SUNXI_ALRM_EN				0x0044
-#define SUNXI_ALRM_EN_CNT_EN			BIT(8)
-
-#define SUNXI_ALRM_IRQ_EN			0x0048
-#define SUNXI_ALRM_IRQ_EN_CNT_IRQ_EN		BIT(0)
-
-#define SUNXI_ALRM_IRQ_STA			0x004c
-#define SUNXI_ALRM_IRQ_STA_CNT_IRQ_PEND		BIT(0)
-#else
-#define SUNXI_ALRM_COUNTER                      0x0020
-#define SUNXI_ALRM_CURRENT                      0x0024
-
-#define SUNXI_ALRM_EN                           0x0028
-#define SUNXI_ALRM_EN_CNT_EN                    BIT(0)
-
-#define SUNXI_ALRM_IRQ_EN                       0x002c
-#define SUNXI_ALRM_IRQ_EN_CNT_IRQ_EN            BIT(0)
-
-#define SUNXI_ALRM_IRQ_STA                      0x0030
-#define SUNXI_ALRM_IRQ_STA_CNT_IRQ_PEND         BIT(0)
-#endif
-#else
-#define SUNXI_RTC_YMD				0x0004
-
-#define SUNXI_RTC_HMS				0x0008
-
-#define SUNXI_ALRM_DHMS				0x000c
-
-#define SUNXI_ALRM_EN				0x0014
-#define SUNXI_ALRM_EN_CNT_EN			BIT(8)
-
-#define SUNXI_ALRM_IRQ_EN			0x0018
-#define SUNXI_ALRM_IRQ_EN_CNT_IRQ_EN		BIT(0)
-
-#define SUNXI_ALRM_IRQ_STA			0x001c
-#define SUNXI_ALRM_IRQ_STA_CNT_IRQ_PEND		BIT(0)
-#endif
-
-#define SUNXI_MASK_DH				0x0000001f
-#define SUNXI_MASK_SM				0x0000003f
-#define SUNXI_MASK_M				0x0000000f
-#define SUNXI_MASK_LY				0x00000001
-#define SUNXI_MASK_D				0x00000ffe
-
-#define SUNXI_GET(x, mask, shift)		(((x) & ((mask) << (shift))) \
-							>> (shift))
-
-#define SUNXI_SET(x, mask, shift)		(((x) & (mask)) << (shift))
-
-/*
- * Get date values
- */
-#define SUNXI_DATE_GET_DAY_VALUE(x)		SUNXI_GET(x, SUNXI_MASK_DH, 0)
-#define SUNXI_DATE_GET_MON_VALUE(x)		SUNXI_GET(x, SUNXI_MASK_M, 8)
-#define SUNXI_DATE_GET_YEAR_VALUE(x, mask)	SUNXI_GET(x, mask, 16)
-
-/*
- * Get time values
- */
-#define SUNXI_TIME_GET_SEC_VALUE(x)		SUNXI_GET(x, SUNXI_MASK_SM, 0)
-#define SUNXI_TIME_GET_MIN_VALUE(x)		SUNXI_GET(x, SUNXI_MASK_SM, 8)
-#define SUNXI_TIME_GET_HOUR_VALUE(x)		SUNXI_GET(x, SUNXI_MASK_DH, 16)
-
-/*
- * Get alarm values
- */
-#define SUNXI_ALRM_GET_SEC_VALUE(x)		SUNXI_GET(x, SUNXI_MASK_SM, 0)
-#define SUNXI_ALRM_GET_MIN_VALUE(x)		SUNXI_GET(x, SUNXI_MASK_SM, 8)
-#define SUNXI_ALRM_GET_HOUR_VALUE(x)		SUNXI_GET(x, SUNXI_MASK_DH, 16)
-
-/*
- * Set date values
- */
-#define SUNXI_DATE_SET_DAY_VALUE(x)		SUNXI_DATE_GET_DAY_VALUE(x)
-#define SUNXI_DATE_SET_MON_VALUE(x)		SUNXI_SET(x, SUNXI_MASK_M, 8)
-#define SUNXI_DATE_SET_YEAR_VALUE(x, mask)	SUNXI_SET(x, mask, 16)
-#define SUNXI_LEAP_SET_VALUE(x, shift)		SUNXI_SET(x, SUNXI_MASK_LY, shift)
-
-/*
- * Set time values
- */
-#define SUNXI_TIME_SET_SEC_VALUE(x)		SUNXI_TIME_GET_SEC_VALUE(x)
-#define SUNXI_TIME_SET_MIN_VALUE(x)		SUNXI_SET(x, SUNXI_MASK_SM, 8)
-#define SUNXI_TIME_SET_HOUR_VALUE(x)		SUNXI_SET(x, SUNXI_MASK_DH, 16)
-
-/*
- * Set alarm values
- */
-#define SUNXI_ALRM_SET_SEC_VALUE(x)		SUNXI_ALRM_GET_SEC_VALUE(x)
-#define SUNXI_ALRM_SET_MIN_VALUE(x)		SUNXI_SET(x, SUNXI_MASK_SM, 8)
-#define SUNXI_ALRM_SET_HOUR_VALUE(x)		SUNXI_SET(x, SUNXI_MASK_DH, 16)
-#define SUNXI_ALRM_SET_DAY_VALUE(x)		SUNXI_SET(x, SUNXI_MASK_D, 21)
-
-/*
- * Time unit conversions
- */
-#define SEC_IN_MIN				60
-#define SEC_IN_HOUR				(60 * SEC_IN_MIN)
-#define SEC_IN_DAY				(24 * SEC_IN_HOUR)
-
-/*
- * The year parameter passed to the driver is usually an offset relative to
- * the year 1900. This macro is used to convert this offset to another one
- * relative to the minimum year allowed by the hardware.
- */
-#define SUNXI_YEAR_OFF(x)			((x)->min - 1900)
-
-/*
- * min and max year are arbitrary set considering the limited range of the
- * hardware register field
- */
-struct sunxi_rtc_data_year {
-	unsigned int min;		/* min year allowed */
-	unsigned int max;		/* max year allowed */
-	unsigned int mask;		/* mask for the year field */
-	unsigned char leap_shift;	/* bit shift to get the leap year */
-};
+#include "rtc-sunxi.h"
 
 static struct sunxi_rtc_data_year data_year_param[] = {
 	[0] = {
 		.min		= 2010,
 		.max		= 2073,
 		.mask		= 0x3f,
+		.yshift		= 16,
 		.leap_shift	= 22,
 	},
 	[1] = {
 		.min		= 1970,
 		.max		= 2225,
 		.mask		= 0xff,
+		.yshift		= 16,
 		.leap_shift	= 24,
 	},
-};
-
-struct sunxi_rtc_dev {
-	struct rtc_device *rtc;
-	struct device *dev;
-	struct sunxi_rtc_data_year *data_year;
-	void __iomem *base;
-	int irq;
+	[2] = {
+		.min		= 2010,
+		.max		= 2137,
+		.mask		= 0x7f,
+		.yshift		= 15,
+		.leap_shift	= 22,
+	},
+	[3] = {
+		.min		= 1970,
+		.max		= 2097,
+		.mask		= 0x7f,
+		.yshift		= 16,
+		.leap_shift	= 23,
+	},
 };
 
 #ifdef CONFIG_RTC_SHUTDOWN_ALARM
 static int alarm_in_booting = 0;
 module_param_named(alarm_in_booting, alarm_in_booting, int, S_IRUGO | S_IWUSR);
+
+static int sunxi_rtc_alarm_in_boot(struct sunxi_rtc_dev *rtc)
+{
+	unsigned int cnt, cur, en, int_ctrl, int_stat;
+
+	/*
+	 * when alarm irq occur at boot0~rtc_driver.probe() process in shutdown
+	 * charger mode, /charger in userspace must know this irq through sysfs
+	 * node 'alarm_in_booting' to reboot and startup system.
+	 * */
+	cnt = readl(rtc->base + SUNXI_ALRM_COUNTER);
+	cur = readl(rtc->base + SUNXI_ALRM_CURRENT);
+	en = readl(rtc->base + SUNXI_ALRM_EN);
+	int_ctrl = readl(rtc->base + SUNXI_ALRM_IRQ_EN);
+	int_stat = readl(rtc->base + SUNXI_ALRM_IRQ_STA);
+	if (int_stat && int_ctrl && en && (cnt <= cur))
+		alarm_in_booting = 1;
+}
 #endif
 
 static irqreturn_t sunxi_rtc_alarmirq(int irq, void *id)
@@ -272,8 +162,7 @@ static int sunxi_rtc_getalarm(struct device *dev, struct rtc_wkalrm *wkalrm)
 
 	alrm_tm->tm_mday = SUNXI_DATE_GET_DAY_VALUE(date);
 	alrm_tm->tm_mon = SUNXI_DATE_GET_MON_VALUE(date);
-	alrm_tm->tm_year = SUNXI_DATE_GET_YEAR_VALUE(date,
-			chip->data_year->mask);
+	alrm_tm->tm_year = SUNXI_DATE_GET_YEAR_VALUE(date, chip->data_year);
 
 	alrm_tm->tm_mon -= 1;
 
@@ -339,8 +228,7 @@ static int sunxi_rtc_gettime(struct device *dev, struct rtc_time *rtc_tm)
 
 	rtc_tm->tm_mday = SUNXI_DATE_GET_DAY_VALUE(date);
 	rtc_tm->tm_mon  = SUNXI_DATE_GET_MON_VALUE(date);
-	rtc_tm->tm_year = SUNXI_DATE_GET_YEAR_VALUE(date,
-					chip->data_year->mask);
+	rtc_tm->tm_year = SUNXI_DATE_GET_YEAR_VALUE(date, chip->data_year);
 
 	rtc_tm->tm_mon  -= 1;
 
@@ -349,6 +237,10 @@ static int sunxi_rtc_gettime(struct device *dev, struct rtc_time *rtc_tm)
 	 * a (1900)-relative one
 	 */
 	rtc_tm->tm_year += SUNXI_YEAR_OFF(chip->data_year);
+
+	dev_dbg(dev, "Read hardware RTC time %04d-%02d-%02d %02d:%02d:%02d\n",
+			rtc_tm->tm_year + 1900, rtc_tm->tm_mon + 1, rtc_tm->tm_mday,
+			rtc_tm->tm_hour, rtc_tm->tm_min, rtc_tm->tm_sec);
 
 	return rtc_valid_tm(rtc_tm);
 }
@@ -456,7 +348,8 @@ static int sunxi_rtc_settime(struct device *dev, struct rtc_time *rtc_tm)
 	 */
 
 	year = rtc_tm->tm_year + 1900;
-	if (year < chip->data_year->min || year > chip->data_year->max) {
+	if (rtc_valid_tm(rtc_tm) || year < chip->data_year->min \
+			|| year > chip->data_year->max) {
 		dev_err(dev, "rtc only supports year in range %d - %d\n",
 				chip->data_year->min, chip->data_year->max);
 		return -EINVAL;
@@ -465,10 +358,13 @@ static int sunxi_rtc_settime(struct device *dev, struct rtc_time *rtc_tm)
 	rtc_tm->tm_year -= SUNXI_YEAR_OFF(chip->data_year);
 	rtc_tm->tm_mon += 1;
 
+	dev_dbg(dev, "Will set hardware RTC time %04d-%02d-%02d %02d:%02d:%02d\n",
+			rtc_tm->tm_year, rtc_tm->tm_mon, rtc_tm->tm_mday,
+			rtc_tm->tm_hour, rtc_tm->tm_min, rtc_tm->tm_sec);
+
 	date = SUNXI_DATE_SET_DAY_VALUE(rtc_tm->tm_mday) |
 		SUNXI_DATE_SET_MON_VALUE(rtc_tm->tm_mon)  |
-		SUNXI_DATE_SET_YEAR_VALUE(rtc_tm->tm_year,
-				chip->data_year->mask);
+		SUNXI_DATE_SET_YEAR_VALUE(rtc_tm->tm_year, chip->data_year);
 
 	if (is_leap_year(year))
 		date |= SUNXI_LEAP_SET_VALUE(1, chip->data_year->leap_shift);
@@ -532,11 +428,34 @@ static const struct rtc_class_ops sunxi_rtc_ops = {
 static const struct of_device_id sunxi_rtc_dt_ids[] = {
 	{ .compatible = "allwinner,sun4i-a10-rtc", .data = &data_year_param[0] },
 	{ .compatible = "allwinner,sun7i-a20-rtc", .data = &data_year_param[1] },
-	{ .compatible = "allwinner,sun8i-b100-rtc", .data = &data_year_param[0] },
+	{ .compatible = "allwinner,sun8iw10-rtc", .data = &data_year_param[2] },
+	{ .compatible = "allwinner,sun8iw11p1-rtc", .data = &data_year_param[3] },
 	{ .compatible = "allwinner,sun50i-rtc", .data = &data_year_param[0] },
 	{ /* sentinel */ },
 };
 MODULE_DEVICE_TABLE(of, sunxi_rtc_dt_ids);
+
+static ssize_t sunxi_rtc_min_year_show(struct device *dev,
+		struct device_attribute *attr, char *buf)
+{
+	struct platform_device *pdev = container_of(dev, struct platform_device, dev);
+	struct sunxi_rtc_dev *rtc_dev = platform_get_drvdata(pdev);
+
+	return snprintf(buf, PAGE_SIZE, "%d \n", rtc_dev->data_year->min);
+}
+static struct device_attribute sunxi_rtc_min_year_attr =
+	__ATTR(min_year, S_IRUGO, sunxi_rtc_min_year_show, NULL);
+
+static ssize_t sunxi_rtc_max_year_show(struct device *dev,
+		struct device_attribute *attr, char *buf)
+{
+	struct platform_device *pdev = container_of(dev, struct platform_device, dev);
+	struct sunxi_rtc_dev *rtc_dev = platform_get_drvdata(pdev);
+
+	return snprintf(buf, PAGE_SIZE, "%d \n", rtc_dev->data_year->max);
+}
+static struct device_attribute sunxi_rtc_max_year_attr =
+	__ATTR(max_year, S_IRUGO, sunxi_rtc_max_year_show, NULL);
 
 static int sunxi_rtc_probe(struct platform_device *pdev)
 {
@@ -545,9 +464,6 @@ static int sunxi_rtc_probe(struct platform_device *pdev)
 	const struct of_device_id *of_id;
 	int ret;
 	unsigned int tmp_data;
-#ifdef CONFIG_RTC_SHUTDOWN_ALARM
-	unsigned int alarm_cnt, alarm_cur, alarm_en, alarm_int_ctrl, alarm_int_stat;
-#endif
 
 	of_id = of_match_device(sunxi_rtc_dt_ids, &pdev->dev);
 	if (!of_id) {
@@ -575,19 +491,7 @@ static int sunxi_rtc_probe(struct platform_device *pdev)
 	chip->data_year = (struct sunxi_rtc_data_year *) of_id->data;
 
 #ifdef CONFIG_RTC_SHUTDOWN_ALARM
-	/*
-	 * when alarm irq occur at boot0~rtc_driver.probe() process in shutdown
-	 * charger mode, /charger in userspace must know this irq through sysfs
-	 * node 'alarm_in_booting' to reboot and startup system.
-	 * */
-	alarm_cnt = readl(chip->base + SUNXI_ALRM_COUNTER);
-	alarm_cur = readl(chip->base + SUNXI_ALRM_CURRENT);
-	alarm_en = readl(chip->base + SUNXI_ALRM_EN);
-	alarm_int_ctrl = readl(chip->base + SUNXI_ALRM_IRQ_EN);
-	alarm_int_stat = readl(chip->base + SUNXI_ALRM_IRQ_STA);
-	if (alarm_int_stat && alarm_int_ctrl && alarm_en && (alarm_cnt <= alarm_cur)) {
-		alarm_in_booting = 1;
-	}
+	sunxi_rtc_alarm_in_boot(chip);
 #else
 	/*
 	 * to support RTC shutdown alarm, we should not clear alarm for android
@@ -624,7 +528,7 @@ static int sunxi_rtc_probe(struct platform_device *pdev)
 	writel(tmp_data, chip->base + SUNXI_LOSC_CTRL);
 	device_init_wakeup(&pdev->dev, 1);
 
-	chip->rtc = rtc_device_register("rtc-sunxi", &pdev->dev,
+	chip->rtc = devm_rtc_device_register(&pdev->dev, "sunxi-rtc",
 	                                &sunxi_rtc_ops, THIS_MODULE);
 	if (IS_ERR(chip->rtc)) {
 		dev_err(&pdev->dev, "unable to register device\n");
@@ -636,19 +540,17 @@ static int sunxi_rtc_probe(struct platform_device *pdev)
 		dev_err(&pdev->dev, "No IRQ resource\n");
 		goto fail;
 	}
-#if  (defined CONFIG_FPGA_V4_PLATFORM) || (defined CONFIG_FPGA_V7_PLATFORM)
-	ret = devm_request_irq(&pdev->dev, 46, sunxi_rtc_alarmirq,
-	                       0, dev_name(&pdev->dev), chip);
-#else
+
 	ret = devm_request_irq(&pdev->dev, chip->irq, sunxi_rtc_alarmirq,
 	                       0, dev_name(&pdev->dev), chip);
-#endif
 	if (ret) {
 		dev_err(&pdev->dev, "Could not request IRQ\n");
 		goto fail;
 	}
-
 	dev_info(&pdev->dev, "RTC enabled\n");
+
+	device_create_file(&pdev->dev, &sunxi_rtc_min_year_attr);
+	device_create_file(&pdev->dev, &sunxi_rtc_max_year_attr);
 
 	return 0;
 
@@ -662,7 +564,10 @@ static int sunxi_rtc_remove(struct platform_device *pdev)
 {
 	struct sunxi_rtc_dev *chip = platform_get_drvdata(pdev);
 
-	rtc_device_unregister(chip->rtc);
+	device_remove_file(&pdev->dev, &sunxi_rtc_min_year_attr);
+	device_remove_file(&pdev->dev, &sunxi_rtc_max_year_attr);
+
+	devm_rtc_device_unregister(chip->dev, chip->rtc);
 
 	/* Disable the clock/module */
 	pm_runtime_put_sync(&pdev->dev);
@@ -685,4 +590,4 @@ module_platform_driver(sunxi_rtc_driver);
 
 MODULE_DESCRIPTION("sunxi RTC driver");
 MODULE_AUTHOR("Carlo Caione <carlo.caione@gmail.com>");
-MODULE_LICENSE("GPL V2");
+MODULE_LICENSE("Dual BSD/GPL");

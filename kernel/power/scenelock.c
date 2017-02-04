@@ -312,8 +312,12 @@ int standby_show_state(void)
 }
 EXPORT_SYMBOL(standby_show_state);
 
-#if (defined(CONFIG_ARCH_SUN8IW8P1) || defined(CONFIG_ARCH_SUN8IW6P1) \
-	|| defined(CONFIG_ARCH_SUN8IW10P1) || defined(CONFIG_ARCH_SUN50IW1P1) )
+#if (defined(CONFIG_ARCH_SUN8IW8P1) || \
+	defined(CONFIG_ARCH_SUN8IW6P1) || \
+	defined(CONFIG_ARCH_SUN8IW10P1) || \
+	defined(CONFIG_ARCH_SUN8IW11P1) || \
+	defined(CONFIG_ARCH_SUN50IW1P1) || \
+	defined(CONFIG_ARCH_SUN50IW2P1))
 /**
  *	extended_standby_set_volt   -     set  suspend volt.
  *

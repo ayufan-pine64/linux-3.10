@@ -87,7 +87,6 @@ ep_matches (
 					return 0;
 #ifdef CONFIG_USB_SUNXI_UDC0
 			if(gadget_is_softwinner_otg(gadget) && 'n' != tmp [2]){
-				printk("gadget_is_softwinner_otg is not -int\n");
 				return 0;
 			}
 #endif

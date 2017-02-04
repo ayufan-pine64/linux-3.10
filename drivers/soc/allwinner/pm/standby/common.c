@@ -21,7 +21,7 @@
 *********************************************************************************************************
 *                           standby_memcpy
 *
-*Description: memory copy function for standby.
+*Description :  memory copy function for standby.
 *
 *Arguments  :
 *
@@ -33,20 +33,25 @@
 */
 void standby_memcpy(void *dest, void *src, int n)
 {
-    char    *tmp_src = (char *)src;
-    char    *tmp_dst = (char *)dest;
+	char *tmp_src = (char *)NULL;
+	char *tmp_dst = (char *)NULL;
+	u32 *src_p = (u32 *)(src);
+	u32 *dst_p = (u32 *)dest;
 
-    if(!dest || !src){
-        /* parameter is invalid */
-        return;
-    }
+	if (!dest || !src) {
+		/* parameter is invalid */
+		return;
+	}
 
-    for( ; n > 0; n--){
-        *tmp_dst ++ = *tmp_src ++;
-    }
+	for (; n > 4; n -= 4) {
+		*dst_p++ = *src_p++;
+	}
+	tmp_src = (char *)(src_p);
+	tmp_dst = (char *)(dst_p);
 
-    return;
+	for (; n > 0; n--) {
+		*tmp_dst++ = *tmp_src++;
+	}
+
+	return;
 }
-
-
-

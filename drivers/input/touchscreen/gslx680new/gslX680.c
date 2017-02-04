@@ -76,7 +76,9 @@
 #include "gsl1680e_t1_v2.h"
 #include "gsl1680e_a86.h"
 #include "A86_GSL3676B_8001280_OGS_DZ_80A22.h"
-#include "gsl2681_a9005qd.h"
+#include "AW_gsl3676_1024600_a64_p2.h"
+
+
 
 struct gslX680_fw_array {
 	const char* name;
@@ -98,7 +100,7 @@ struct gslX680_fw_array {
 	{"gsl_t1_v2"  ,  ARRAY_SIZE(GSL1680E_FW_T1_V2),GSL1680E_FW_T1_V2},
 	{"gsl_a86"  ,  ARRAY_SIZE(GSL1680E_FW_A86),GSL1680E_FW_A86},
 	{"gsl_a86_ogs"  ,  ARRAY_SIZE(A86_GSL3676B_8001280_OGS_DZ_80A22),A86_GSL3676B_8001280_OGS_DZ_80A22},
-	{"gsl_fw_A9005"  ,  ARRAY_SIZE(GSL2681_FW_A9005QD),GSL2681_FW_A9005QD},
+	{"gsl_a64_v2-1_p2"  ,  ARRAY_SIZE(FW_AW_GSL3676_1024600_A64_P2), FW_AW_GSL3676_1024600_A64_P2},
 };
 
 unsigned int *gslX680_config_data[16] = {
@@ -117,13 +119,13 @@ unsigned int *gslX680_config_data[16] = {
     gsl_config_data_id_t1_v2,
     gsl_config_data_id_a86,
     gsl_config_data_id_A86_GSL3676B_8001280_OGS_DZ_80A22,
-	gsl_config_data_id_A9005QD,
+    gsl_config_data_id_AW_GSL3676_1024600_A64_P2,
 };
 
 #define FOR_TSLIB_TEST
 //#define TPD_PROC_DEBUG 1
 
-#define HAVE_TOUCH_KEY
+/*#define HAVE_TOUCH_KEY*/
 #ifdef TPD_PROC_DEBUG
 #include <linux/proc_fs.h>
 #include <asm/uaccess.h>
@@ -1501,12 +1503,13 @@ static void glsX680_resume_events (struct work_struct *work)
 #ifdef CONFIG_PM
 static int gsl_ts_suspend(struct device *dev)
 {
-	dprintk(DEBUG_SUSPEND, "@@@@@@@@gsl_ts_suspend start @@@@@@@@@@@@@\n");
+	struct gsl_ts *ts = dev_get_drvdata(dev);
 #ifndef GSL_TIMER
-	int ret;
+		int ret;
 #endif
-        struct gsl_ts *ts = dev_get_drvdata(dev);
-        
+
+		dprintk(DEBUG_SUSPEND, "@@@@@@@@gsl_ts_suspend start @@@@@@@@@@@@@\n");
+
         cancel_work_sync(&glsX680_resume_work);
         flush_workqueue(gslX680_resume_wq);
 
@@ -1522,7 +1525,6 @@ static int gsl_ts_suspend(struct device *dev)
 	del_timer(&ts->gsl_timer);
 #endif
 
-
         flush_workqueue(gslX680_resume_wq);
         cancel_work_sync(&ts->work);
         flush_workqueue(ts->wq);
@@ -1536,9 +1538,9 @@ static int gsl_ts_suspend(struct device *dev)
 			dprintk(DEBUG_SUSPEND,"do suspend\n");
 			ts->is_suspended = true;
 		}
-		
+
 #ifndef GSL_TIMER
-	    ret = gsl_irq_disable(ts);
+		ret = gsl_irq_disable(ts);
 		if (ret < 0)
 			dprintk(DEBUG_SUSPEND,"%s irq disable failed\n", __func__);
 #endif

@@ -2,7 +2,7 @@
  * sunxi-nmi.c NMI driver
  *
  * Copyright (C) 2014-2015 allwinner.
- *	Ming Li<liming@allwinnertech.com>
+ *  Ming Li<liming@allwinnertech.com>
  *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License version 2 as
@@ -13,35 +13,41 @@
 #include <linux/platform_device.h>
 #include <linux/of.h>
 #include <linux/of_device.h>
+#include <linux/of_platform.h>
+#include <linux/of_irq.h>
+#include <linux/of_address.h>
+#include <linux/io.h>
 #include <linux/slab.h>
 #include <linux/arisc/arisc.h>
 #include "sunxi-nmi.h"
 
-static u32 debug_mask = 0x0;
-static nmi_struct *nmi_data;
-
 void clear_nmi_status(void)
 {
+#ifdef CONFIG_SUNXI_ARISC
 	arisc_clear_nmi_status();
-
-	return;
+#else
+	__clear_nmi_status();
+#endif
 }
 EXPORT_SYMBOL(clear_nmi_status);
 
-
 void enable_nmi(void)
 {
+#ifdef CONFIG_SUNXI_ARISC
 	arisc_enable_nmi_irq();
-
-	return;
+#else
+	__enable_nmi_irq();
+#endif
 }
 EXPORT_SYMBOL(enable_nmi);
 
 void disable_nmi(void)
 {
+#ifdef CONFIG_SUNXI_ARISC
 	arisc_disable_nmi_irq();
-
-	return;
+#else
+	__disable_nmi_irq();
+#endif
 }
 EXPORT_SYMBOL(disable_nmi);
 
@@ -58,65 +64,65 @@ void set_nmi_trigger(u32 trigger)
 	else if (IRQF_TRIGGER_RISING==trigger)
 		tmp = NMI_IRQ_PO_EDGE;
 
+#ifdef CONFIG_SUNXI_ARISC
 	arisc_set_nmi_trigger(tmp);
-
-	return;
+#else
+	__set_nmi_trigger(tmp);
+#endif
 }
 EXPORT_SYMBOL(set_nmi_trigger);
 
+#ifndef CONFIG_SUNXI_ARISC
 static int sunxi_nmi_probe(struct platform_device *pdev)
 {
 	struct device_node *node = pdev->dev.of_node;
 	struct resource *mem_res = NULL;
-	s32 ret;
-
-	dprintk(DEBUG_INIT, "%s: enter!!\n", __func__);
+	s32 ret = 0;
 
 	if (!of_device_is_available(node)) {
-		printk("%s: nmi status disable!!\n", __func__);
+		pr_err("%s: nmi status disable!!\n", __func__);
 		return -EPERM;
 	}
 
 	nmi_data = kzalloc(sizeof(*nmi_data), GFP_KERNEL);
 	if (nmi_data == NULL) {
-		ret = -ENOMEM;
-		return ret;
+		pr_err("%s: no memory for nmi data\n", __func__);
+		return -ENOMEM;
 	}
 
 	mem_res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
 	if (mem_res == NULL) {
-		printk(KERN_ERR "%s: failed to get MEM res\n", __func__);
+		pr_err("%s: failed to get MEM res\n", __func__);
 		ret = -ENXIO;
 		goto mem_io_err;
 	}
 
 	if (!request_mem_region(mem_res->start, resource_size(mem_res), mem_res->name)) {
-		printk(KERN_ERR  "%s: failed to request mem region\n", __func__);
+		pr_err("%s: failed to request mem region\n", __func__);
 		ret = -EINVAL;
 		goto mem_io_err;
 	}
 
 	nmi_data->base_addr = ioremap(mem_res->start, resource_size(mem_res));
 	if (!nmi_data->base_addr) {
-		printk(KERN_ERR  "%s: failed to io remap\n", __func__);
+		pr_err("%s: failed to io remap\n", __func__);
 		ret = -EIO;
 		goto mem_io_err;
 	}
 
 	if (of_property_read_u32(node, "nmi_irq_ctrl", &nmi_data->nmi_irq_ctrl))
-		nmi_data->nmi_irq_ctrl = 0xffffffff;
+		goto of_property_err;
 
 	if (of_property_read_u32(node, "nmi_irq_en", &nmi_data->nmi_irq_en))
-		nmi_data->nmi_irq_en = 0xffffffff;
+		goto of_property_err;
 
 	if (of_property_read_u32(node, "nmi_irq_status", &nmi_data->nmi_irq_status))
-		nmi_data->nmi_irq_status = 0xffffffff;
-
-	if (of_property_read_u32(node, "nmi_irq_mask", &nmi_data->nmi_irq_mask))
-		nmi_data->nmi_irq_mask = 0xffffffff;
+		goto of_property_err;
 
 	return 0;
 
+of_property_err:
+	iounmap(nmi_data->base_addr);
 mem_io_err:
 	kfree(nmi_data);
 
@@ -125,15 +131,15 @@ mem_io_err:
 
 static int sunxi_nmi_remove(struct platform_device *pdev)
 {
-	printk(KERN_INFO "%s: module unloaded\n", __func__);
+	pr_info("%s: module unloaded\n", __func__);
 
 	return 0;
 }
 
 
 static const struct of_device_id sunxi_nmi_match[] = {
-	 { .compatible = "allwinner,sunxi-nmi", },
-	 {},
+	{ .compatible = "allwinner,sunxi-nmi", },
+	{},
 };
 MODULE_DEVICE_TABLE(of, sunxi_nmi_match);
 
@@ -141,7 +147,7 @@ static struct platform_driver nmi_platform_driver = {
 	.probe  = sunxi_nmi_probe,
 	.remove = sunxi_nmi_remove,
 	.driver = {
-		.name	= NMI_MODULE_NAME,
+		.name  = NMI_MODULE_NAME,
 		.owner = THIS_MODULE,
 		.of_match_table = sunxi_nmi_match,
 	},
@@ -159,8 +165,7 @@ static void __exit sunxi_nmi_exit(void)
 
 arch_initcall(sunxi_nmi_init);
 module_exit(sunxi_nmi_exit);
-module_param_named(debug_mask, debug_mask, int, 0644);
 MODULE_DESCRIPTION("sunxi nmi driver");
 MODULE_AUTHOR("Ming Li<liming@allwinnertech.com>");
 MODULE_LICENSE("GPL");
-
+#endif

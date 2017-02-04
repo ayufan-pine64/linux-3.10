@@ -35,16 +35,20 @@ unsigned int arisc_debug_level = 2;
 static unsigned char arisc_version[40] = "arisc defualt version";
 static unsigned int arisc_pll = 0;
 
+#if defined CONFIG_ARCH_SUN50IW2P1
+static struct arisc_twi_block_cfg block_cfg;
+static u8 regaddr;
+static u8 data;
+#else
 static struct arisc_rsb_block_cfg block_cfg;
-static u32 devaddr = 0;
-static u8 regaddr = 0;
-static u32 data = 0;
-static u32 datatype = 0;
+static u32 devaddr;
+static u8 regaddr;
+static u32 data;
+static u32 datatype;
+#endif
 
 /* for save power check configuration */
 struct standby_info_para arisc_powchk_back;
-
-asmlinkage int invoke_scp_fn_smc(u64, u64, u64, u64);
 
 static ssize_t arisc_version_show(struct device *dev,
 		struct device_attribute *attr, char *buf)
@@ -289,9 +293,13 @@ static const unsigned char pmu_powername[32][8] = {
 	"dcdca",  "dcdcb", "dcdcc", "dcdcd", "dcdce", "aldo1", "aldo2", "aldo3",
 	"bldo1",  "bldo2", "bldo3", "bldo4", "cldo1", "cldo2", "cldo3", "swout",
 };
-#elif (defined CONFIG_ARCH_SUN8IW1P1) || (defined CONFIG_ARCH_SUN8IW3P1) || \
-	(defined CONFIG_ARCH_SUN8IW5P1) || (defined CONFIG_ARCH_SUN8IW7P1) || \
-	(defined CONFIG_ARCH_SUN8IW9P1) || (defined CONFIG_ARCH_SUN50IW1P1)
+#elif (defined CONFIG_ARCH_SUN8IW1P1) || \
+	(defined CONFIG_ARCH_SUN8IW3P1) || \
+	(defined CONFIG_ARCH_SUN8IW5P1) || \
+	(defined CONFIG_ARCH_SUN8IW7P1) || \
+	(defined CONFIG_ARCH_SUN8IW9P1) || \
+	(defined CONFIG_ARCH_SUN50IW1P1) || \
+	(defined CONFIG_ARCH_SUN50IW2P1)
 #define SST_POWER_MASK 0x07ffff
 static const unsigned char pmu_powername[20][8] = {
 	"dc5ldo", "dcdc1",  "dcdc2",  "dcdc3", "dcdc4", "dcdc5", "aldo1", "aldo2",
@@ -464,19 +472,20 @@ static ssize_t arisc_freq_show(struct device *dev,
 	} else if (arisc_pll == 2) {
 		pll = clk_get(NULL, "pll2");
 	}
-#elif (defined CONFIG_ARCH_SUN8IW5P1) || (defined CONFIG_ARCH_SUN8IW7P1) || \
-	(defined CONFIG_ARCH_SUN50IW1P1)
+#elif (defined CONFIG_ARCH_SUN8IW5P1) || \
+	(defined CONFIG_ARCH_SUN8IW7P1) || \
+	(defined CONFIG_ARCH_SUN50IW1P1) || \
+	(defined CONFIG_ARCH_SUN50IW2P1)
 	if (arisc_pll == 1)
 		pll = clk_get(NULL, "pll_cpu");
 #elif (defined CONFIG_ARCH_SUN8IW6P1) || (defined CONFIG_ARCH_SUN8IW9P1)
-	if (arisc_pll == 1) {
+	if (arisc_pll == 1)
 		pll = clk_get(NULL, "pll_cpu0");
-	} else if (arisc_pll == 2) {
+	else if (arisc_pll == 2)
 		pll = clk_get(NULL, "pll_cpu1");
-	}
 #endif
 
-	if(!pll || IS_ERR(pll)){
+	if (!pll || IS_ERR(pll)) {
 		ARISC_ERR("try to get pll%u failed!\n", arisc_pll);
 		return size;
 	}
@@ -496,9 +505,12 @@ static ssize_t arisc_freq_store(struct device *dev,
 
 	sscanf(buf, "%u %u", &pll, &freq);
 
-#if (defined CONFIG_ARCH_SUN8IW1P1) || (defined CONFIG_ARCH_SUN8IW3P1) || \
-	(defined CONFIG_ARCH_SUN8IW5P1) || (defined CONFIG_ARCH_SUN8IW7P1) || \
-	(defined CONFIG_ARCH_SUN50IW1P1)
+#if (defined CONFIG_ARCH_SUN8IW1P1) || \
+	(defined CONFIG_ARCH_SUN8IW3P1) || \
+	(defined CONFIG_ARCH_SUN8IW5P1) || \
+	(defined CONFIG_ARCH_SUN8IW7P1) || \
+	(defined CONFIG_ARCH_SUN50IW1P1) || \
+	(defined CONFIG_ARCH_SUN50IW2P1)
 	if ((pll != 1) || (freq < 0) || (freq > 3000000)) {
 		ARISC_WRN("invalid pll [%u] or freq [%u] to set, this platform only support pll1, freq [0, 3000000]KHz\n", pll, freq);
 		ARISC_WRN("pls echo like that: echo pll freq > freq\n");
@@ -522,6 +534,115 @@ static ssize_t arisc_freq_store(struct device *dev,
 	return size;
 }
 
+#if defined CONFIG_ARCH_SUN50IW2P1
+static ssize_t arisc_twi_read_block_data_show(struct device *dev,
+		struct device_attribute *attr, char *buf)
+{
+	ssize_t size = 0;
+	u32 ret = 0;
+
+	if ((block_cfg.addr == NULL) || (block_cfg.data == NULL) ||
+		(*block_cfg.addr < 0) || (*block_cfg.addr > 0xff)) {
+		ARISC_LOG("invalid twi paras, regaddr:0x%x\n",
+			block_cfg.addr ? *block_cfg.addr : 0);
+		ARISC_LOG("echo like: echo regaddr > twi_read_block_data\n");
+		return size;
+	}
+
+	ret = arisc_twi_read_block_data(&block_cfg);
+	if (ret) {
+		ARISC_LOG("twi read data:0x%x from regaddr:0x%x fail\n",
+			*block_cfg.data, *block_cfg.addr);
+	} else {
+		ARISC_LOG("twi read data:0x%x from regaddr:0x%x success\n",
+			*block_cfg.data, *block_cfg.addr);
+	}
+	size = sprintf(buf, "%x\n", data);
+
+	return size;
+}
+
+static ssize_t arisc_twi_read_block_data_store(struct device *dev,
+		struct device_attribute *attr, const char *buf, size_t size)
+{
+	sscanf(buf, "%x", (u32 *)&regaddr);
+	if ((regaddr < 0) || (regaddr > 0xff)) {
+		ARISC_WRN("invalid paras, regaddr:0x%x\n", regaddr);
+		ARISC_LOG("echo like: echo regaddr > twi_read_block_data\n");
+		return size;
+	}
+
+	block_cfg.msgattr = ARISC_MESSAGE_ATTR_SOFTSYN;
+	block_cfg.len = 1;
+	block_cfg.addr = &regaddr;
+	block_cfg.data = &data;
+
+	ARISC_LOG("twi read regaddr:0x%x\n", *block_cfg.addr);
+
+	return size;
+}
+
+static ssize_t arisc_twi_write_block_data_show(struct device *dev,
+		struct device_attribute *attr, char *buf)
+{
+	ssize_t size = 0;
+	u32 ret = 0;
+
+	if ((block_cfg.addr == NULL) || (block_cfg.data == NULL) ||
+	    (*block_cfg.addr < 0) || (*block_cfg.addr > 0xff)) {
+		ARISC_WRN("invalid paras, regaddr:0x%x, data:0x%x\n",
+			block_cfg.addr ? *block_cfg.addr : 0,
+			block_cfg.data ? *block_cfg.data : 0);
+		ARISC_LOG("echo like: echo regaddr data > twi_write_block_data\n");
+		return size;
+	}
+
+	block_cfg.msgattr = ARISC_MESSAGE_ATTR_SOFTSYN;
+	block_cfg.len = 1;
+	block_cfg.addr = &regaddr;
+	block_cfg.data = &data;
+	ret = arisc_twi_read_block_data(&block_cfg);
+	if (ret) {
+		ARISC_ERR("twi read data:0x%x from regaddr:0x%x fail\n",
+			*block_cfg.data, *block_cfg.addr);
+	} else {
+		ARISC_LOG("twi read data:0x%x from regaddr:0x%x success\n",
+			*block_cfg.data, *block_cfg.addr);
+	}
+	size = sprintf(buf, "%x\n", data);
+
+	return size;
+}
+
+static ssize_t arisc_twi_write_block_data_store(struct device *dev,
+		struct device_attribute *attr, const char *buf, size_t size)
+{
+	u32 ret = 0;
+
+	sscanf(buf, "%x %x", (u32 *)&regaddr, (u32 *)&data);
+	if ((regaddr < 0) || (regaddr > 0xff)) {
+		ARISC_WRN("invalid paras, regaddr:0x%x, data:0x%x\n",
+				regaddr, data);
+		ARISC_WRN("echo like: echo regaddr data > twi_write_block_data\n");
+		return size;
+	}
+
+	block_cfg.msgattr = ARISC_MESSAGE_ATTR_SOFTSYN;
+	block_cfg.len = 1;
+	block_cfg.addr = &regaddr;
+	block_cfg.data = &data;
+	ret = arisc_twi_write_block_data(&block_cfg);
+	if (ret) {
+		ARISC_ERR("twi write data:0x%x to regaddr:0x%x fail\n",
+			*block_cfg.data, *block_cfg.addr);
+	} else {
+		ARISC_LOG("twi write data:0x%x to regaddr:0x%x success\n",
+			*block_cfg.data, *block_cfg.addr);
+	}
+
+	return size;
+}
+#else
 static ssize_t arisc_rsb_read_block_data_show(struct device *dev,
 		struct device_attribute *attr, char *buf)
 {
@@ -623,6 +744,7 @@ static ssize_t arisc_rsb_write_block_data_store(struct device *dev,
 
 	return size;
 }
+#endif
 
 #ifdef CONFIG_PM
 static int sunxi_arisc_suspend(struct device *dev)
@@ -672,8 +794,13 @@ static struct device_attribute sunxi_arisc_attrs[] = {
 	__ATTR(sst_power_consume_mask,  S_IRUGO | S_IWUSR,  arisc_power_consum_show,            arisc_power_consum_store),
 	__ATTR(sst_power_real_info,     S_IRUGO,            arisc_power_trueinfo_show,          NULL),
 	__ATTR(freq,                    S_IRUGO | S_IWUSR,  arisc_freq_show,                    arisc_freq_store),
+#if defined CONFIG_ARCH_SUN50IW2P1
+	__ATTR(twi_read_block_data,     S_IRUGO | S_IWUSR,  arisc_twi_read_block_data_show,     arisc_twi_read_block_data_store),
+	__ATTR(twi_write_block_data,    S_IRUGO | S_IWUSR,  arisc_twi_write_block_data_show,    arisc_twi_write_block_data_store),
+#else
 	__ATTR(rsb_read_block_data,     S_IRUGO | S_IWUSR,  arisc_rsb_read_block_data_show,     arisc_rsb_read_block_data_store),
 	__ATTR(rsb_write_block_data,    S_IRUGO | S_IWUSR,  arisc_rsb_write_block_data_show,    arisc_rsb_write_block_data_store),
+#endif
 };
 
 static void sunxi_arisc_sysfs(struct platform_device *pdev)
@@ -709,6 +836,8 @@ static int  sunxi_arisc_clk_cfg(struct platform_device *pdev)
 		return -EINVAL;
 	}
 
+
+#if (defined CONFIG_ARCH_SUN50IW1P1)
 	if(clk_prepare_enable(arisc_cfg.dram.pllddr0)) {
 		ARISC_ERR("try to enable pll_ddr0 output failed!\n");
 		return -EINVAL;
@@ -718,6 +847,12 @@ static int  sunxi_arisc_clk_cfg(struct platform_device *pdev)
 		ARISC_ERR("try to enable pll_ddr1 output failed!\n");
 		return -EINVAL;
 	}
+#elif (defined CONFIG_ARCH_SUN50IW2P1)
+	if (clk_prepare_enable(arisc_cfg.dram.pllddr0)) {
+		ARISC_ERR("try to enable pll_ddr0 output failed!\n");
+		return -EINVAL;
+	}
+#endif
 
 	ARISC_INF("device [%s] clk resource request ok\n", dev_name(&pdev->dev));
 
@@ -726,7 +861,9 @@ static int  sunxi_arisc_clk_cfg(struct platform_device *pdev)
 
 static int  sunxi_arisc_pin_cfg(struct platform_device *pdev)
 {
-	struct platform_device *pdev_srsb, *pdev_suart, *pdev_sjtag;
+	struct platform_device *pdev_suart, *pdev_sjtag;
+	struct platform_device __maybe_unused *pdev_stwi;
+	struct platform_device __maybe_unused *pdev_srsb;
 	struct pinctrl *pinctrl = NULL;
 
 	ARISC_INF("device [%s] pin resource request enter\n", dev_name(&pdev->dev));
@@ -744,6 +881,21 @@ static int  sunxi_arisc_pin_cfg(struct platform_device *pdev)
 		}
 	}
 
+#if defined CONFIG_ARCH_SUN50IW2P1
+	/* s_twi0 gpio */
+	if (arisc_cfg.stwi.status) {
+		pdev_stwi = of_find_device_by_node(arisc_cfg.stwi.np);
+		if (!pdev_stwi) {
+			ARISC_ERR("get s_twi0 platform_device error!\n");
+			return -EINVAL;
+		}
+		pinctrl = pinctrl_get_select_default(&pdev_stwi->dev);
+		if (!pinctrl || IS_ERR(pinctrl)) {
+			ARISC_ERR("set s_twi0 pin error!\n");
+			return -EINVAL;
+		}
+	}
+#else
 	/* s_rsb0 gpio */
 	if (arisc_cfg.srsb.status) {
 		pdev_srsb = of_find_device_by_node(arisc_cfg.srsb.np);
@@ -757,6 +909,7 @@ static int  sunxi_arisc_pin_cfg(struct platform_device *pdev)
 			return -EINVAL;
 		}
 	}
+#endif
 
 	/* s_jtag0 gpio */
 	if (arisc_cfg.sjtag.status) {
@@ -830,6 +983,7 @@ static int sunxi_arisc_parse_cfg(struct platform_device *pdev)
 		return -EINVAL;
 	}
 
+#if (defined CONFIG_ARCH_SUN50IW1P1)
 	arisc_cfg.dram.pllddr0 = of_clk_get_by_name(arisc_cfg.dram.np, "pll_ddr0");
 	if(!arisc_cfg.dram.pllddr0 || IS_ERR(arisc_cfg.dram.pllddr0)){
 		ARISC_ERR("try to get pll_ddr0 failed!\n");
@@ -841,7 +995,14 @@ static int sunxi_arisc_parse_cfg(struct platform_device *pdev)
 		ARISC_ERR("try to get pll_ddr1 failed!\n");
 		return -EINVAL;
 	}
-
+#elif (defined CONFIG_ARCH_SUN50IW2P1)
+	arisc_cfg.dram.pllddr0 = of_clk_get_by_name(arisc_cfg.dram.np,
+			"pll_ddr");
+	if (!arisc_cfg.dram.pllddr0 || IS_ERR(arisc_cfg.dram.pllddr0)) {
+		ARISC_ERR("try to get pll_ddr0 failed!\n");
+		return -EINVAL;
+	}
+#endif
 	/* parse s_uart node */
 	arisc_cfg.suart.np = of_find_compatible_node(NULL, NULL, "allwinner,s_uart");
 	if (IS_ERR(arisc_cfg.suart.np)) {
@@ -867,11 +1028,43 @@ static int sunxi_arisc_parse_cfg(struct platform_device *pdev)
 
 	arisc_cfg.suart.status = of_device_is_available(arisc_cfg.suart.np);
 
-	ARISC_INF("suart pbase:0x%llx, vbase:0x%p, size:0x%lx, irq:0x%x, status:%u\n",
-		arisc_cfg.suart.pbase, arisc_cfg.suart.vbase,
+	ARISC_INF("suart pbase:0x%p, vbase:0x%p, size:0x%zx, irq:0x%x, status:%u\n",
+		(void *)arisc_cfg.suart.pbase, arisc_cfg.suart.vbase,
 		arisc_cfg.suart.size, arisc_cfg.suart.irq,
 		arisc_cfg.suart.status);
 
+#if defined CONFIG_ARCH_SUN50IW2P1
+	/* parse s_twi node */
+	arisc_cfg.stwi.np = of_find_compatible_node(NULL, NULL,
+			"allwinner,s_twi");
+	if (IS_ERR(arisc_cfg.stwi.np)) {
+		ARISC_ERR("get [allwinner,s_twi] device node error\n");
+		return -EINVAL;
+	}
+
+	ret = of_address_to_resource(arisc_cfg.stwi.np, 0, &res);
+	if (ret || !res.start) {
+		ARISC_ERR("get stwi pbase error\n");
+		return -EINVAL;
+	}
+	arisc_cfg.stwi.pbase = res.start;
+	arisc_cfg.stwi.size = resource_size(&res);
+
+	arisc_cfg.stwi.vbase = of_iomap(arisc_cfg.stwi.np, 0);
+	if (!arisc_cfg.stwi.vbase)
+		panic("Can't map stwi registers");
+
+	arisc_cfg.stwi.irq = irq_of_parse_and_map(arisc_cfg.stwi.np, 0);
+	if (arisc_cfg.stwi.irq <= 0)
+		panic("Can't parse stwi IRQ");
+
+	arisc_cfg.stwi.status = of_device_is_available(arisc_cfg.stwi.np);
+
+	ARISC_INF("stwi pbase:0x%p, vbase:0x%p, size:0x%zx, irq:0x%x, status:%u\n",
+		(void *)arisc_cfg.stwi.pbase, arisc_cfg.stwi.vbase,
+		arisc_cfg.stwi.size, arisc_cfg.stwi.irq,
+		arisc_cfg.stwi.status);
+#else
 	/* parse s_rsb node */
 	arisc_cfg.srsb.np = of_find_compatible_node(NULL, NULL, "allwinner,s_rsb");
 	if (IS_ERR(arisc_cfg.srsb.np)) {
@@ -897,10 +1090,11 @@ static int sunxi_arisc_parse_cfg(struct platform_device *pdev)
 
 	arisc_cfg.srsb.status = of_device_is_available(arisc_cfg.srsb.np);
 
-	ARISC_INF("srsb pbase:0x%llx, vbase:0x%p, size:0x%lx, irq:0x%x, status:%u\n",
-		arisc_cfg.srsb.pbase, arisc_cfg.srsb.vbase,
+	ARISC_INF("srsb pbase:0x%p, vbase:0x%p, size:0x%zx, irq:0x%x, status:%u\n",
+		(void *)arisc_cfg.srsb.pbase, arisc_cfg.srsb.vbase,
 		arisc_cfg.srsb.size, arisc_cfg.srsb.irq,
 		arisc_cfg.srsb.status);
+#endif
 
 	/* parse s_jtag node */
 	arisc_cfg.sjtag.np = of_find_compatible_node(NULL, NULL, "allwinner,s_jtag");

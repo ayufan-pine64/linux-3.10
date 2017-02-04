@@ -4,7 +4,7 @@
 
 #include "disp_private.h"
 
-#define LCD_GPIO_NUM 6
+#define LCD_GPIO_NUM 8
 #define LCD_POWER_NUM 4
 #define LCD_POWER_STR_LEN 32
 #define LCD_GPIO_REGU_NUM 3
@@ -17,6 +17,7 @@ typedef struct
 
 	bool                  lcd_bl_en_used;
 	disp_gpio_set_t       lcd_bl_en;
+	int                   lcd_bl_gpio_hdl;
 	char                  lcd_bl_en_power[LCD_POWER_STR_LEN];
 
 	u32                   lcd_power_used[LCD_POWER_NUM];
@@ -27,7 +28,7 @@ typedef struct
 
 	bool                  lcd_gpio_used[LCD_GPIO_NUM];  //index4: scl;  index5: sda
 	disp_gpio_set_t       lcd_gpio[LCD_GPIO_NUM];       //index4: scl; index5: sda
-	u32                   gpio_hdl[LCD_GPIO_NUM];
+	int                   gpio_hdl[LCD_GPIO_NUM];
 	char                  lcd_gpio_power[LCD_GPIO_REGU_NUM][LCD_POWER_STR_LEN];
 
 	char                  lcd_pin_power[LCD_GPIO_REGU_NUM][LCD_POWER_STR_LEN];
@@ -49,5 +50,8 @@ s32 disp_lcd_gpio_set_direction(struct disp_device* lcd, u32 io_index, u32 direc
 s32 disp_lcd_gpio_get_value(struct disp_device* lcd,u32 io_index);
 s32 disp_lcd_gpio_set_value(struct disp_device* lcd, u32 io_index, u32 data);
 s32 disp_lcd_is_enabled(struct disp_device* lcd);
+#if defined(SUPPORT_EINK) && defined(CONFIG_EINK_PANEL_USED)
+extern int diplay_finish_flag;
+#endif
 
 #endif

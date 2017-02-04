@@ -118,7 +118,7 @@ struct cpufreq_interactive_tunables {
 	bool io_is_busy;
 
 #ifdef CONFIG_CPU_FREQ_INPUT_EVNT_NOTIFY
-	#define DEFAULT_INPUT_EVENT_FRFQ     (1008000)
+	#define DEFAULT_INPUT_EVENT_FRFQ_PERCENT     (80)
 	int input_dev_monitor;
 	int input_event_freq;
 #endif
@@ -372,7 +372,7 @@ static void cpufreq_interactive_timer(unsigned long data)
 	spin_lock_irqsave(&pcpu->target_freq_lock, flags);
 	do_div(cputime_speedadj, delta_time);
 	loadadjfreq = (unsigned int)cputime_speedadj * 100;
-	cpu_load = loadadjfreq / pcpu->target_freq;
+	cpu_load = loadadjfreq / pcpu->policy->cur;
 	tunables->boosted = tunables->boost_val || now < tunables->boostpulse_endtime;
 
 	if (cpu_load >= tunables->go_hispeed_load || tunables->boosted) {
@@ -1393,10 +1393,14 @@ static int cpufreq_governor_interactive(struct cpufreq_policy *policy,
 #ifdef CONFIG_CPU_FREQ_INPUT_EVNT_NOTIFY
 		if (!input_handler_register_count) {
 			cpumask_clear(&interactive_cpumask);
-			input_register_handler(&cpufreq_interactive_input_handler);
+			rc = input_register_handler(
+					&cpufreq_interactive_input_handler);
+			if (rc)
+				return rc;
 		}
 
-		tunables->input_event_freq = DEFAULT_INPUT_EVENT_FRFQ;
+		tunables->input_event_freq = policy->max *
+				DEFAULT_INPUT_EVENT_FRFQ_PERCENT / 100;
 		tunables->input_dev_monitor = true;
 		input_handler_register_count++;
 #endif

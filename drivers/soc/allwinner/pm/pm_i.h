@@ -16,7 +16,7 @@
 #include <linux/power/aw_pm.h>
 #include <stdarg.h>
 
-#if defined(CONFIG_ARCH_SUN8IW10P1)
+#if defined(CONFIG_ARCH_SUN8IW10P1) || defined(CONFIG_ARCH_SUN8IW11P1)
 #define readb(addr)		(*((volatile unsigned char  *)(addr)))
 #define readw(addr)		(*((volatile unsigned short *)(addr)))
 #define readl(addr)		(*((volatile unsigned long  *)(addr)))
@@ -27,40 +27,38 @@
 #endif
 
 /* define register for interrupt controller */
-typedef struct __MEM_INT_REG{
+typedef struct __MEM_INT_REG {
 
-    volatile __u32   Vector;
-    volatile __u32   BaseAddr;
-    volatile __u32   reserved0;
-    volatile __u32   NmiCtrl;
+	volatile __u32 Vector;
+	volatile __u32 BaseAddr;
+	volatile __u32 reserved0;
+	volatile __u32 NmiCtrl;
 
-    volatile __u32   IrqPend[3];
-    volatile __u32   reserved1;
+	volatile __u32 IrqPend[3];
+	volatile __u32 reserved1;
 
-    volatile __u32   FiqPend[3];
-    volatile __u32   reserved2;
+	volatile __u32 FiqPend[3];
+	volatile __u32 reserved2;
 
-    volatile __u32   TypeSel[3];
-    volatile __u32   reserved3;
+	volatile __u32 TypeSel[3];
+	volatile __u32 reserved3;
 
-    volatile __u32   IrqEn[3];
-    volatile __u32   reserved4;
+	volatile __u32 IrqEn[3];
+	volatile __u32 reserved4;
 
-    volatile __u32   IrqMask[3];
-    volatile __u32   reserved5;
+	volatile __u32 IrqMask[3];
+	volatile __u32 reserved5;
 
-    volatile __u32   IrqResp[3];
-    volatile __u32   reserved6;
+	volatile __u32 IrqResp[3];
+	volatile __u32 reserved6;
 
-    volatile __u32   IrqForce[3];
-    volatile __u32   reserved7;
+	volatile __u32 IrqForce[3];
+	volatile __u32 reserved7;
 
-    volatile __u32   IrqPrio[5];
+	volatile __u32 IrqPrio[5];
 } __mem_int_reg_t;
-
 
 void standby_delay(int cycle);
 void standby_delay_cycle(int cycle);
 
 #endif /*_PM_I_H*/
-

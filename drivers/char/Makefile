@@ -67,5 +67,6 @@ obj-y				+= sunxi-scr/
 obj-y				+= sunxi-di/
 obj-$(CONFIG_DUMP_REG) += dump_reg/
 obj-$(CONFIG_SUNXI_TRANSFORM)   += sunxi_tr/
-obj-y    += sunxi_sys_info/
+obj-$(CONFIG_ARCH_SUNXI)    += sunxi-sysinfo/
 obj-$(CONFIG_SUNXI_TIMER_TEST)	+= timer_test/
+obj-$(CONFIG_SUNXI_G2D)		+= sunxi_g2d/

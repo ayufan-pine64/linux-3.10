@@ -5,7 +5,7 @@
  * Author: Johannes Stezenbach <js@sig21.net>
  *
  * based on code from:
- *	Wolfson Microelectronics PLC.
+ *	wolfson Microelectronics PLC.
  *	  Mark Brown <broonie@opensource.wolfsonmicro.com>
  *	Freescale Semiconductor, Inc.
  *	  Timur Tabi <timur@freescale.com>
@@ -35,6 +35,10 @@
 #include <sound/soc-dapm.h>
 #include <sound/initval.h>
 #include <sound/tlv.h>
+#include <linux/gpio.h>
+#include <linux/of_gpio.h>
+#include <linux/sys_config.h>
+
 
 #include <sound/sta32x.h>
 #include "sta32x.h"
@@ -100,13 +104,18 @@ static const struct reg_default sta32x_regs[] = {
 	{ 0x28, 0xc0 },
 	{ 0x2b, 0x00 },
 	{ 0x2c, 0x0c },
+	{ 0x2d, 0x00 },
 };
 
+static u32 reset_gpio;
+static u32 power_gpio;
 /* regulator power supply names */
 static const char *sta32x_supply_names[] = {
+#ifndef CONFIG_ARCH_SUN8IW10
 	"Vdda",	/* analog supply, 3.3VV */
 	"Vdd3",	/* digital supply, 3.3V */
 	"Vcc"	/* power amp spply, 10V - 36V */
+#endif
 };
 
 /* codec private data */
@@ -328,7 +337,6 @@ static int sta32x_sync_coef_shadow(struct snd_soc_codec *codec)
 	}
 	return 0;
 }
-
 static int sta32x_cache_sync(struct snd_soc_codec *codec)
 {
 	struct sta32x_priv *sta32x = snd_soc_codec_get_drvdata(codec);
@@ -369,19 +377,15 @@ static void sta32x_watchdog(struct work_struct *work)
 
 static void sta32x_watchdog_start(struct sta32x_priv *sta32x)
 {
-	if (sta32x->pdata->needs_esd_watchdog) {
-		sta32x->shutdown = 0;
-		schedule_delayed_work(&sta32x->watchdog_work,
-				      round_jiffies_relative(HZ));
-	}
+	sta32x->shutdown = 0;
+	schedule_delayed_work(&sta32x->watchdog_work,
+			      round_jiffies_relative(HZ));
 }
 
 static void sta32x_watchdog_stop(struct sta32x_priv *sta32x)
 {
-	if (sta32x->pdata->needs_esd_watchdog) {
-		sta32x->shutdown = 1;
-		cancel_delayed_work_sync(&sta32x->watchdog_work);
-	}
+	sta32x->shutdown = 1;
+	cancel_delayed_work_sync(&sta32x->watchdog_work);
 }
 
 #define SINGLE_COEF(xname, index) \
@@ -512,8 +516,8 @@ static struct {
 } mclk_ratios[3][7] = {
 	{ { 768, 0 }, { 512, 1 }, { 384, 2 }, { 256, 3 },
 	  { 128, 4 }, { 576, 5 }, { 0, 0 } },
-	{ { 384, 2 }, { 256, 3 }, { 192, 4 }, { 128, 5 }, {64, 0 }, { 0, 0 } },
-	{ { 384, 2 }, { 256, 3 }, { 192, 4 }, { 128, 5 }, {64, 0 }, { 0, 0 } },
+	{ { 384, 0 }, { 256, 1 }, { 192, 2 }, { 128, 3 }, {64, 4 }, { 0, 0 } },
+	{ { 192, 0 }, { 128, 1 }, { 96, 2 }, { 64, 3 }, {32, 4 }, { 0, 0 } },
 };
 
 
@@ -578,9 +582,11 @@ static int sta32x_set_dai_sysclk(struct snd_soc_dai *codec_dai,
 		rate_max = 192000;
 	}
 
+#ifndef CONFIG_ARCH_SUN8IW10
 	codec_dai->driver->playback.rates = rates;
 	codec_dai->driver->playback.rate_min = rate_min;
 	codec_dai->driver->playback.rate_max = rate_max;
+#endif
 	return 0;
 }
 
@@ -667,9 +673,10 @@ static int sta32x_hw_params(struct snd_pcm_substream *substream,
 			mcs = mclk_ratios[ir][i].mcs;
 			break;
 		}
-	if (mcs < 0)
+	if (mcs < 0) {
+		pr_debug("mcs < 0 \n");
 		return -EINVAL;
-
+	}
 	confa = snd_soc_read(codec, STA32X_CONFA);
 	confa &= ~(STA32X_CONFA_MCS_MASK | STA32X_CONFA_IR_MASK);
 	confa |= (ir << STA32X_CONFA_IR_SHIFT) | (mcs << STA32X_CONFA_MCS_SHIFT);
@@ -748,6 +755,7 @@ static int sta32x_hw_params(struct snd_pcm_substream *substream,
 
 		break;
 	default:
+		pr_debug(" err fmt \n");
 		return -EINVAL;
 	}
 
@@ -801,7 +809,7 @@ static int sta32x_set_bias_level(struct snd_soc_codec *codec,
 		/* FIXME */
 		snd_soc_update_bits(codec, STA32X_CONFF,
 				    STA32X_CONFF_PWDN | STA32X_CONFF_EAPD,
-				    STA32X_CONFF_PWDN | STA32X_CONFF_EAPD);
+				    STA32X_CONFF_PWDN);
 
 		break;
 
@@ -842,12 +850,18 @@ static struct snd_soc_dai_driver sta32x_dai = {
 static int sta32x_suspend(struct snd_soc_codec *codec)
 {
 	sta32x_set_bias_level(codec, SND_SOC_BIAS_OFF);
+	if (gpio_is_valid(power_gpio)) {
+		gpio_set_value(power_gpio, 0);
+	}
 	return 0;
 }
 
 static int sta32x_resume(struct snd_soc_codec *codec)
 {
 	sta32x_set_bias_level(codec, SND_SOC_BIAS_STANDBY);
+	if (gpio_is_valid(power_gpio)) {
+		gpio_set_value(power_gpio, 1);
+	}
 	return 0;
 }
 #else
@@ -861,15 +875,15 @@ static int sta32x_probe(struct snd_soc_codec *codec)
 	int i, ret = 0, thermal = 0;
 
 	sta32x->codec = codec;
+#ifndef CONFIG_ARCH_SUN8IW10
 	sta32x->pdata = dev_get_platdata(codec->dev);
-
+#endif
 	ret = regulator_bulk_enable(ARRAY_SIZE(sta32x->supplies),
 				    sta32x->supplies);
 	if (ret != 0) {
 		dev_err(codec->dev, "Failed to enable supplies: %d\n", ret);
 		return ret;
 	}
-
 	/* Tell ASoC what kind of I/O to use to read the registers.  ASoC will
 	 * then do the I2C transactions itself.
 	 */
@@ -889,13 +903,19 @@ static int sta32x_probe(struct snd_soc_codec *codec)
 	regcache_cache_only(sta32x->regmap, true);
 	snd_soc_write(codec, STA32X_CONFC, 0xc2);
 	snd_soc_write(codec, STA32X_CONFE, 0xc2);
-	snd_soc_write(codec, STA32X_CONFF, 0x5c);
+	snd_soc_write(codec, STA32X_CONFF, 0x5d);
+	snd_soc_write(codec, STA32X_MVOL, 0xff);
+	snd_soc_write(codec, STA32X_CONFA, 0x61);
 	snd_soc_write(codec, STA32X_MMUTE, 0x10);
-	snd_soc_write(codec, STA32X_AUTO1, 0x60);
+	snd_soc_write(codec, STA32X_AUTO1, 0x80);
+	snd_soc_write(codec, STA32X_AUTO2, 0xC0);
+	snd_soc_write(codec, STA32X_C1CFG, 0x04);
+	snd_soc_write(codec, STA32X_C2CFG, 0x44);
 	snd_soc_write(codec, STA32X_AUTO3, 0x00);
-	snd_soc_write(codec, STA32X_C3CFG, 0x40);
+	snd_soc_write(codec, STA32X_C3CFG, 0x84);
+	snd_soc_write(codec, STA32X_B0CF1, 0x0);
 	regcache_cache_only(sta32x->regmap, false);
-
+#ifndef CONFIG_ARCH_SUN8IW10
 	/* set thermal warning adjustment and recovery */
 	if (!(sta32x->pdata->thermal_conf & STA32X_THERMAL_ADJUSTMENT_ENABLE))
 		thermal |= STA32X_CONFA_TWAB;
@@ -924,7 +944,7 @@ static int sta32x_probe(struct snd_soc_codec *codec)
 			    STA32X_CxCFG_OM_MASK,
 			    sta32x->pdata->ch3_output_mapping
 			    << STA32X_CxCFG_OM_SHIFT);
-
+#endif
 	/* initialize coefficient shadow RAM with reset values */
 	for (i = 4; i <= 49; i += 5)
 		sta32x->coef_shadow[i] = 0x400000;
@@ -936,8 +956,7 @@ static int sta32x_probe(struct snd_soc_codec *codec)
 	sta32x->coef_shadow[60] = 0x400000;
 	sta32x->coef_shadow[61] = 0x400000;
 
-	if (sta32x->pdata->needs_esd_watchdog)
-		INIT_DELAYED_WORK(&sta32x->watchdog_work, sta32x_watchdog);
+	INIT_DELAYED_WORK(&sta32x->watchdog_work, sta32x_watchdog);
 
 	sta32x_set_bias_level(codec, SND_SOC_BIAS_STANDBY);
 	/* Bias level configuration will have done an extra enable */
@@ -988,7 +1007,7 @@ static const struct snd_soc_codec_driver sta32x_codec = {
 static const struct regmap_config sta32x_regmap = {
 	.reg_bits =		8,
 	.val_bits =		8,
-	.max_register =		STA32X_FDRC2,
+	.max_register =		STA32X_STATUS,
 	.reg_defaults =		sta32x_regs,
 	.num_reg_defaults =	ARRAY_SIZE(sta32x_regs),
 	.cache_type =		REGCACHE_RBTREE,
@@ -1000,6 +1019,8 @@ static int sta32x_i2c_probe(struct i2c_client *i2c,
 {
 	struct sta32x_priv *sta32x;
 	int ret, i;
+	struct device_node *np = i2c->dev.of_node;
+	struct gpio_config config;
 
 	sta32x = devm_kzalloc(&i2c->dev, sizeof(struct sta32x_priv),
 			      GFP_KERNEL);
@@ -1016,7 +1037,37 @@ static int sta32x_i2c_probe(struct i2c_client *i2c,
 		dev_err(&i2c->dev, "Failed to request supplies: %d\n", ret);
 		return ret;
 	}
+#ifdef CONFIG_ARCH_SUN8IW10
+	reset_gpio = of_get_named_gpio_flags(np, "gpio-reset",
+						0, (enum of_gpio_flags *)&config);
+	if (!gpio_is_valid(reset_gpio)) {
+		pr_debug("failed to get gpio-reset gpio from dts,reset:%d\n", reset_gpio);
+	} else {
+		ret = devm_gpio_request(&i2c->dev, reset_gpio, "RESET");
+		if (ret) {
+			pr_debug("failed to request gpio-reset gpio\n");
+		} else {
+			gpio_direction_output(reset_gpio, 1);
+			gpio_set_value(reset_gpio, 0);
+			msleep(5);
+			gpio_set_value(reset_gpio, 1);
+		}
+	}
+	/*initial speaker gpio */
+	power_gpio = of_get_named_gpio_flags(np, "power_gpio", 0, (enum of_gpio_flags *)&config);
+	if (!gpio_is_valid(power_gpio)) {
+		pr_err("failed to get power_gpio gpio from dts,power_gpio:%d\n", power_gpio);
+	} else {
+		ret = devm_gpio_request(&i2c->dev, power_gpio, "power_gpio");
+		if (ret) {
+			pr_err("failed to request power_gpio  gpio\n");
+		} else {
+			gpio_direction_output(power_gpio, 1);
+			gpio_set_value(power_gpio, 1);
+		}
+	}
 
+#endif
 	sta32x->regmap = devm_regmap_init_i2c(i2c, &sta32x_regmap);
 	if (IS_ERR(sta32x->regmap)) {
 		ret = PTR_ERR(sta32x->regmap);
@@ -1025,7 +1076,6 @@ static int sta32x_i2c_probe(struct i2c_client *i2c,
 	}
 
 	i2c_set_clientdata(i2c, sta32x);
-
 	ret = snd_soc_register_codec(&i2c->dev, &sta32x_codec, &sta32x_dai, 1);
 	if (ret != 0)
 		dev_err(&i2c->dev, "Failed to register codec (%d)\n", ret);
@@ -1040,9 +1090,10 @@ static int sta32x_i2c_remove(struct i2c_client *client)
 }
 
 static const struct i2c_device_id sta32x_i2c_id[] = {
-	{ "sta326", 0 },
+	{ "sta32x", 0 },
 	{ "sta328", 0 },
 	{ "sta329", 0 },
+	{ "sta369", 0 },
 	{ }
 };
 MODULE_DEVICE_TABLE(i2c, sta32x_i2c_id);

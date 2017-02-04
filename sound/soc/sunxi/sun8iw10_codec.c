@@ -31,6 +31,8 @@
 #include <linux/pm.h>
 #include <linux/of_gpio.h>
 #include <linux/sys_config.h>
+
+#include "sunxi_rw_func.h"
 #include "sunxi_cpudai.h"
 
 #define DRV_NAME "sunxi-internal-codec"
@@ -68,17 +70,17 @@ static const struct codec_sr codec_sr_s[] = {
 };
 
 static struct label reg_labels[]={
-    LABEL(AC_DAC_DPC),
-    LABEL(AC_DAC_FIFOC),
-    LABEL(AC_DAC_FIFOS),
-    LABEL(AC_ADC_FIFOC),
-    LABEL(AC_ADC_FIFOS),
-    LABEL(AC_ADC_RXDATA),
-    LABEL(AC_ADC_TXDATA),
-    LABEL(AC_DAC_CNT),
-    LABEL(AC_ADC_CNT),
-	LABEL(AC_DAC_DG),
-	LABEL(AC_ADC_DG),
+	LABEL(SUNXI_DAC_DPC),
+	LABEL(SUNXI_DAC_FIFOC),
+	LABEL(SUNXI_DAC_FIFOS),
+	LABEL(SUNXI_ADC_FIFOC),
+	LABEL(SUNXI_ADC_FIFOS),
+	LABEL(SUNXI_ADC_RXDATA),
+	LABEL(SUNXI_DAC_TXDATA),
+	LABEL(SUNXI_DAC_CNT),
+	LABEL(SUNXI_ADC_CNT),
+	LABEL(SUNXI_DAC_DG),
+	LABEL(SUNXI_ADC_DG),
 
 	LABEL(HP_VOL),
 	LABEL(LOMIX_SRC),
@@ -105,6 +107,67 @@ static struct label reg_labels[]={
 	LABEL_END,
 };
 
+static void adcagc_config(struct snd_soc_codec *codec)
+{
+}
+
+static void adcdrc_config(struct snd_soc_codec *codec)
+{
+}
+
+static void adchpf_config(struct snd_soc_codec *codec)
+{
+	snd_soc_update_bits(codec, SUNXI_ADC_DRC_HHPFC, (0xFF<<ADC_HHPF_CONF), (0xFF<<ADC_HHPF_CONF));
+	snd_soc_update_bits(codec, SUNXI_ADC_DRC_LHPFC, (0xFFFF<<ADC_LHPF_CONF), (0xFAC1<<ADC_LHPF_CONF));
+}
+
+static void adchpf_enable(struct snd_soc_codec *codec, bool on)
+{
+	if (on) {
+		snd_soc_update_bits(codec, SUNXI_ADC_DAP_CTR, (0x01<<ENADC_DRC), (0x01<<ENADC_DRC));
+		snd_soc_update_bits(codec, SUNXI_ADC_DAP_CTR, (0x01<<ADC_DRC_HPF_EN), (0x01<<ADC_DRC_HPF_EN));
+	} else {
+		snd_soc_update_bits(codec, SUNXI_ADC_DAP_CTR, (0x01<<ENADC_DRC), (0x0<<ENADC_DRC));
+		snd_soc_update_bits(codec, SUNXI_ADC_DAP_CTR, (0x01<<ADC_DRC_HPF_EN), (0x0<<ADC_DRC_HPF_EN));
+	}
+}
+
+static void dacdrc_config(struct snd_soc_codec *codec)
+{
+}
+
+static void dachpf_config(struct snd_soc_codec *codec)
+{
+}
+
+static void adcdrc_enable(struct snd_soc_codec *codec, bool on)
+{
+	if (on) {
+	} else {
+	}
+}
+
+static void dacdrc_enable(struct snd_soc_codec *codec, bool on)
+{
+	if (on) {
+	} else {
+	}
+}
+
+static void adcagc_enable(struct snd_soc_codec *codec, bool on)
+{
+	if (on) {
+	} else {
+	}
+}
+
+static void dachpf_enable(struct snd_soc_codec *codec, bool on)
+{
+	if (on) {
+	} else {
+	}
+}
+
 /*
 *enable the codec function which should be enable during system init.
 */
@@ -119,22 +182,47 @@ static int codec_init(struct sunxi_codec *sunxi_internal_codec)
 		snd_soc_update_bits(codec, HP_CTRL, (0x3<<HPCOM_FC), (0x0<<HPCOM_FC));
 		snd_soc_update_bits(codec, HP_CTRL, (0x1<<HPCOM_PT), (0x0<<HPCOM_PT));
 	}
+
+	if (sunxi_internal_codec->hwconfig.adcagc_cfg)
+		adcagc_config(sunxi_internal_codec->codec);
+
+	if (sunxi_internal_codec->hwconfig.adcdrc_cfg)
+		adcdrc_config(sunxi_internal_codec->codec);
+
+	if (sunxi_internal_codec->hwconfig.adchpf_cfg)
+		adchpf_config(sunxi_internal_codec->codec);
+
+	if (sunxi_internal_codec->hwconfig.dacdrc_cfg)
+		dacdrc_config(sunxi_internal_codec->codec);
+
+	if (sunxi_internal_codec->hwconfig.dachpf_cfg)
+		dachpf_config(sunxi_internal_codec->codec);
+
+	snd_soc_update_bits(codec, HP_CTRL, (0x1<<HPPAEN), (0x1<<HPPAEN));
 	snd_soc_update_bits(codec, DAC_PA_SRC, (0x1<<LHPPAMUTE), (0x0<<LHPPAMUTE));
 	snd_soc_update_bits(codec, DAC_PA_SRC, (0x1<<RHPPAMUTE), (0x0<<RHPPAMUTE));
+
+	/*ADC fifo delay function for waiting data after EN_AD */
+	snd_soc_update_bits(codec, SUNXI_ADC_FIFOC, (0x1<<ADCDFEN), (0x1<<ADCDFEN));
 
 	/*when TX FIFO available room less than or equal N,
 	* DRQ Requeest will be de-asserted.
 	*/
-	snd_soc_update_bits(codec, AC_DAC_FIFOC, (0x3<<DAC_DRQ_CLR_CNT), (0x3<<DAC_DRQ_CLR_CNT));
-	snd_soc_update_bits(codec, AC_DAC_FIFOC, (0x1<<FIFO_FLUSH), (0x1<<FIFO_FLUSH));
+	snd_soc_update_bits(codec, SUNXI_DAC_FIFOC,
+			(0x3<<DAC_DRQ_CLR_CNT), (0x3<<DAC_DRQ_CLR_CNT));
+	snd_soc_update_bits(codec, SUNXI_DAC_FIFOC,
+			(0x1<<FIFO_FLUSH), (0x1<<FIFO_FLUSH));
 	/*
 	*	0:64-Tap FIR
 	*	1:32-Tap FIR
 	*/
-	snd_soc_update_bits(codec, AC_DAC_FIFOC, (0x1<<FIR_VER), (0x0<<FIR_VER));
+	snd_soc_update_bits(codec, SUNXI_DAC_FIFOC,
+			(0x1<<FIR_VER), (0x0<<FIR_VER));
 
-	snd_soc_update_bits(codec, AC_ADC_FIFOC, (0x1<<ADC_FIFO_FLUSH), (0x1<<ADC_FIFO_FLUSH));
-
+	snd_soc_update_bits(codec, SUNXI_ADC_FIFOC,
+			(0x1<<ADC_FIFO_FLUSH), (0x1<<ADC_FIFO_FLUSH));
+	snd_soc_update_bits(codec, PA_POP_CTR,
+			(0x7<<PA_POP_CTRL), (0x02<<PA_POP_CTRL));
 	return 0;
 }
 
@@ -144,11 +232,12 @@ static int late_enable_dac(struct snd_soc_dapm_widget *w,
 	struct snd_soc_codec *codec = w->codec;
 	struct sunxi_codec *sunxi_internal_codec = snd_soc_codec_get_drvdata(codec);
 	mutex_lock(&sunxi_internal_codec->dac_mutex);
-	pr_debug("..dac power state change.\n");
-	switch (event) {
+	pr_debug("..dac power state change \n");
+        switch (event) {
 	case SND_SOC_DAPM_PRE_PMU:
 		if (sunxi_internal_codec->dac_enable == 0) {
-			snd_soc_update_bits(codec, AC_DAC_DPC, (0x1<<EN_DAC), (0x1<<EN_DAC));
+			snd_soc_update_bits(codec, SUNXI_DAC_DPC,
+					(0x1<<EN_DAC), (0x1<<EN_DAC));
 		}
 		sunxi_internal_codec->dac_enable++;
 		break;
@@ -156,7 +245,8 @@ static int late_enable_dac(struct snd_soc_dapm_widget *w,
 		if (sunxi_internal_codec->dac_enable > 0) {
 			sunxi_internal_codec->dac_enable--;
 			if (sunxi_internal_codec->dac_enable == 0) {
-				snd_soc_update_bits(codec, AC_DAC_DPC, (0x1<<EN_DAC), (0x0<<EN_DAC));
+				snd_soc_update_bits(codec, SUNXI_DAC_DPC,
+						(0x1<<EN_DAC), (0x0<<EN_DAC));
 			}
 		}
 		break;
@@ -175,7 +265,11 @@ static int late_enable_adc(struct snd_soc_dapm_widget *w,
 	switch (event) {
 	case SND_SOC_DAPM_PRE_PMU:
 		if (sunxi_internal_codec->adc_enable == 0) {
-			snd_soc_update_bits(codec, AC_ADC_FIFOC, (0x1<<EN_AD), (0x1<<EN_AD));
+			/* should flush adc fifo before enable ADC */
+			snd_soc_update_bits(codec, SUNXI_DAC_FIFOC,
+					(0x1<<FIFO_FLUSH), (0x1<<FIFO_FLUSH));
+			snd_soc_update_bits(codec, SUNXI_ADC_FIFOC,
+					(0x1<<EN_AD), (0x1<<EN_AD));
 		}
 		sunxi_internal_codec->adc_enable++;
 		break;
@@ -183,7 +277,11 @@ static int late_enable_adc(struct snd_soc_dapm_widget *w,
 		if (sunxi_internal_codec->adc_enable > 0) {
 			sunxi_internal_codec->adc_enable--;
 			if (sunxi_internal_codec->adc_enable == 0) {
-				snd_soc_update_bits(codec, AC_ADC_FIFOC, (0x1<<EN_AD), (0x0<<EN_AD));
+				snd_soc_update_bits(codec, SUNXI_ADC_FIFOC,
+					(0x1<<EN_AD), (0x0<<EN_AD));
+				/* should flush adc fifo after disable ADC */
+				snd_soc_update_bits(codec, SUNXI_DAC_FIFOC,
+					(0x1<<FIFO_FLUSH), (0x1<<FIFO_FLUSH));
 			}
 		}
 		break;
@@ -200,14 +298,11 @@ static int ac_headphone_event(struct snd_soc_dapm_widget *w,
 	switch (event) {
 	case SND_SOC_DAPM_POST_PMU:
 		/*open*/
-		snd_soc_update_bits(codec, HP_CTRL, (0x1<<HPPAEN), (0x1<<HPPAEN));
-		msleep(10);
 		snd_soc_update_bits(codec, DAC_PA_SRC, (0x1<<LHPPAMUTE), (0x1<<LHPPAMUTE));
 		snd_soc_update_bits(codec, DAC_PA_SRC, (0x1<<RHPPAMUTE), (0x1<<RHPPAMUTE));
 		break;
 	case SND_SOC_DAPM_PRE_PMD:
 		/*close*/
-		snd_soc_update_bits(codec, HP_CTRL, (0x1<<HPPAEN), (0x0<<HPPAEN));
 		snd_soc_update_bits(codec, DAC_PA_SRC, (0x1<<LHPPAMUTE), (0x0<<LHPPAMUTE));
 		snd_soc_update_bits(codec, DAC_PA_SRC, (0x1<<RHPPAMUTE), (0x0<<RHPPAMUTE));
 		break;
@@ -248,8 +343,50 @@ static int ac_speaker_event(struct snd_soc_dapm_widget *w,
 	return 0;
 }
 
+static int codec_get_hub_mode(struct snd_kcontrol *kcontrol,
+			struct snd_ctl_elem_value *ucontrol)
+{
+	struct snd_soc_codec *codec = snd_kcontrol_chip(kcontrol);
+	unsigned int reg_val;
+
+	reg_val = snd_soc_read(codec, SUNXI_DAC_DPC);
+
+	ucontrol->value.integer.value[0] = ((reg_val & (1<<HUB_EN)) ? 2 : 1);
+	return 0;
+}
+
+static int codec_set_hub_mode(struct snd_kcontrol *kcontrol,
+			struct snd_ctl_elem_value *ucontrol)
+{
+	struct snd_soc_codec *codec = snd_kcontrol_chip(kcontrol);
+
+	switch (ucontrol->value.integer.value[0]) {
+	case	0:
+	case	1:
+		snd_soc_update_bits(codec, SUNXI_DAC_DPC, (0x1<<HUB_EN), (0x0<<HUB_EN));
+		snd_soc_update_bits(codec, SUNXI_DAC_FIFOC, (0x1<<DAC_DRQ_EN), (0x0<<DAC_DRQ_EN));
+		break;
+	case	2:
+		snd_soc_update_bits(codec, SUNXI_DAC_DPC, (0x1<<HUB_EN), (0x1<<HUB_EN));
+		snd_soc_update_bits(codec, SUNXI_DAC_FIFOC, (0x1<<DAC_DRQ_EN), (0x1<<DAC_DRQ_EN));
+		break;
+	default:
+		return -EINVAL;
+	}
+	return 0;
+}
+
+
+/* sunxi codec hub mdoe select */
+static const char *codec_hub_function[] = {"null" , "hub_disable", "hub_enable"};
+
+static const struct soc_enum codec_hub_mode_enum[] = {
+	SOC_ENUM_SINGLE_EXT(ARRAY_SIZE(codec_hub_function),
+			codec_hub_function),
+};
+
 static const struct snd_kcontrol_new sunxi_codec_controls[] = {
-	SOC_SINGLE_TLV("digital volume", AC_DAC_DPC, DVOL, 0x3f, 0, dig_vol_tlv),
+	SOC_SINGLE_TLV("digital volume", SUNXI_DAC_DPC, DVOL, 0x3f, 0, dig_vol_tlv),
 
 	/*analog control*/
 	SOC_SINGLE_TLV("headphone volume", HP_VOL, HPVOL, 0x3f, 0, headphone_vol_tlv),
@@ -262,6 +399,9 @@ static const struct snd_kcontrol_new sunxi_codec_controls[] = {
 	SOC_SINGLE_TLV("LINEINL/R to L_R output mixer gain", LINEIN_GCTR, LINEING, 0x7, 0, linein_to_l_r_mix_vol_tlv),
 	/*ADC*/
 	SOC_SINGLE_TLV("ADC input gain control", ADC_A_CTR, ADCG, 0x7, 0, adc_input_gain_tlv),
+
+	/* codec hub mode */
+	SOC_ENUM_EXT("codec hub mode" , codec_hub_mode_enum[0], codec_get_hub_mode, codec_set_hub_mode),
 };
 
 /*output mixer source select*/
@@ -284,7 +424,7 @@ static const struct snd_kcontrol_new ac_routmix_controls[] = {
 /*hp source select*/
 /*0x0a:headphone input source*/
 static const char *ac_hp_r_func_sel[] = {
-	"DACR HPR Switch", "Right Analog Mixer HPR Switch"};
+	"DACR HPR Switch", "MIXER_R Switch"};
 static const struct soc_enum ac_hp_r_func_enum =
 	SOC_ENUM_SINGLE(DAC_PA_SRC, RHPIS, 2, ac_hp_r_func_sel);
 
@@ -292,7 +432,7 @@ static const struct snd_kcontrol_new ac_hp_r_func_controls =
 	SOC_DAPM_ENUM("HP_R Mux", ac_hp_r_func_enum);
 
 static const char *ac_hp_l_func_sel[] = {
-	"DACL HPL Switch", "Left Analog Mixer HPL Switch"};
+	"DACL HPL Switch", "MIXER_L Switch"};
 static const struct soc_enum ac_hp_l_func_enum =
 	SOC_ENUM_SINGLE(DAC_PA_SRC, LHPIS, 2, ac_hp_l_func_sel);
 
@@ -301,17 +441,17 @@ static const struct snd_kcontrol_new ac_hp_l_func_controls =
 
 /*0x05:spk source select*/
 static const char *ac_rspks_func_sel[] = {
-	"MIXER Switch", "MIXR MIXL Switch", "MIXR+MIXL"};
+	"NULL", "MIXER_L Switch", "MIXER_R Switch", "MIXR+MIXL"};
 static const struct soc_enum ac_rspks_func_enum =
-	SOC_ENUM_SINGLE(SPKR_CTR, SPKR_SS, 3, ac_rspks_func_sel);
+	SOC_ENUM_SINGLE(SPKR_CTR, SPKR_SS, 4, ac_rspks_func_sel);
 
 static const struct snd_kcontrol_new ac_rspks_func_controls =
 	SOC_DAPM_ENUM("SPK_R Mux", ac_rspks_func_enum);
 
 static const char *ac_lspks_l_func_sel[] = {
-	"MIXEL Switch", "MIXL MIXR  Switch", "MIXR+MIXL"};
+	"NULL", "MIXER_L Switch", "MIXER_R Switch", "MIXR+MIXL"};
 static const struct soc_enum ac_lspks_func_enum =
-	SOC_ENUM_SINGLE(SPKL_CTR, SPKL_SS, 3, ac_lspks_l_func_sel);
+	SOC_ENUM_SINGLE(SPKL_CTR, SPKL_SS, 4, ac_lspks_l_func_sel);
 
 static const struct snd_kcontrol_new ac_lspks_func_controls =
 	SOC_DAPM_ENUM("SPK_L Mux", ac_lspks_func_enum);
@@ -339,8 +479,8 @@ static const struct snd_soc_dapm_widget ac_dapm_widgets[] = {
 	SND_SOC_DAPM_MIXER_E("Right Output Mixer", DAC_PA_SRC, RMIXEN, 0,
 			ac_routmix_controls, ARRAY_SIZE(ac_routmix_controls), late_enable_dac, SND_SOC_DAPM_PRE_PMU|SND_SOC_DAPM_POST_PMD),
 
-	SND_SOC_DAPM_MUX("HP_R Mux", SND_SOC_NOPM, 0, 0,	&ac_hp_r_func_controls),
-	SND_SOC_DAPM_MUX("HP_L Mux", SND_SOC_NOPM, 0, 0,	&ac_hp_l_func_controls),
+	SND_SOC_DAPM_MUX_E("HP_R Mux", SND_SOC_NOPM, 0, 0,	&ac_hp_r_func_controls,late_enable_dac, SND_SOC_DAPM_PRE_PMU|SND_SOC_DAPM_POST_PMD),
+	SND_SOC_DAPM_MUX_E("HP_L Mux", SND_SOC_NOPM, 0, 0,	&ac_hp_l_func_controls,late_enable_dac, SND_SOC_DAPM_PRE_PMU|SND_SOC_DAPM_POST_PMD),
 
 	/*0x05*/
 	SND_SOC_DAPM_MUX("SPK_R Mux", SND_SOC_NOPM, 0, 0,	&ac_rspks_func_controls),
@@ -394,10 +534,10 @@ static const struct snd_soc_dapm_route ac_dapm_routes[] = {
 
 	/*hp mux*/
 	{"HP_R Mux", "DACR HPR Switch",		"DAC_R"},
-	{"HP_R Mux", "Right Analog Mixer HPR Switch",		"Right Output Mixer"},
+	{"HP_R Mux", "MIXER_R Switch",		"Right Output Mixer"},
 
 	{"HP_L Mux", "DACL HPL Switch",		"DAC_L"},
-	{"HP_L Mux", "Left Analog Mixer HPL Switch",		"Left Output Mixer"},
+	{"HP_L Mux", "MIXER_L Switch",		"Left Output Mixer"},
 
 	/*hp endpoint*/
 	{"HPOUTR", NULL,				"HP_R Mux"},
@@ -410,11 +550,13 @@ static const struct snd_soc_dapm_route ac_dapm_routes[] = {
 	{"SPK_LR Adder", NULL,				"Right Output Mixer"},
 	{"SPK_LR Adder", NULL,				"Left Output Mixer"},
 
-	{"SPK_L Mux", "MIXL MIXR  Switch",				"SPK_LR Adder"},
-	{"SPK_L Mux", "MIXEL Switch",				"Left Output Mixer"},
+	{"SPK_L Mux", "MIXR+MIXL",				"SPK_LR Adder"},
+	{"SPK_L Mux", "MIXER_L Switch",				"Left Output Mixer"},
+	{"SPK_L Mux", "MIXER_R Switch",				"Right Output Mixer"},
 
-	{"SPK_R Mux", "MIXR MIXL Switch",				"SPK_LR Adder"},
-	{"SPK_R Mux", "MIXER Switch",				"Right Output Mixer"},
+	{"SPK_R Mux", "MIXR+MIXL",				"SPK_LR Adder"},
+	{"SPK_R Mux", "MIXER_R Switch",				"Right Output Mixer"},
+	{"SPK_R Mux", "MIXER_L Switch",				"Left Output Mixer"},
 
 	{"SPKR", NULL,				"SPK_R Mux"},
 	{"SPKL", NULL,				"SPK_L Mux"},
@@ -438,6 +580,23 @@ static const struct snd_soc_dapm_route ac_dapm_routes[] = {
 
 static int codec_start(struct snd_pcm_substream *substream, struct snd_soc_dai *codec_dai)
 {
+	struct snd_soc_codec *codec = codec_dai->codec;
+	struct sunxi_codec *sunxi_internal_codec = snd_soc_codec_get_drvdata(codec);
+	if (substream->stream == SNDRV_PCM_STREAM_PLAYBACK) {
+		if (sunxi_internal_codec->hwconfig.dacdrc_cfg)
+			dacdrc_enable(codec, 1);
+		if (sunxi_internal_codec->hwconfig.dachpf_cfg)
+			dachpf_enable(codec, 1);
+	} else {
+		if (sunxi_internal_codec->hwconfig.adcagc_cfg)
+			adcagc_enable(codec, 1);
+
+		if (sunxi_internal_codec->hwconfig.adcdrc_cfg)
+			adcdrc_enable(codec, 1);
+
+		if (sunxi_internal_codec->hwconfig.adchpf_cfg)
+			adchpf_enable(codec, 1);
+	}
 	return 0;
 }
 
@@ -455,6 +614,24 @@ static int codec_mute(struct snd_soc_dai *codec_dai, int mute)
 static void codec_shutdown(struct snd_pcm_substream *substream,
 	struct snd_soc_dai *codec_dai)
 {
+	struct snd_soc_codec *codec = codec_dai->codec;
+	struct sunxi_codec *sunxi_internal_codec = snd_soc_codec_get_drvdata(codec);
+
+	if (substream->stream == SNDRV_PCM_STREAM_PLAYBACK) {
+		if (sunxi_internal_codec->hwconfig.dacdrc_cfg)
+			dacdrc_enable(codec, 0);
+		if (sunxi_internal_codec->hwconfig.dachpf_cfg)
+			dachpf_enable(codec, 0);
+	} else {
+		if (sunxi_internal_codec->hwconfig.adcagc_cfg)
+			adcagc_enable(codec, 0);
+
+		if (sunxi_internal_codec->hwconfig.adcdrc_cfg)
+			adcdrc_enable(codec, 0);
+
+		if (sunxi_internal_codec->hwconfig.adchpf_cfg)
+			adchpf_enable(codec, 0);
+	}
 }
 
 static int codec_trigger(struct snd_pcm_substream *substream,
@@ -468,12 +645,14 @@ static int codec_trigger(struct snd_pcm_substream *substream,
 			case SNDRV_PCM_TRIGGER_RESUME:
 			case SNDRV_PCM_TRIGGER_PAUSE_RELEASE:
 				/*enable dac drq*/
-				snd_soc_update_bits(codec, AC_DAC_FIFOC, (0x1<<DAC_DRQ_EN), (0x1<<DAC_DRQ_EN));
+				snd_soc_update_bits(codec, SUNXI_DAC_FIFOC,
+					(0x1<<DAC_DRQ_EN), (0x1<<DAC_DRQ_EN));
 				return 0;
 			case SNDRV_PCM_TRIGGER_SUSPEND:
 			case SNDRV_PCM_TRIGGER_STOP:
 			case SNDRV_PCM_TRIGGER_PAUSE_PUSH:
-				snd_soc_update_bits(codec, AC_DAC_FIFOC, (0x1<<DAC_DRQ_EN), (0x0<<DAC_DRQ_EN));
+				snd_soc_update_bits(codec, SUNXI_DAC_FIFOC,
+					(0x1<<DAC_DRQ_EN), (0x0<<DAC_DRQ_EN));
 				return 0;
 			default:
 				return -EINVAL;
@@ -483,12 +662,14 @@ static int codec_trigger(struct snd_pcm_substream *substream,
 		case SNDRV_PCM_TRIGGER_START:
 		case SNDRV_PCM_TRIGGER_RESUME:
 		case SNDRV_PCM_TRIGGER_PAUSE_RELEASE:
-			snd_soc_update_bits(codec, AC_ADC_FIFOC, (0x1<<ADC_DRQ_EN), (0x1<<ADC_DRQ_EN));
+			snd_soc_update_bits(codec, SUNXI_ADC_FIFOC,
+					(0x1<<ADC_DRQ_EN), (0x1<<ADC_DRQ_EN));
 			return 0;
 		case SNDRV_PCM_TRIGGER_SUSPEND:
 		case SNDRV_PCM_TRIGGER_STOP:
 		case SNDRV_PCM_TRIGGER_PAUSE_PUSH:
-			snd_soc_update_bits(codec, AC_ADC_FIFOC, (0x1<<ADC_DRQ_EN), (0x0<<ADC_DRQ_EN));
+			snd_soc_update_bits(codec, SUNXI_ADC_FIFOC,
+					(0x1<<ADC_DRQ_EN), (0x0<<ADC_DRQ_EN));
 			return 0;
 		default:
 			pr_err("error:%s,%d\n", __func__, __LINE__);
@@ -508,54 +689,70 @@ static int codec_hw_params(struct snd_pcm_substream *substream,
 	for (i = 0; i < ARRAY_SIZE(codec_sr_s); i++) {
 		if (codec_sr_s[i].samplerate ==  params_rate(params)) {
 			if (substream->stream == SNDRV_PCM_STREAM_PLAYBACK) {
-				snd_soc_update_bits(codec, AC_DAC_FIFOC, (0x7<<DAC_FS), (codec_sr_s[i].srbit<<DAC_FS));
-				snd_soc_update_bits(codec, AC_DAC_FIFOC, (0x7<<DAC_FS), (codec_sr_s[i].srbit<<DAC_FS));
+				snd_soc_update_bits(codec, SUNXI_DAC_FIFOC,
+				(0x7<<DAC_FS), (codec_sr_s[i].srbit<<DAC_FS));
+				snd_soc_update_bits(codec, SUNXI_DAC_FIFOC,
+				(0x7<<DAC_FS), (codec_sr_s[i].srbit<<DAC_FS));
 			} else {
-				snd_soc_update_bits(codec, AC_ADC_FIFOC, (0x7<<ADFS), (codec_sr_s[i].srbit<<ADFS));
-				snd_soc_update_bits(codec, AC_ADC_FIFOC, (0x7<<ADFS), (codec_sr_s[i].srbit<<ADFS));				
+				snd_soc_update_bits(codec, SUNXI_ADC_FIFOC,
+				(0x7<<ADFS), (codec_sr_s[i].srbit<<ADFS));
+				snd_soc_update_bits(codec, SUNXI_ADC_FIFOC,
+				(0x7<<ADFS), (codec_sr_s[i].srbit<<ADFS));
 			}
 			break;
 		}
 	}
 
 	switch (params_format(params)) {
-		case SNDRV_PCM_FORMAT_S24_LE:
-		case SNDRV_PCM_FORMAT_S32_LE:
-			if (substream->stream == SNDRV_PCM_STREAM_PLAYBACK) {
-				/*set TX FIFO MODE:24bit*/
-				snd_soc_update_bits(codec, AC_DAC_FIFOC, (0x3<<FIFO_MODE), (0x2<<FIFO_MODE));
-				snd_soc_update_bits(codec, AC_DAC_FIFOC, (0x1<<TX_SAMPLE_BITS), (0x1<<TX_SAMPLE_BITS));
-			} else {
-				/*set RX FIFO MODE:24bit*/
-				snd_soc_update_bits(codec, AC_ADC_FIFOC, (0x1<<RX_FIFO_MODE), (0x0<<RX_FIFO_MODE));
-				snd_soc_update_bits(codec, AC_ADC_FIFOC, (0x1<<RX_SAMPLE_BITS), (0x1<<RX_SAMPLE_BITS));
-			}
+	case SNDRV_PCM_FORMAT_S24_LE:
+	case SNDRV_PCM_FORMAT_S32_LE:
+		if (substream->stream == SNDRV_PCM_STREAM_PLAYBACK) {
+			/*set TX FIFO MODE:24bit*/
+			snd_soc_update_bits(codec, SUNXI_DAC_FIFOC,
+				(0x3<<FIFO_MODE), (0x2<<FIFO_MODE));
+			snd_soc_update_bits(codec, SUNXI_DAC_FIFOC,
+				(0x1<<TX_SAMPLE_BITS), (0x1<<TX_SAMPLE_BITS));
+		} else {
+			/*set RX FIFO MODE:24bit*/
+			snd_soc_update_bits(codec, SUNXI_ADC_FIFOC,
+				(0x1<<RX_FIFO_MODE), (0x0<<RX_FIFO_MODE));
+			snd_soc_update_bits(codec, SUNXI_ADC_FIFOC,
+				(0x1<<RX_SAMPLE_BITS), (0x1<<RX_SAMPLE_BITS));
+		}
 		break;
-		case SNDRV_PCM_FORMAT_S16_LE:
-		default:
-			if (substream->stream == SNDRV_PCM_STREAM_PLAYBACK) {
-				/*set TX FIFO MODE:16bit*/
-				snd_soc_update_bits(codec, AC_DAC_FIFOC, (0x3<<FIFO_MODE), (0x3<<FIFO_MODE));
-				snd_soc_update_bits(codec, AC_DAC_FIFOC, (0x1<<TX_SAMPLE_BITS), (0x0<<TX_SAMPLE_BITS));
-			} else {
-				/*set RX FIFO MODE:16bit*/
-				snd_soc_update_bits(codec, AC_ADC_FIFOC, (0x1<<RX_FIFO_MODE), (0x1<<RX_FIFO_MODE));
-				snd_soc_update_bits(codec, AC_ADC_FIFOC, (0x1<<RX_SAMPLE_BITS), (0x0<<RX_SAMPLE_BITS));
-			}
+	case SNDRV_PCM_FORMAT_S16_LE:
+	default:
+		if (substream->stream == SNDRV_PCM_STREAM_PLAYBACK) {
+			/*set TX FIFO MODE:16bit*/
+			snd_soc_update_bits(codec, SUNXI_DAC_FIFOC,
+				(0x3<<FIFO_MODE), (0x3<<FIFO_MODE));
+			snd_soc_update_bits(codec, SUNXI_DAC_FIFOC,
+				(0x1<<TX_SAMPLE_BITS), (0x0<<TX_SAMPLE_BITS));
+		} else {
+			/*set RX FIFO MODE:16bit*/
+			snd_soc_update_bits(codec, SUNXI_ADC_FIFOC,
+				(0x1<<RX_FIFO_MODE), (0x1<<RX_FIFO_MODE));
+			snd_soc_update_bits(codec, SUNXI_ADC_FIFOC,
+				(0x1<<RX_SAMPLE_BITS), (0x0<<RX_SAMPLE_BITS));
+		}
 		break;
 	}
 
 	if (params_channels(params)==1) {
 		if (substream->stream == SNDRV_PCM_STREAM_PLAYBACK) {
-			snd_soc_update_bits(codec, AC_DAC_FIFOC, (0x1<<DAC_MONO_EN), (0x1<<DAC_MONO_EN));			
+			snd_soc_update_bits(codec, SUNXI_DAC_FIFOC,
+					(0x1<<DAC_MONO_EN), (0x1<<DAC_MONO_EN));
 		} else {
-			snd_soc_update_bits(codec, AC_ADC_FIFOC, (0x1<<ADC_MONO_EN), (0x1<<ADC_MONO_EN));
+			snd_soc_update_bits(codec, SUNXI_ADC_FIFOC,
+					(0x1<<ADC_MONO_EN), (0x1<<ADC_MONO_EN));
 		}
 	} else {
 		if (substream->stream == SNDRV_PCM_STREAM_PLAYBACK) {
-			snd_soc_update_bits(codec, AC_DAC_FIFOC, (0x1<<DAC_MONO_EN), (0x0<<DAC_MONO_EN));
+			snd_soc_update_bits(codec, SUNXI_DAC_FIFOC,
+					(0x1<<DAC_MONO_EN), (0x0<<DAC_MONO_EN));
 		} else {
-			snd_soc_update_bits(codec, AC_ADC_FIFOC, (0x1<<ADC_MONO_EN), (0x0<<ADC_MONO_EN));
+			snd_soc_update_bits(codec, SUNXI_ADC_FIFOC,
+					(0x1<<ADC_MONO_EN), (0x0<<ADC_MONO_EN));
 		}
 	}
 
@@ -667,6 +864,7 @@ static int codec_suspend(struct snd_soc_codec *codec)
 	struct sunxi_codec *sunxi_internal_codec = snd_soc_codec_get_drvdata(codec);
 	pr_debug("[audio codec]:suspend start.\n");
 
+	snd_soc_update_bits(codec, HP_CTRL, (0x1<<HPPAEN), (0x0<<HPPAEN));
 	if (spk_gpio.cfg) {
 		audio_gpio_iodisable(spk_gpio.gpio);
 	}
@@ -677,13 +875,10 @@ static int codec_suspend(struct snd_soc_codec *codec)
 		clk_disable(sunxi_internal_codec->pllclk);
 	}
 
-	if (sunxi_internal_codec->vol_supply.cpvdd) {
-		regulator_disable(sunxi_internal_codec->vol_supply.cpvdd);
+	if (!IS_ERR(sunxi_internal_codec->vol_supply.pa_shdn)) {
+		regulator_disable(sunxi_internal_codec->vol_supply.pa_shdn);
 	}
 
-	if (sunxi_internal_codec->vol_supply.avcc) {
-		regulator_disable(sunxi_internal_codec->vol_supply.avcc);
-	}
 
 	pr_debug("[audio codec]:suspend end..\n");
 
@@ -696,17 +891,10 @@ static int codec_resume(struct snd_soc_codec *codec)
 	struct sunxi_codec *sunxi_internal_codec = snd_soc_codec_get_drvdata(codec);
 	pr_debug("[audio codec]:resume start\n");
 
-	if (sunxi_internal_codec->vol_supply.cpvdd) {
-		ret = regulator_enable(sunxi_internal_codec->vol_supply.cpvdd);
+	if (!IS_ERR(sunxi_internal_codec->vol_supply.pa_shdn)) {
+		ret = regulator_enable(sunxi_internal_codec->vol_supply.pa_shdn);
 		if (ret) {
 			pr_err("[%s]: cpvdd:regulator_enable() failed!\n",__func__);
-		}
-	}
-
-	if (sunxi_internal_codec->vol_supply.avcc) {
-		ret = regulator_enable(sunxi_internal_codec->vol_supply.avcc);
-		if (ret) {
-			pr_err("[%s]: avcc:regulator_enable() failed!\n",__func__);
 		}
 	}
 
@@ -723,7 +911,6 @@ static int codec_resume(struct snd_soc_codec *codec)
 	}
 
 	codec_init(sunxi_internal_codec);
-
 	if (spk_gpio.cfg) {
 		gpio_direction_output(spk_gpio.gpio, 1);
 		gpio_set_value(spk_gpio.gpio, 0);
@@ -743,10 +930,11 @@ static unsigned int codec_read(struct snd_soc_codec *codec,
 					  unsigned int reg)
 {
 	struct sunxi_codec *sunxi_internal_codec = snd_soc_codec_get_drvdata(codec);
-
-	if (reg <= 0x1e) {
+	unsigned int analog_reg;
+	if (reg & ANALOG_FLAG) {
 		/*analog reg*/
-		return read_prcm_wvalue(reg,sunxi_internal_codec->codec_abase);
+		analog_reg = reg & (~ANALOG_FLAG);
+		return read_prcm_wvalue(analog_reg,sunxi_internal_codec->codec_abase);
 	} else {
 		/*digital reg*/
 		return codec_rdreg(sunxi_internal_codec->codec_dbase + reg);
@@ -757,14 +945,15 @@ static int codec_write(struct snd_soc_codec *codec,
 				  unsigned int reg, unsigned int value)
 {
 	struct sunxi_codec *sunxi_internal_codec = snd_soc_codec_get_drvdata(codec);
-
-	if (reg <= 0x1e) {
+	unsigned int analog_reg;
+	if (reg & ANALOG_FLAG) {
 		/*analog reg*/
-		write_prcm_wvalue(reg, value,sunxi_internal_codec->codec_abase);
+		analog_reg = reg & (~ANALOG_FLAG);
+                write_prcm_wvalue(analog_reg, value,sunxi_internal_codec->codec_abase);
 	} else {
 		/*digital reg*/
 		codec_wrreg(sunxi_internal_codec->codec_dbase + reg, value);
-	}
+        }
 	return 0;
 }
 
@@ -789,7 +978,7 @@ static ssize_t show_audio_reg(struct device *dev, struct device_attribute *attr,
 	count += sprintf(buf, "dump audio reg:\n");
 
 	while (reg_labels[i].name != NULL) {
-		if (reg_labels[i].value == 0) {
+		if ((reg_labels[i].value & (~ANALOG_FLAG)) == 0) {
 			reg_group++;
 		}
 		if (reg_group == 1) {
@@ -798,8 +987,8 @@ static ssize_t show_audio_reg(struct device *dev, struct device_attribute *attr,
 							readl(codec_digitaladress + reg_labels[i].value) );
 		} else if (reg_group == 2) {
 			count +=sprintf(buf + count, "%s 0x%x: 0x%x\n", reg_labels[i].name,
-							(reg_labels[i].value),
-						        read_prcm_wvalue(reg_labels[i].value,codec_analogadress) );
+							(reg_labels[i].value&(~ANALOG_FLAG)),
+						        read_prcm_wvalue(reg_labels[i].value&(~ANALOG_FLAG),codec_analogadress) );
 		}
 		i++;
 	}
@@ -880,12 +1069,11 @@ static const struct of_device_id sunxi_codec_of_match[] = {
 	{},
 };
 
-static int __init sunxi_internal_codec_probe(struct platform_device *pdev)
+static int  sunxi_internal_codec_probe(struct platform_device *pdev)
 {
 	s32 ret = 0;
 	u32 temp_val = 0;
 	struct resource res;
-	struct gpio_config config;
 	const struct of_device_id *device;
 	struct sunxi_codec *sunxi_internal_codec;
 	struct device_node *node = pdev->dev.of_node;
@@ -933,34 +1121,22 @@ static int __init sunxi_internal_codec_probe(struct platform_device *pdev)
 		clk_prepare_enable(sunxi_internal_codec->moduleclk);
 	}
 
-#if 0
 	/*voltage*/
-	sunxi_internal_codec->vol_supply.cpvdd =  regulator_get(NULL, "vcc-cpvdd");/*HPVCC*/
-	if (!sunxi_internal_codec->vol_supply.cpvdd) {
-		pr_err("get audio cpvdd failed\n");
-		ret = -EFAULT;
-		goto err1;
+	sunxi_internal_codec->vol_supply.pa_shdn =  regulator_get(NULL, "pa-shdn");/*HPVCC*/
+	if (IS_ERR(sunxi_internal_codec->vol_supply.pa_shdn)) {
+		pr_err("get audio pa-shdn failed\n");
 	} else {
-		ret = regulator_enable(sunxi_internal_codec->vol_supply.cpvdd);
+		ret = regulator_set_voltage(sunxi_internal_codec->vol_supply.pa_shdn , 3300000 , 3300000);
 		if (ret) {
-			pr_err("[%s]: cpvdd:regulator_enable() failed!\n",__func__);
+			pr_err("[%s]:pa_shdn:regulator_set_volatge failed!\n", __func__);
+			goto err1;
+		}
+		ret = regulator_enable(sunxi_internal_codec->vol_supply.pa_shdn);
+		if (ret) {
+			pr_err("[%s]: pa_shdn:regulator_enable() failed!\n", __func__);
 			goto err1;
 		}
 	}
-
-	sunxi_internal_codec->vol_supply.avcc = regulator_get(NULL, "vcc-avcc");
-	if (!sunxi_internal_codec->vol_supply.avcc) {
-		pr_err("[%s]:get audio avcc failed\n",__func__);
-		ret = -EFAULT;
-		goto err1;
-	} else {
-		ret = regulator_enable(sunxi_internal_codec->vol_supply.avcc);
-		if (ret) {
-			pr_err("[%s]: avcc:regulator_enable() failed!\n",__func__);
-			goto err1;
-		}
-	}
-#endif
 
 	sunxi_internal_codec->codec_abase = NULL;
 	sunxi_internal_codec->codec_dbase = NULL;
@@ -976,25 +1152,6 @@ static int __init sunxi_internal_codec_probe(struct platform_device *pdev)
 	} else {
 		codec_analogadress = sunxi_internal_codec->codec_abase;
 	}
-
-	/*initial speaker gpio */
-	spk_gpio.gpio = of_get_named_gpio_flags(node, "gpio-spk", 0, (enum of_gpio_flags *)&config);
-	if (!gpio_is_valid(spk_gpio.gpio)) {
-		pr_err("failed to get gpio-spk gpio from dts,spk_gpio:%d\n",spk_gpio.gpio);
-		spk_gpio.cfg = 0;
-	} else {
-		ret = devm_gpio_request(&pdev->dev, spk_gpio.gpio, "SPK");
-		if (ret) {
-			spk_gpio.cfg = 0;
-			pr_err("failed to request gpio-spk gpio\n");
-			goto err1;
-		} else {
-			spk_gpio.cfg = 1;
-			gpio_direction_output(spk_gpio.gpio, 1);
-			gpio_set_value(spk_gpio.gpio, 0);
-		}
-	}
-
 	ret = of_property_read_u32(node, "headphonevol",&temp_val);
 	if (ret < 0) {
 		pr_err("[audio-codec]headphonevol configurations missing or invalid.\n");
@@ -1035,6 +1192,47 @@ static int __init sunxi_internal_codec_probe(struct platform_device *pdev)
 	} else {
 		sunxi_internal_codec->pa_sleep_time = temp_val;
 	}
+
+	ret = of_property_read_u32(node, "adcagc_cfg", &temp_val);
+	if (ret < 0) {
+		pr_err("[audio-codec]adcagc_cfg configurations missing or invalid.\n");
+		ret = -EINVAL;
+	} else {
+		sunxi_internal_codec->hwconfig.adcagc_cfg = temp_val;
+	}
+
+	ret = of_property_read_u32(node, "adcdrc_cfg", &temp_val);
+	if (ret < 0) {
+		pr_err("[audio-codec]adcdrc_cfg configurations missing or invalid.\n");
+		ret = -EINVAL;
+	} else {
+		sunxi_internal_codec->hwconfig.adcdrc_cfg = temp_val;
+	}
+
+	ret = of_property_read_u32(node, "adchpf_cfg", &temp_val);
+	if (ret < 0) {
+		pr_err("[audio-codec]adchpf_cfg configurations missing or invalid.\n");
+		ret = -EINVAL;
+	} else {
+		sunxi_internal_codec->hwconfig.adchpf_cfg = temp_val;
+	}
+
+	ret = of_property_read_u32(node, "dacdrc_cfg", &temp_val);
+	if (ret < 0) {
+		pr_err("[audio-codec]dacdrc_cfg configurations missing or invalid.\n");
+		ret = -EINVAL;
+	} else {
+		sunxi_internal_codec->hwconfig.dacdrc_cfg = temp_val;
+	}
+
+	ret = of_property_read_u32(node, "dachpf_cfg", &temp_val);
+	if (ret < 0) {
+		pr_err("[audio-codec]dachpf_cfg configurations missing or invalid.\n");
+		ret = -EINVAL;
+	} else {
+		sunxi_internal_codec->hwconfig.dachpf_cfg = temp_val;
+	}
+
 
 	pr_debug("headphonevol:%d, spkervol:%d, maingain:%d, pa_sleep_time:%d\n",
 		sunxi_internal_codec->gain_config.headphonevol,

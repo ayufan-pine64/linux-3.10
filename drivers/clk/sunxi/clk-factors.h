@@ -185,27 +185,40 @@ struct sunxi_clk_factors {
 	spinlock_t *lock;
 	struct sunxi_reg_ops*  priv_regops;
 };
+
 struct sunxi_clk_pat_item
 {
 	char* name;
 	char* patname;
 };
-static inline u32 factor_readl(struct sunxi_clk_factors * factor, void __iomem * reg)
+
+static inline u32 factor_readl(struct sunxi_clk_factors *factor, void __iomem *reg)
 {
-	return (((unsigned long*)factor->priv_regops)?factor->priv_regops->reg_readl(reg):readl(reg));
+	return ((unsigned long *)factor->priv_regops)
+			? factor->priv_regops->reg_readl(reg)
+			: readl(reg);
 }
-static inline void factor_writel(struct sunxi_clk_factors * factor, unsigned int val, void __iomem * reg)
+
+static inline void factor_writel(struct sunxi_clk_factors *factor,
+			unsigned int val, void __iomem *reg)
 {
-	(((unsigned long*)factor->priv_regops)?factor->priv_regops->reg_writel(val,reg):writel(val,reg));
+	(((unsigned long *)factor->priv_regops)
+		? factor->priv_regops->reg_writel(val, reg)
+		: writel(val, reg));
 }
-void sunxi_clk_get_factors_ops(struct clk_ops* ops);
-struct clk *sunxi_clk_register_factors(struct device *dev,void __iomem *base,spinlock_t *lock,struct factor_init_data* init_data);
+
+void sunxi_clk_get_factors_ops(struct clk_ops *ops);
+
+struct clk *sunxi_clk_register_factors(struct device *dev,
+		void __iomem *base, spinlock_t *lock,
+		struct factor_init_data *init_data);
 
 
-#define SUNXI_CLK_FACTORS(name, _nshift, _nwidth, _kshift, _kwidth, _mshift, _mwidth,   \
-				_pshift, _pwidth, _d1shift, _d1width, _d2shift, _d2width,     \
-				_frac, _outshift, _modeshift, _enshift, _sdmshift, _sdmwidth, _sdmpat, _sdmval)     \
-	static struct sunxi_clk_factors_config sunxi_clk_factor_##name ={            \
+#define SUNXI_CLK_FACTORS(name, _nshift, _nwidth, _kshift, _kwidth,	\
+		_mshift, _mwidth,  _pshift, _pwidth, _d1shift, _d1width, \
+		_d2shift, _d2width, _frac, _outshift, _modeshift,	\
+		_enshift, _sdmshift, _sdmwidth, _sdmpat, _sdmval)     \
+	static struct sunxi_clk_factors_config sunxi_clk_factor_##name = {            \
 		.nshift = _nshift,  \
 		.nwidth = _nwidth,  \
 		.kshift = _kshift,  \
@@ -228,16 +241,21 @@ struct clk *sunxi_clk_register_factors(struct device *dev,void __iomem *base,spi
 		.sdmval  =_sdmval,    \
 		.updshift = 0\
 	}
-#define FACTOR_ALL(nv,ns,nw,kv,ks,kw,mv,ms,mw, \
-				pv,ps,pw,d0v,d0s,d0w,d1v,d1s,d1w) \
-				((nv&((1<<nw)-1))<<ns|(kv&((1<<kw)-1))<<ks| \
-				(mv&((1<<mw)-1))<<ms|(pv&((1<<pw)-1))<<ps| \
-				(d0v&((1<<d0w)-1))<<d0s|(d1v&((1<<d1w)-1))<<d1s)
 
-#define SUNXI_CLK_FACTORS_UPDATE(name, _nshift, _nwidth, _kshift, _kwidth, _mshift, _mwidth,   \
-				_pshift, _pwidth, _d1shift, _d1width, _d2shift, _d2width,     \
-				 _frac, _outshift, _modeshift, _enshift, _sdmshift, _sdmwidth, _sdmpat, _sdmval , _updshift)     \
-	static struct sunxi_clk_factors_config sunxi_clk_factor_##name ={            \
+#define FACTOR_ALL(nv, ns, nw, kv, ks, kw, mv, ms, mw, \
+		   pv, ps, pw, d0v, d0s, d0w, d1v, d1s, d1w) \
+		  ((((nv & ((1 << nw) - 1)) << ns) | \
+		    ((kv & ((1 << kw) - 1)) << ks) | \
+		    ((mv & ((1 << mw) - 1)) << ms) | \
+		    ((pv & ((1 << pw) - 1)) << ps) | \
+		    ((d0v & ((1 << d0w) - 1)) << d0s) | \
+		    ((d1v & ((1 << d1w) - 1)) << d1s)))
+
+#define SUNXI_CLK_FACTORS_UPDATE(name, _nshift, _nwidth, _kshift, _kwidth, \
+		_mshift, _mwidth,  _pshift, _pwidth, _d1shift, _d1width, \
+		_d2shift, _d2width, _frac, _outshift, _modeshift, \
+		_enshift, _sdmshift, _sdmwidth, _sdmpat, _sdmval , _updshift)   \
+	static struct sunxi_clk_factors_config sunxi_clk_factor_##name = {       \
 		.nshift = _nshift,  \
 		.nwidth = _nwidth,  \
 		.kshift = _kshift,  \
@@ -261,10 +279,11 @@ struct clk *sunxi_clk_register_factors(struct device *dev,void __iomem *base,spi
 		.updshift = _updshift\
 	}
 
-#define SUNXI_CLK_FACTORS_DELAY(name, _nshift, _nwidth, _kshift, _kwidth, _mshift, _mwidth,   \
-				  _pshift, _pwidth, _d1shift, _d1width, _d2shift, _d2width,     \
-				  _frac, _outshift, _modeshift, _enshift, _sdmshift, _sdmwidth, _sdmpat, _sdmval , _delay)     \
-	static struct sunxi_clk_factors_config sunxi_clk_factor_##name ={            \
+#define SUNXI_CLK_FACTORS_DELAY(name, _nshift, _nwidth, _kshift, _kwidth, \
+		_mshift, _mwidth, _pshift, _pwidth, _d1shift, _d1width, \
+		_d2shift, _d2width, _frac, _outshift, _modeshift, \
+		_enshift, _sdmshift, _sdmwidth, _sdmpat, _sdmval , _delay)     \
+	static struct sunxi_clk_factors_config sunxi_clk_factor_##name = {	\
 		.nshift = _nshift,  \
 		.nwidth = _nwidth,  \
 		.kshift = _kshift,  \
@@ -288,6 +307,14 @@ struct clk *sunxi_clk_register_factors(struct device *dev,void __iomem *base,spi
 		.delay = _delay\
 	}
 
-int sunxi_clk_get_common_factors(struct sunxi_clk_factors_config* f_config,struct clk_factors_value *factor, struct sunxi_clk_factor_freq table[],unsigned long index,unsigned long tbl_size);
-int sunxi_clk_get_common_factors_search(struct sunxi_clk_factors_config* f_config,struct clk_factors_value *factor, struct sunxi_clk_factor_freq table[],unsigned long index,unsigned long tbl_count);
+int sunxi_clk_get_common_factors(struct sunxi_clk_factors_config *f_config,
+			struct clk_factors_value *factor,
+			struct sunxi_clk_factor_freq table[],
+			unsigned long index, unsigned long tbl_size);
+
+int sunxi_clk_com_ftr_sr(struct sunxi_clk_factors_config *f_config,
+			struct clk_factors_value *factor,
+			struct sunxi_clk_factor_freq table[],
+			unsigned long index, unsigned long tbl_count);
+
 #endif

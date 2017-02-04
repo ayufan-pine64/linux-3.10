@@ -13,6 +13,8 @@
 #include <linux/power/aw_pm.h>
 #include <linux/power/axp_depend.h>
 #include "common.h"
+#include "../pm.h"
+#include "standby_dram.h"
 
 #ifndef IO_ADDRESS
 #define IO_ADDRESS(x)  ((x) + 0xf0000000)
@@ -25,6 +27,8 @@
 #define writew(v, addr)	(*((volatile unsigned short *)(addr)) = (unsigned short)(v))
 #define writel(v, addr)	(*((volatile unsigned long  *)(addr)) = (unsigned long)(v))
 
+extern char *__bss_start;
+extern char *__bss_end;
+typedef void (*losc_enter_ss_func)(void);
+
 #endif /*_PM_H*/
-
-

@@ -6,7 +6,7 @@
  *   - adapted for the Linux kernel on Oct 2, 2003
  */
 
-//for 1008M
+/*for 1008M*/
 #define STANDBY_COEFFICIENT (17)
 
 .text
@@ -21,7 +21,7 @@ standby_delay_loop2:
 	mov     r0, r3
 	subs    r1, r1, #1
 	bhi     standby_delay_loop2
-	
+
 	pop     {r0-r3}
 	mov     pc, lr
 
@@ -32,7 +32,7 @@ standby_delay_cycle_loop3:
 	subs    r0, r0, #1
 	bhi     standby_delay_cycle_loop3
 	mov     pc, lr
- 
+
 .macro ARM_DIV_BODY dividend, divisor, result, curbit
 
 	clz	\curbit, \divisor
@@ -42,7 +42,7 @@ standby_delay_cycle_loop3:
 	mov	\divisor, \divisor, lsl \result
 	mov	\curbit, \curbit, lsl \result
 	mov	\result, #0
-	
+
 	@ Division loop
 1:	cmp	\dividend, \divisor
 	subhs	\dividend, \dividend, \divisor
@@ -204,4 +204,3 @@ __aeabi_idivmod:
 	mul	r3, r0, r2
 	sub	r1, r1, r3
 	mov	pc, lr
-	

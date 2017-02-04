@@ -12,4 +12,3 @@
 #include "pm_config.h"
 
 #endif /*_PM_ASSEMBLER_I_H*/
-

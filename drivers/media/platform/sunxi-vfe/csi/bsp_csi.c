@@ -5,6 +5,8 @@
 
 #include "bsp_csi.h"
 
+#define CHANNEL_OUTPUT_SEPARATE
+
 static struct frame_arrange frm_arrange_gbl[MAX_CSI];
 static unsigned int line_stride_y_ch_gbl[MAX_CSI][MAX_CH_NUM];
 static unsigned int line_stride_c_ch_gbl[MAX_CSI][MAX_CH_NUM];
@@ -92,7 +94,20 @@ int bsp_csi_set_fmt(unsigned int sel, struct bus_info *bus_info, struct frame_in
 		if_cfg.interface = CSI_IF_INTLV;
 		break;
 	case BT656:
+#if defined CONFIG_ARCH_SUN8IW11P1
+	if (bus_info->ch_total_num == 1) {
+		if (find_bus_width(bus_info->bus_ch_fmt[0]) == W_16BIT)
+			if_cfg.interface = CSI_IF_CCIR656_16BIT;
+		else
+			if_cfg.interface = CSI_IF_CCIR656_1CH;
+	} else if (bus_info->ch_total_num == 2) {
+		if_cfg.interface = CSI_IF_CCIR656_2CH;
+	} else if (bus_info->ch_total_num == 4) {
+		if_cfg.interface = CSI_IF_CCIR656_4CH;
+	}
+#else
 		if_cfg.interface = CSI_IF_CCIR656_1CH;
+#endif
 		break;
 	case CSI2:
 		if_cfg.interface = CSI_IF_MIPI;
@@ -416,6 +431,11 @@ int bsp_csi_set_size(unsigned int sel, struct bus_info *bus_info, struct frame_i
 	unsigned int line_stride_y_row[MAX_CH_NUM],line_stride_c_row[MAX_CH_NUM];
 	unsigned int ch,i,j,row,column;
 
+#ifdef CHANNEL_OUTPUT_SEPARATE
+	frame_info->arrange.row = bus_info->ch_total_num;
+	frame_info->arrange.column = 1;
+#endif
+
 	row = frame_info->arrange.row;
 	column = frame_info->arrange.column;
 	frm_arrange_gbl[sel].row = row;
@@ -543,19 +563,17 @@ int bsp_csi_set_size(unsigned int sel, struct bus_info *bus_info, struct frame_i
 		buf_height_cr_ch_gbl[sel][ch] = buf_height_cr_ch[ch];
 		csi_set_offset(sel, ch, start_h[ch], start_v[ch]);
 	}
-
 	//assume channels at the same row has the same height
 	//assume channels at the same column has the same width
-	for(i=0;i<row;i++) {
-		line_stride_y_row[i] = 0;
-		line_stride_c_row[i] = 0;     
-		for(j=0;j<column;j++) {
-			ch = i*column + j;  //ch=i when column==1
-			line_stride_y_row[i] += line_stride_y_ch[ch];
-			line_stride_c_row[i] += line_stride_c_ch[ch];
+	for (i = 0; i < row; i++) {
+		for (j = 0; j < column; j++) {
+			ch = i*column + j;
+			line_stride_y_row[i] = line_stride_y_ch[ch] * column;
+			line_stride_c_row[i] = line_stride_c_ch[ch] * column;
 			line_stride_y_row_gbl[sel][i] = line_stride_y_row[i];
 			line_stride_c_row_gbl[sel][i] = line_stride_c_row[i];
-			csi_set_size(sel, ch, input_len_h[ch], input_len_v[ch], line_stride_y_row[i], line_stride_c_row[i]);
+			csi_set_size(sel, ch, input_len_h[ch], input_len_v[ch],
+				line_stride_y_row[i], line_stride_c_row[i]);
 		}
 	}
 	frame_info->frm_byte_size = 0;
@@ -564,6 +582,7 @@ int bsp_csi_set_size(unsigned int sel, struct bus_info *bus_info, struct frame_i
 	           						line_stride_c_ch[ch] * buf_height_cb_ch[ch] + \
 	           						line_stride_c_ch[ch] * buf_height_cr_ch[ch];
 	}
+
 	return 0;
 }
 
@@ -587,7 +606,7 @@ void bsp_csi_set_addr(unsigned int sel, u64 buf_base_addr)
 
 	row = frm_arrange_gbl[sel].row;
 	column = frm_arrange_gbl[sel].column;
-
+#ifdef CHANNEL_OUTPUT_SEPARATE
 	for(i=0;i<row;i++) {
 		for(j=0;j<column;j++) {
 			ch = i*column+j;
@@ -596,28 +615,56 @@ void bsp_csi_set_addr(unsigned int sel, u64 buf_base_addr)
 			          + line_stride_y_row_gbl[sel][i] * buf_height_y_ch_gbl[sel][ch];
 			buf_addr_plane2[ch] = buf_addr_plane1[ch] \
 			          + line_stride_c_row_gbl[sel][i] * buf_height_cb_ch_gbl[sel][ch];
-			for(k=0;k<j;k++) {
+			for (k = 1; k <= j; k++) {
 				buf_addr_plane0[ch] += line_stride_y_ch_gbl[sel][i*column+k-1];
 				buf_addr_plane1[ch] += line_stride_c_ch_gbl[sel][i*column+k-1];
 				buf_addr_plane2[ch] += line_stride_c_ch_gbl[sel][i*column+k-1];
 			}
 
-			for(l=1;l<i;l++) {
+			for (l = 1; l <= i; l++) {
 				buf_addr_plane0[ch] += ((line_stride_y_row_gbl[sel][l-1] * buf_height_y_ch_gbl[sel][l*column+j-1]) \
-				            + (line_stride_c_row_gbl[sel][l-1] * buf_height_cb_ch_gbl[sel][l*column+j-1]) \
-				            + (line_stride_c_row_gbl[sel][l-1] * buf_height_cr_ch_gbl[sel][l*column+j-1]));
+					+ (line_stride_c_row_gbl[sel][l-1] * buf_height_cb_ch_gbl[sel][l*column+j-1]) \
+					+ (line_stride_c_row_gbl[sel][l-1] * buf_height_cr_ch_gbl[sel][l*column+j-1]));
 				buf_addr_plane1[ch] += ((line_stride_c_row_gbl[sel][l-1] * buf_height_cb_ch_gbl[sel][l*column+j-1]) \
-				            + (line_stride_c_row_gbl[sel][l-1] * buf_height_cr_ch_gbl[sel][l*column+j-1]) \
-				            + (line_stride_y_row_gbl[sel][l]   * buf_height_y_ch_gbl[sel][l*column+j]));
+					+ (line_stride_c_row_gbl[sel][l-1] * buf_height_cr_ch_gbl[sel][l*column+j-1]) \
+					+ (line_stride_y_row_gbl[sel][l-1] * buf_height_y_ch_gbl[sel][l*column+j-1]));
 				buf_addr_plane2[ch] += ((line_stride_c_row_gbl[sel][l-1] * buf_height_cr_ch_gbl[sel][l*column+j-1]) \
-				            + (line_stride_y_row_gbl[sel][l]   * buf_height_y_ch_gbl[sel][l*column+j]) \
-				            + (line_stride_c_row_gbl[sel][l]   * buf_height_cb_ch_gbl[sel][l*column+j]));
+					+ (line_stride_y_row_gbl[sel][l-1] * buf_height_y_ch_gbl[sel][l*column+j-1]) \
+					+ (line_stride_c_row_gbl[sel][l-1] * buf_height_cb_ch_gbl[sel][l*column+j-1]));
 			}
 			csi_set_buffer_address(sel, ch,CSI_BUF_0_A, buf_addr_plane0[ch]);
 			csi_set_buffer_address(sel, ch,CSI_BUF_1_A, buf_addr_plane1[ch]);
 			csi_set_buffer_address(sel, ch,CSI_BUF_2_A, buf_addr_plane2[ch]);
 		}
 	}
+#else
+	for (i = 0; i < row; i++) {
+		for (j = 0; j < column; j++) {
+			ch = i * column + j;
+
+			buf_addr_plane0[ch] = buf_base_addr;
+			buf_addr_plane1[ch] = buf_addr_plane0[ch] \
+				+ line_stride_y_row_gbl[sel][i] * buf_height_y_ch_gbl[sel][ch] * row;
+			buf_addr_plane2[ch] = buf_addr_plane1[ch] \
+				+ line_stride_c_row_gbl[sel][i] * buf_height_cb_ch_gbl[sel][ch] * row;
+
+			for (k = j; k > 0; k--) {
+				buf_addr_plane0[ch] += line_stride_y_ch_gbl[sel][k - 1];
+				buf_addr_plane1[ch] += line_stride_c_ch_gbl[sel][k - 1];
+				buf_addr_plane2[ch] += line_stride_c_ch_gbl[sel][k - 1];
+			}
+
+			for (l = i; l > 0; l--) {
+				buf_addr_plane0[ch] += line_stride_y_row_gbl[sel][l - 1] * buf_height_y_ch_gbl[sel][ch];
+				buf_addr_plane1[ch] += line_stride_c_row_gbl[sel][l - 1] * buf_height_cb_ch_gbl[sel][ch];
+				buf_addr_plane2[ch] += line_stride_c_row_gbl[sel][l - 1] * buf_height_cr_ch_gbl[sel][ch];
+			}
+			csi_set_buffer_address(sel, ch, CSI_BUF_0_A, buf_addr_plane0[ch]);
+			csi_set_buffer_address(sel, ch, CSI_BUF_1_A, buf_addr_plane1[ch]);
+			csi_set_buffer_address(sel, ch, CSI_BUF_2_A, buf_addr_plane2[ch]);
+		}
+	}
+#endif
 }
 
 

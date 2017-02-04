@@ -17,14 +17,13 @@
 */
 #include "pm_i.h"
 
-static __mem_key_reg_t  *KeyReg;
+static __mem_key_reg_t *KeyReg;
 static __u32 KeyCtrl, KeyIntc;
-//static __u32 KeyInts, KeyData0, KeyData1;
+/*static __u32 KeyInts, KeyData0, KeyData1;*/
 
-//==============================================================================
-// QUERRY KEY FOR WAKE UP SYSTEM FROM MEM
-//==============================================================================
-
+/*==============================================================================*/
+/* QUERRY KEY FOR WAKE UP SYSTEM FROM MEM*/
+/*==============================================================================*/
 
 /*
 *********************************************************************************************************
@@ -39,21 +38,20 @@ static __u32 KeyCtrl, KeyIntc;
 */
 __s32 mem_key_init(void)
 {
-    /* set key register base */
-    KeyReg = (__mem_key_reg_t *)(IO_ADDRESS(AW_LRADC01_BASE));
+	/* set key register base */
+	KeyReg = (__mem_key_reg_t *) (IO_ADDRESS(AW_LRADC01_BASE));
 
-    /* backup LRADC registers */
-    KeyCtrl = KeyReg->Lradc_Ctrl;
-    KeyIntc = KeyReg->Lradc_Intc;
-    KeyReg->Lradc_Ctrl = 0;
-    //note: mem_mdelay(10);
-    KeyReg->Lradc_Ctrl = (0x1<<6)|(0x1<<0);
-    KeyReg->Lradc_Intc = (0x1<<1);
-    KeyReg->Lradc_Ints = (0x1<<1);
+	/* backup LRADC registers */
+	KeyCtrl = KeyReg->Lradc_Ctrl;
+	KeyIntc = KeyReg->Lradc_Intc;
+	KeyReg->Lradc_Ctrl = 0;
+	/*note: mem_mdelay(10); */
+	KeyReg->Lradc_Ctrl = (0x1 << 6) | (0x1 << 0);
+	KeyReg->Lradc_Intc = (0x1 << 1);
+	KeyReg->Lradc_Ints = (0x1 << 1);
 
-    return 0;
+	return 0;
 }
-
 
 /*
 *********************************************************************************************************
@@ -68,10 +66,11 @@ __s32 mem_key_init(void)
 */
 __s32 mem_key_exit(void)
 {
-    KeyReg->Lradc_Ctrl =  KeyCtrl;
-    KeyReg->Lradc_Intc =  KeyIntc;
-    return 0;
+	KeyReg->Lradc_Ctrl = KeyCtrl;
+	KeyReg->Lradc_Intc = KeyIntc;
+	return 0;
 }
+
 /*
 *********************************************************************************************************
 *                                     QUERY KEY FOR WAKEUP MEM
@@ -87,11 +86,9 @@ __s32 mem_key_exit(void)
 */
 __s32 mem_query_key(void)
 {
-    if(KeyReg->Lradc_Ints & 0x2)
-    {
-        KeyReg->Lradc_Ints = 0x2;
-        return 0;
-    }
-    return -1;
+	if (KeyReg->Lradc_Ints & 0x2) {
+		KeyReg->Lradc_Ints = 0x2;
+		return 0;
+	}
+	return -1;
 }
-

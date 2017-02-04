@@ -18,21 +18,18 @@
 #ifndef __MEM_KEY_H__
 #define __MEM_KEY_H__
 
-//define key controller registers
-typedef struct __MEM_KEY_REG
-{
-    // offset:0x00
-    volatile __u32   Lradc_Ctrl;
-    volatile __u32   Lradc_Intc;
-    volatile __u32   Lradc_Ints;
-    volatile __u32   Lradc_Data0;
-    volatile __u32   Lradc_Data1;
+/*define key controller registers*/
+typedef struct __MEM_KEY_REG {
+	/* offset:0x00 */
+	volatile __u32 Lradc_Ctrl;
+	volatile __u32 Lradc_Intc;
+	volatile __u32 Lradc_Ints;
+	volatile __u32 Lradc_Data0;
+	volatile __u32 Lradc_Data1;
 } __mem_key_reg_t;
 
 extern __s32 mem_key_init(void);
 extern __s32 mem_key_exit(void);
 extern __s32 mem_query_key(void);
 
-
-#endif  /* __MEM_KEY_H__ */
-
+#endif				/* __MEM_KEY_H__ */

@@ -38,6 +38,8 @@
 #define ARISC_VERSIONS (105)
 #elif defined CONFIG_ARCH_SUN50IW1P1
 #define ARISC_VERSIONS (110)
+#elif defined CONFIG_ARCH_SUN50IW2P1
+#define ARISC_VERSIONS (120)
 #elif defined CONFIG_ARCH_SUN9IW1P1
 #define ARISC_VERSIONS (200)
 #else

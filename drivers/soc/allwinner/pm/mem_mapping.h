@@ -8,7 +8,7 @@
 *                                             All Rights Reserved
 *
 * File    : mem_mapping.h
-* By      : 
+* By      :
 * Version : v1.0
 * Date    : 2012-5-31 14:34
 * Descript:
@@ -21,7 +21,6 @@
 /*mem_mapping.c*/
 extern void create_mapping(void);
 extern void save_mapping(unsigned long vaddr);
-extern void restore_mapping(unsigned long vaddr);
+extern void restore_mapping(void);
 
-#endif  /* __MEM_MAPPING_H__ */
-
+#endif				/* __MEM_MAPPING_H__ */

@@ -89,6 +89,17 @@
 	ldp	x21, x22, [sp, #S_PC]		// load ELR, SPSR
 	.if	\el == 0
 	ldr	x23, [sp, #S_SP]		// load return stack pointer
+#ifdef CONFIG_ARM64_ERRATUM_845719
+	tbz	x22, #4, 1f
+#ifdef CONFIG_PID_IN_CONTEXTIDR
+	mrs 	x29, contextidr_el1
+	msr 	contextidr_el1, x29
+1:
+#else
+	msr 	contextidr_el1, xzr
+1:
+#endif
+#endif
 	.endif
 	.if	\ret
 	ldr	x1, [sp, #S_X1]			// preserve x0 (syscall return)
@@ -590,7 +601,7 @@ fast_work_pending:
 	str	x0, [sp, #S_X0]			// returned x0
 work_pending:
 	tbnz	x1, #TIF_NEED_RESCHED, work_resched
-	/* TIF_SIGPENDING or TIF_NOTIFY_RESUME case */
+	/* TIF_SIGPENDING, TIF_NOTIFY_RESUME or TIF_FOREIGN_FPSTATE case */
 	ldr	x2, [sp, #S_PSTATE]
 	mov	x0, sp				// 'regs'
 	tst	x2, #PSR_MODE_MASK		// user mode regs?

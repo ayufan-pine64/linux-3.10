@@ -369,7 +369,7 @@ static const struct of_device_id sunxi_dsd_of_match[] = {
 	{},
 };
 
-static int __init sunxi_dsd_dev_probe(struct platform_device *pdev)
+static int sunxi_dsd_dev_probe(struct platform_device *pdev)
 {
 	u32 ret = 0;
 	u32 temp_val = 0;

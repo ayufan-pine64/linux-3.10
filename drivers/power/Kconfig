@@ -8,7 +8,67 @@ menuconfig POWER_SUPPLY
 
 if POWER_SUPPLY
 
-source "drivers/power/axp_power/Kconfig"
+menuconfig AW_AXP
+	bool "AXP Power drivers"
+	depends on REGULATOR
+	depends on ARCH_SUNXI
+	select MFD_CORE
+	help
+	  This option allows you to select AXP power driver
+
+if AW_AXP
+
+config AXP_TWI_USED
+	bool "AXP use twi as transfer channel"
+	depends on I2C
+	help
+	  To use twi as transfer channel
+
+config AXP_NMI_USED
+	bool "AXP use NMI as IRQ SRC"
+
+config AW_AXP15
+	bool "AXP15x driver"
+	depends on ARCH_SUN8IW10 || ARCH_SUN8IW11
+	depends on AXP_TWI_USED
+	help
+	  AXP15x driver
+
+config AW_AXP22
+	bool "AXP22x driver"
+	depends on ARCH_SUN8IW10 || ARCH_SUN8IW11
+	depends on AXP_TWI_USED
+	help
+	  AXP22x driver
+
+config AW_AXP81X
+	bool "AXP81X driver"
+	depends on ARCH_SUN50IW1
+	help
+	  AXP81X driver
+
+config AW_AXP20
+	bool "AXP20X driver"
+	depends on ARCH_SUN8IW11
+	depends on AXP_TWI_USED
+	help
+	  AXP20x driver
+
+config AW_AXP80
+	bool "AXP80x driver"
+	depends on ARCH_SUN50IW2
+	depends on SUNXI_ARISC
+	help
+	  AXP80x driver
+
+config AW_AXPDUMMY
+	bool "AXPDUMMY driver"
+	depends on ARCH_SUN50IW2
+	depends on SUNXI_ARISC
+	help
+	  AXPDUMMY driver
+
+endif # AW_AXP
 
 config POWER_SUPPLY_DEBUG
 	bool "Power supply debug"

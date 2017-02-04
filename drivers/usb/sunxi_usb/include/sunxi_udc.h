@@ -82,7 +82,7 @@ struct sw_udc_fifo{
 	u8  double_fifo;
 };
 
-#if defined (CONFIG_ARCH_SUN50I)
+#if defined(CONFIG_ARCH_SUN50IW1)
 //fifo 8k
 
 /*

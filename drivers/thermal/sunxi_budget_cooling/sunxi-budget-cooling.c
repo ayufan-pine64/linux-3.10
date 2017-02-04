@@ -340,7 +340,19 @@ static struct platform_driver sunxi_budget_cooling_driver = {
 		.of_match_table = of_match_ptr(sunxi_budget_cooling_of_match),
 	}
 };
-module_platform_driver(sunxi_budget_cooling_driver);
+
+static int __init sunxi_budget_cooling_driver_init(void)
+{
+	return platform_driver_register(&sunxi_budget_cooling_driver);
+}
+
+static void __exit sunxi_budget_cooling_driver_exit(void)
+{
+	platform_driver_unregister(&sunxi_budget_cooling_driver);
+}
+
+subsys_initcall_sync(sunxi_budget_cooling_driver_init);
+module_exit(sunxi_budget_cooling_driver_exit);
 MODULE_DESCRIPTION("SUNXI budget cooling driver");
 MODULE_AUTHOR("QIn");
 MODULE_LICENSE("GPL v2");

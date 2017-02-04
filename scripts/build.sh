@@ -3,9 +3,11 @@ set -e
 
 #Setup common variables
 export ARCH=arm
-if [ -n "`echo ${LICHEE_CHIP} | grep "sun5[0-9]i"`" ]; then
+if [ -n "`echo ${LICHEE_CHIP} | grep "sun5[0-9]i"`" ] && \
+	[ "x${LICHEE_ARCH}" = "xarm64" ]; then
     export ARCH=arm64
 fi
+
 export CROSS_COMPILE=${ARCH}-linux-gnueabi-
 if [ -n "${LICHEE_TOOLCHAIN_PATH}" \
 	-a -d "${LICHEE_TOOLCHAIN_PATH}" ]; then
@@ -68,48 +70,60 @@ build_nand_lib()
 	fi
 }
 
-build_gpu_sun8i()
+gpu_message()
 {
-    echo "$0"
-}
-
-build_gpu_sun8iw6()
-{
-    echo "$0"
-}
-
-build_gpu_sun9iw1()
-{
-    echo "$0"
+	echo -ne "\033[34;1m"
+	echo "[GPU]: $1"
+	echo -ne "\033[0m"
 }
 
 build_gpu()
 {
-	if [ "x${LICHEE_PLATFORM}" = "xandroid" ] ; then
+	GPU_TYPE=`fgrep CONFIG_SUNXI_GPU_TYPE ${LICHEE_KDIR}/.config | cut -d \" -f 2`
+	if [ "X$GPU_TYPE" = "XNone" -o "X$GPU_TYPE" = "X" ]; then
 	{
-        unset OUT
-        unset TOP
+		gpu_message "No GPU type is configured in ${LICHEE_KDIR}/.config."
+		return
 	}
 	fi
-	
+
+	gpu_message "Building $GPU_TYPE device driver..."
+
+	if [ "X${LICHEE_PLATFORM}" = "Xandroid" -o "X${LICHEE_PLATFORM}" = "Xsecureandroid" ] ; then
+	{
+		TMP_OUT=$OUT
+		TMP_TOP=$TOP
+		unset OUT
+		unset TOP
+	}
+	fi
+
 	make -C modules/gpu LICHEE_MOD_DIR=${LICHEE_MOD_DIR} LICHEE_KDIR=${LICHEE_KDIR}
-}
 
-clean_gpu_sun9iw1()
-{
-    echo "$0"
-}
+	if [ "X${LICHEE_PLATFORM}" = "Xandroid" -o "X${LICHEE_PLATFORM}" = "Xsecureandroid" ] ; then
+	{
+		export OUT=$TMP_OUT
+		export TOP=$TMP_TOP
+	}
+	fi
 
-clean_gpu_sun8iw6()
-{
-    echo "$0"
+	gpu_message "$GPU_TYPE device driver has been built."
 }
 
 clean_gpu()
 {
-    echo "Nothing to do."
-}
+	GPU_TYPE=`fgrep CONFIG_SUNXI_GPU_TYPE ${LICHEE_KDIR}/.config | cut -d \" -f 2`
+	if [ "X$GPU_TYPE" = "XNone" -o "X$GPU_TYPE" = "X" ]; then
+	{
+		gpu_message "No GPU type is configured in .config."
+		return
+	}
+	fi
 
+	gpu_message "Cleaning $GPU_TYPE device driver..."
+	make -C modules/gpu LICHEE_MOD_DIR=${LICHEE_MOD_DIR} LICHEE_KDIR=${LICHEE_KDIR} clean
+	gpu_message "$GPU_TYPE device driver has been cleaned."
+}
 
 build_kernel()
 {
@@ -121,13 +135,35 @@ build_kernel()
     echo "${LICHEE_MOD_DIR}"
     mkdir -p ${LICHEE_MOD_DIR}
 
+    # uImage is arm architecture specific target
+    local arch_target=""
+    if [ "${ARCH}" = "arm" ]; then
+        arch_target="uImage dtbs"
+    else
+        arch_target="all"
+    fi
+
     # We need to copy rootfs files to compile kernel for linux image
-	echo "lichee_chip = $LICHEE_CHIP"
-	if [ "${LICHEE_CHIP}" = "sun8iw10p1" ] || [ "${LICHEE_CHIP}" = "sun8iw11p1" ]; then
-		echo "cp rootfs_32bit.cpio.gz"
+	echo "Copy rootfs.cpio.gz for ${ARCH}"
+	if [ "${ARCH}" = "arm" ]; then
 		cp -f rootfs_32bit.cpio.gz output/rootfs.cpio.gz
 	else
 		cp -f rootfs.cpio.gz output/
+	fi
+	#exchange sdc0 and sdc2 for dragonBoard card boot
+	if [ "x${LICHEE_PLATFORM}" = "xdragonboard" ]; then
+		local SYS_CONFIG_FILE=../tools/pack/chips/${LICHEE_CHIP}/configs/${LICHEE_BOARD}/sys_config.fex
+		local DTS_PATH=./arch/${ARCH}/boot/dts/
+
+		if [ -f ${DTS_PATH}/${LICHEE_CHIP}_bak.dtsi ];then
+			rm -f ${DTS_PATH}/${LICHEE_CHIP}.dtsi
+			mv ${DTS_PATH}/${LICHEE_CHIP}_bak.dtsi ${DTS_PATH}/${LICHEE_CHIP}.dtsi
+		fi
+		# if find dragonboard_test=1 in sys_config.fex ,then will exchange sdc0 and sdc2
+		if [ -n "`grep "dragonboard_test" $SYS_CONFIG_FILE | grep "1" | grep -v ";"`" ]; then
+			echo "exchange sdc0 and sdc2 for dragonboard card boot"
+			./scripts/exchange-sdc0-sdc2-for-dragonboard.sh  ${LICHEE_CHIP}
+		fi
 	fi
 
     if [ ! -f .config ] ; then
@@ -141,18 +177,18 @@ build_kernel()
         SUNXI_STACK_CHECK=1
     fi
     if [ "x$SUNXI_SPARSE_CHECK" = "x" ] && [ "x$SUNXI_SMATCH_CHECK" = "x" ];then
-        make ARCH=${ARCH} CROSS_COMPILE=${CROSS_COMPILE} -j${LICHEE_JLEVEL} all modules
+        make ARCH=${ARCH} CROSS_COMPILE=${CROSS_COMPILE} -j${LICHEE_JLEVEL} ${arch_target} modules
     else
         if [ "x$SUNXI_SPARSE_CHECK" = "x1" ] && [ -f ../tools/codecheck/sparse/sparse ];then
             echo "\n\033[0;31;1mBuilding Round for sparse check ${KERNEL_CFG}...\033[0m\n\n"
             make clean
-            make CHECK="../tools/codecheck/sparse/sparse" ARCH=${ARCH} CROSS_COMPILE=${CROSS_COMPILE} -j${LICHEE_JLEVEL} C=2 all modules 2>&1|tee output/build_sparse.txt
+            make CHECK="../tools/codecheck/sparse/sparse" ARCH=${ARCH} CROSS_COMPILE=${CROSS_COMPILE} -j${LICHEE_JLEVEL} C=2 ${arch_target} modules 2>&1|tee output/build_sparse.txt
             cat output/build_sparse.txt|egrep -w '(warn|error|warning)' >output/warn_sparse.txt
         fi
         if [ "x$SUNXI_SMATCH_CHECK" = "x1" ]&& [ -f ../tools/codecheck/smatch/smatch ];then
             echo "\n\033[0;31;1mBuilding Round for smatch check ${KERNEL_CFG}...\033[0m\n\n"
             make clean
-            make CHECK="../tools/codecheck/smatch/smatch --full-path --no-data -p=kkernel" ARCH=${ARCH} CROSS_COMPILE=${CROSS_COMPILE} -j${LICHEE_JLEVEL} C=2 all modules 2>&1|tee output/build_smatch.txt
+            make CHECK="../tools/codecheck/smatch/smatch --full-path --no-data -p=kkernel" ARCH=${ARCH} CROSS_COMPILE=${CROSS_COMPILE} -j${LICHEE_JLEVEL} C=2 ${arch_target} modules 2>&1|tee output/build_smatch.txt
             cat output/build_smatch.txt|egrep -w '(warn|error|warning)' >output/warn_smatch.txt
         fi
     fi
@@ -196,17 +232,14 @@ build_modules()
 	
 	update_kern_ver
 	build_nand_lib
-	make -C modules/nand LICHEE_MOD_DIR=${LICHEE_MOD_DIR} LICHEE_KDIR=${LICHEE_KDIR} \
+	make -C modules/nand LICHEE_MOD_DIR=${LICHEE_MOD_DIR} \
+		LICHEE_KDIR=${LICHEE_KDIR} \
 		CONFIG_CHIP_ID=${CONFIG_CHIP_ID} install
-       make -C modules/aw_schw LICHEE_MOD_DIR=${LICHEE_MOD_DIR} LICHEE_KDIR=${LICHEE_KDIR} \
-               CONFIG_CHIP_ID=${CONFIG_CHIP_ID} install
-	
-	echo "lichee_chip = $LICHEE_CHIP"
-	if [ "${LICHEE_CHIP}" = "sun8iw10p1" ] || [ "${LICHEE_CHIP}" = "sun8iw11p1" ]; then
-		echo "no gpu modules."	
-	else
-		build_gpu
-	fi
+	make -C modules/aw_schw LICHEE_MOD_DIR=${LICHEE_MOD_DIR} \
+		LICHEE_KDIR=${LICHEE_KDIR} \
+		CONFIG_CHIP_ID=${CONFIG_CHIP_ID} install
+
+	build_gpu
 }
 
 regen_rootfs_cpio()
@@ -258,13 +291,14 @@ build_ramfs()
 
 	if [ "${CHIP}" = "sun9i" ]; then
 		BASE="0x20000000";
-		KERNEL_OFFSET="0x8000";
-	elif [ "${CHIP}" = "sun50i" ]; then
-		BASE="0x41000000";
-		KERNEL_OFFSET="0x80000";
 	else
 		BASE="0x40000000";
+	fi
+
+	if [ "${ARCH}" = "arm" ]; then
 		KERNEL_OFFSET="0x8000";
+	elif [ "${ARCH}" = "arm64" ]; then
+		KERNEL_OFFSET="0x80000";
 	fi
 
 	if [ -f vmlinux ]; then
@@ -283,7 +317,7 @@ build_ramfs()
 
 	${MKBOOTIMG} --kernel ${BIMAGE} \
 		--ramdisk ${RAMDISK} \
-		--board ${CHIP} \
+		--board ${CHIP}_${ARCH} \
 		--base ${BASE} \
 		--kernel_offset ${KERNEL_OFFSET} \
 		--ramdisk_offset ${RAMDISK_OFFSET} \
@@ -294,6 +328,10 @@ build_ramfs()
 	echo "Copy boot.img to output directory ..."
 	cp output/boot.img ${LICHEE_PLAT_OUT}
 	cp output/vmlinux.tar.bz2 ${LICHEE_PLAT_OUT}
+
+	if [ -f output/zImage ] || [ -f output/uImage ]; then
+		cp output/[zu]Image ${LICHEE_PLAT_OUT}
+	fi
 
 	if [ ! -f output/arisc ]; then
 		echo "arisc" > output/arisc
@@ -310,13 +348,22 @@ build_ramfs()
 
 gen_output()
 {
-    if [ "x${LICHEE_PLATFORM}" = "xandroid" ] ; then
-        echo "Copy modules to target ..."
-        rm -rf ${LICHEE_PLAT_OUT}/lib
-        cp -rf ${LICHEE_KDIR}/output/* ${LICHEE_PLAT_OUT}
-        return
-    fi
-    echo "$0"
+	if [ "x${LICHEE_PLATFORM}" = "xandroid" ] ; then
+		echo "Copy modules to target ..."
+		rm -rf ${LICHEE_PLAT_OUT}/lib
+		cp -rf ${LICHEE_KDIR}/output/* ${LICHEE_PLAT_OUT}
+		return
+	fi
+
+	if [ -d ${LICHEE_BR_OUT}/target ] ; then
+		echo "Copy modules to target ..."
+		local module_dir="${LICHEE_BR_OUT}/target/lib/modules"
+		rm -rf ${module_dir}
+		mkdir -p ${module_dir}
+		cp -rf ${LICHEE_MOD_DIR} ${module_dir}
+	fi
+
+	echo "$0"
 }
 
 clean_kernel()
@@ -358,8 +405,8 @@ case "$1" in
         build_modules
         ;;
     clean)
-        clean_kernel
         clean_modules
+        clean_kernel
         ;;
     *)
         build_kernel

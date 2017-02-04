@@ -21,11 +21,11 @@ MODULE_DESCRIPTION("A low-level driver for samsung s5k4ec mipi sensors");
 MODULE_LICENSE("GPL");
 
 //for internel driver debug
-#define DEV_DBG_EN      1 
-#if(DEV_DBG_EN == 1)    
+#define DEV_DBG_EN      1
+#if(DEV_DBG_EN == 1)
 #define vfe_dev_dbg(x,arg...) printk("[S5K4EC_MIPI]"x,##arg)
 #else
-#define vfe_dev_dbg(x,arg...) 
+#define vfe_dev_dbg(x,arg...)
 #endif
 #define vfe_dev_err(x,arg...) printk("[S5K4EC_MIPI]"x,##arg)
 #define vfe_dev_print(x,arg...) printk("[S5K4EC_MIPI]"x,##arg)
@@ -67,10 +67,10 @@ unsigned int coarse_af_pd=0;
 /* Registers */
 
 
-static int sensor_s_band_filter(struct v4l2_subdev *sd, 
+static int sensor_s_band_filter(struct v4l2_subdev *sd,
 		enum v4l2_power_line_frequency value);
 
-		
+
 /*
  * Information we maintain about a known sensor.
  */
@@ -102,10 +102,10 @@ static struct regval_list sensor_default_regs[] = {
 //20110728 : ESD Check Register Address Changed
 //20110829 : TnP Changed by S.Y.Lee
 //20120104 : init Parm Update sequence changed
-//20120201 : Flash�� �ֺ��� Green Noise ���� setting 
+//20120201 : Flash�� �ֺ��� Green Noise ���� setting
 //20120228 : Add Brightness Block
 //==================================================================================
-  
+
 //==================================================================================
 // 01.Start Setting
 //==================================================================================
@@ -133,28 +133,28 @@ static struct regval_list sensor_default_regs[] = {
 // 03.Analog Setting & ASP Control
 //==================================================================================
 
-//This register is for FACTORY ONLY. 
+//This register is for FACTORY ONLY.
 //If you change it without prior notification
 //YOU are RESPONSIBLE for the FAILURE that will happen in the future
 
 {0x0028, 0xD000},
 {0x002A, 0x007A},
-{0x0f12, 0x0000},	
+{0x0f12, 0x0000},
 {0x002A, 0xE406},	 //[7]f_ladlc_en [6:5]f max [4]fadlc_en [3:2]L max [1]ladlc_en [0]adlc_ch_sel
-{0x0F12, 0x0092},	
-{0x002A, 0xE410},	
-{0x0F12, 0x3804},	 //[15:8]fadlc_filter_co_b [7:0]fadlc_filter_co_a	
-{0x002A, 0xE41A},	
-{0x0F12, 0x0010},	 	
-{0x002A, 0xE420},	
-{0x0F12, 0x0003},	 //adlc_fadlc_filter_refresh 	
+{0x0F12, 0x0092},
+{0x002A, 0xE410},
+{0x0F12, 0x3804},	 //[15:8]fadlc_filter_co_b [7:0]fadlc_filter_co_a
+{0x002A, 0xE41A},
+{0x0F12, 0x0010},
+{0x002A, 0xE420},
+{0x0F12, 0x0003},	 //adlc_fadlc_filter_refresh
 {0x0F12, 0x0060},	 //adlc_filter_level_diff_threshold
-{0x002A, 0xE42E},	
+{0x002A, 0xE42E},
 {0x0F12, 0x0004},	 //dithered l-ADLC(4bit)
-{0x002A, 0xF400},	
-{0x0F12, 0x5A3C},	 //[15:8]stx_width [7:0]dstx_width 
-{0x0F12, 0x0023},	 //[14]binning_test [13]gain_mode [11:12]row_id [10]cfpn_test [9]pd_pix [8]teg_en [7]adc_res [6]smp_en [5]ldb_en [4]ld_en [3]clp_en [2]srx_en [1]dshut_en [0]dcds_en 
-{0x0F12, 0x8080},	 //CDS option 
+{0x002A, 0xF400},
+{0x0F12, 0x5A3C},	 //[15:8]stx_width [7:0]dstx_width
+{0x0F12, 0x0023},	 //[14]binning_test [13]gain_mode [11:12]row_id [10]cfpn_test [9]pd_pix [8]teg_en [7]adc_res [6]smp_en [5]ldb_en [4]ld_en [3]clp_en [2]srx_en [1]dshut_en [0]dcds_en
+{0x0F12, 0x8080},	 //CDS option
 {0x0F12, 0x03AF},	 //[11:6]rst_mx [5:0]sig_mx
 {0x0F12, 0x000A},	 //Avg mode
 {0x0F12, 0xAA54},	 //x1~x1.49:No MS x1.5~x3.99:MS2 x4~x16:MS4
@@ -164,282 +164,282 @@ static struct regval_list sensor_default_regs[] = {
 {0x0F12, 0x0240},	 //bist_sig_width_o
 {0x0F12, 0x0040},	 //[9]dbs_bist_en [8:0]bist_rst_width
 {0x0F12, 0x1000},	 //[15]aac_en [14]GCLK_DIV2_EN [13:10]dl_cont [9:8]dbs_mode [7:0]dbs_option
-{0x0F12, 0x55cc},	 //bias [15:12]pix [11:8]pix_bst [7:4]comp2 [3:0]comp1  	
+{0x0F12, 0x55cc},	 //bias [15:12]pix [11:8]pix_bst [7:4]comp2 [3:0]comp1
 {0x0F12, 0xD000},	 //[15:8]clp_lvl [7:0]ref_option [5]pix_bst_en
 {0x0F12, 0x0010},	 //[7:0]monit
 {0x0F12, 0x0202},	 //[15:8]dbr_tune_tgsl [7:0]dbr_tune_pix
-{0x0F12, 0x0401},	 //[15:8]dbr_tune_ntg [7:0]dbr_tune_rg                                                                       
-{0x0F12, 0x0022},	 //[15:8]reg_option [7:4]rosc_tune_ncp [3:0]rosc_tune_cp                                                    
-{0x0F12, 0x0088},	 //PD [8]inrush_ctrl [7]fblv [6]reg_ntg [5]reg_tgsl [4]reg_rg [3]reg_pix [2]ncp_rosc [1]cp_rosc [0]cp 
-{0x0F12, 0x009F},	 //[9]capa_ctrl_en [8:7]fb_lv [6:5]dbr_clk_sel [4:0]cp_capa                                                
-{0x0F12, 0x0000},	 //[15:0]blst_en_cintr                                                                                        
-{0x0F12, 0x1800},	 //[11]blst_en [10]rfpn_test [9]sl_off [8]tx_off [7:0]rdv_option                                          
-{0x0F12, 0x0088},	 //[15:0]pmg_reg_tune                                                                                         
-{0x0F12, 0x0000},	 //[15:1]analog_dummy [0]pd_reg_test 
+{0x0F12, 0x0401},	 //[15:8]dbr_tune_ntg [7:0]dbr_tune_rg
+{0x0F12, 0x0022},	 //[15:8]reg_option [7:4]rosc_tune_ncp [3:0]rosc_tune_cp
+{0x0F12, 0x0088},	 //PD [8]inrush_ctrl [7]fblv [6]reg_ntg [5]reg_tgsl [4]reg_rg [3]reg_pix [2]ncp_rosc [1]cp_rosc [0]cp
+{0x0F12, 0x009F},	 //[9]capa_ctrl_en [8:7]fb_lv [6:5]dbr_clk_sel [4:0]cp_capa
+{0x0F12, 0x0000},	 //[15:0]blst_en_cintr
+{0x0F12, 0x1800},	 //[11]blst_en [10]rfpn_test [9]sl_off [8]tx_off [7:0]rdv_option
+{0x0F12, 0x0088},	 //[15:0]pmg_reg_tune
+{0x0F12, 0x0000},	 //[15:1]analog_dummy [0]pd_reg_test
 {0x0F12, 0x2428},	 //[13:11]srx_gap1 [10:8]srx_gap0 [7:0]stx_gap
-{0x0F12, 0x0000},	 //[0]atx_option       
+{0x0F12, 0x0000},	 //[0]atx_option
 {0x0F12, 0x03EE},	 //aig_avg_half
-{0x0F12, 0x0000},	 //[0]hvs_test_reg     
-{0x0F12, 0x0000},	 //[0]dbus_bist_auto   
-{0x0F12, 0x0000},	 //[7:0]dbr_option	    
-{0x002A, 0xF552},	
-{0x0F12, 0x0708},	 //[7:0]lat_st [15:8]lat_width  
+{0x0F12, 0x0000},	 //[0]hvs_test_reg
+{0x0F12, 0x0000},	 //[0]dbus_bist_auto
+{0x0F12, 0x0000},	 //[7:0]dbr_option
+{0x002A, 0xF552},
+{0x0F12, 0x0708},	 //[7:0]lat_st [15:8]lat_width
 {0x0F12, 0x080C},	 //[7:0]hold_st [15:8]hold_width
 
-//For subsampling Size	
+//For subsampling Size
 
-{0x0028, 0x7000},	
-{0x002A, 0x18BC},	
-{0x0F12, 0x0004},	
-{0x0F12, 0x05B6},	
-{0x0F12, 0x0000},	
-{0x0F12, 0x0000},	
-{0x0F12, 0x0001},	
-{0x0F12, 0x05BA},	
-{0x0F12, 0x0000},	
-{0x0F12, 0x0000},	
-{0x0F12, 0x0007},	
-{0x0F12, 0x05BA},	
-{0x0F12, 0x0000},	
-{0x0F12, 0x0000},	
-{0x0F12, 0x01F4},	
-{0x0F12, 0x024E},	
-{0x0F12, 0x0000},	
-{0x0F12, 0x0000},	
-{0x0F12, 0x01F4},	
-{0x0F12, 0x05B6},	
-{0x0F12, 0x0000},	
-{0x0F12, 0x0000},	
-{0x0F12, 0x01F4},	
-{0x0F12, 0x05BA},	
-{0x0F12, 0x0000},	
-{0x0F12, 0x0000},	
-{0x0F12, 0x01F4},	
-{0x0F12, 0x024F},	
-{0x0F12, 0x0000},	
-{0x0F12, 0x0000},	
-{0x0F12, 0x0000},	
-{0x0F12, 0x0000},	
-{0x0F12, 0x0000},	
-{0x0F12, 0x0000},	
-{0x0F12, 0x0075},	
-{0x0F12, 0x00CF},	
-{0x0F12, 0x0000},	
-{0x0F12, 0x0000},	
-{0x0F12, 0x0075},	
-{0x0F12, 0x00D6},	
-{0x0F12, 0x0000},	
-{0x0F12, 0x0000},	
-{0x0F12, 0x0004},	
-{0x0F12, 0x01F4},	
-{0x0F12, 0x0000},	
-{0x0F12, 0x0000},	
-{0x0F12, 0x00F0},	
-{0x0F12, 0x01F4},	
-{0x0F12, 0x029E},	
-{0x0F12, 0x05B2},	
-{0x0F12, 0x0000},	
-{0x0F12, 0x0000},	
-{0x0F12, 0x0000},	
-{0x0F12, 0x0000},	
-{0x0F12, 0x01F8},	
-{0x0F12, 0x0228},	
-{0x0F12, 0x0000},	
-{0x0F12, 0x0000},	
-{0x0F12, 0x0000},	
-{0x0F12, 0x0000},	
-{0x0F12, 0x0208},	
-{0x0F12, 0x0238},	
-{0x0F12, 0x0000},	
-{0x0F12, 0x0000},	
-{0x0F12, 0x0000},	
-{0x0F12, 0x0000},	
-{0x0F12, 0x0218},	
-{0x0F12, 0x0238},	
-{0x0F12, 0x0000},	
-{0x0F12, 0x0000},	
-{0x0F12, 0x0000},	
-{0x0F12, 0x0000},	
-{0x0F12, 0x0001},	
-{0x0F12, 0x0009},	
-{0x0F12, 0x00DE},	
-{0x0F12, 0x05C0},	
-{0x0F12, 0x0000},	
-{0x0F12, 0x0000},	
-{0x0F12, 0x00DF},	
-{0x0F12, 0x00E4},	
-{0x0F12, 0x01F8},	
-{0x0F12, 0x01FD},	
-{0x0F12, 0x05B6},	
-{0x0F12, 0x05BB},	
-{0x0F12, 0x0000},	
-{0x0F12, 0x0000},	
-{0x0F12, 0x0000},	
-{0x0F12, 0x0000},	
-{0x0F12, 0x0000},	
-{0x0F12, 0x0000},	
-{0x0F12, 0x0000},	
-{0x0F12, 0x0000},	
-{0x0F12, 0x0000},	
-{0x0F12, 0x0000},	
-{0x0F12, 0x0000},	
-{0x0F12, 0x0000},	
-{0x0F12, 0x01F8},	
-{0x0F12, 0x0000},	
-{0x0F12, 0x0000},	
-{0x0F12, 0x0077},	
-{0x0F12, 0x007E},	
-{0x0F12, 0x024F},	
-{0x0F12, 0x025E},	
-{0x0F12, 0x0000},	
-{0x0F12, 0x0000},	
-{0x0F12, 0x0000},	
-{0x0F12, 0x0000},	
+{0x0028, 0x7000},
+{0x002A, 0x18BC},
+{0x0F12, 0x0004},
+{0x0F12, 0x05B6},
+{0x0F12, 0x0000},
+{0x0F12, 0x0000},
+{0x0F12, 0x0001},
+{0x0F12, 0x05BA},
+{0x0F12, 0x0000},
+{0x0F12, 0x0000},
+{0x0F12, 0x0007},
+{0x0F12, 0x05BA},
+{0x0F12, 0x0000},
+{0x0F12, 0x0000},
+{0x0F12, 0x01F4},
+{0x0F12, 0x024E},
+{0x0F12, 0x0000},
+{0x0F12, 0x0000},
+{0x0F12, 0x01F4},
+{0x0F12, 0x05B6},
+{0x0F12, 0x0000},
+{0x0F12, 0x0000},
+{0x0F12, 0x01F4},
+{0x0F12, 0x05BA},
+{0x0F12, 0x0000},
+{0x0F12, 0x0000},
+{0x0F12, 0x01F4},
+{0x0F12, 0x024F},
+{0x0F12, 0x0000},
+{0x0F12, 0x0000},
+{0x0F12, 0x0000},
+{0x0F12, 0x0000},
+{0x0F12, 0x0000},
+{0x0F12, 0x0000},
+{0x0F12, 0x0075},
+{0x0F12, 0x00CF},
+{0x0F12, 0x0000},
+{0x0F12, 0x0000},
+{0x0F12, 0x0075},
+{0x0F12, 0x00D6},
+{0x0F12, 0x0000},
+{0x0F12, 0x0000},
+{0x0F12, 0x0004},
+{0x0F12, 0x01F4},
+{0x0F12, 0x0000},
+{0x0F12, 0x0000},
+{0x0F12, 0x00F0},
+{0x0F12, 0x01F4},
+{0x0F12, 0x029E},
+{0x0F12, 0x05B2},
+{0x0F12, 0x0000},
+{0x0F12, 0x0000},
+{0x0F12, 0x0000},
+{0x0F12, 0x0000},
+{0x0F12, 0x01F8},
+{0x0F12, 0x0228},
+{0x0F12, 0x0000},
+{0x0F12, 0x0000},
+{0x0F12, 0x0000},
+{0x0F12, 0x0000},
+{0x0F12, 0x0208},
+{0x0F12, 0x0238},
+{0x0F12, 0x0000},
+{0x0F12, 0x0000},
+{0x0F12, 0x0000},
+{0x0F12, 0x0000},
+{0x0F12, 0x0218},
+{0x0F12, 0x0238},
+{0x0F12, 0x0000},
+{0x0F12, 0x0000},
+{0x0F12, 0x0000},
+{0x0F12, 0x0000},
+{0x0F12, 0x0001},
+{0x0F12, 0x0009},
+{0x0F12, 0x00DE},
+{0x0F12, 0x05C0},
+{0x0F12, 0x0000},
+{0x0F12, 0x0000},
+{0x0F12, 0x00DF},
+{0x0F12, 0x00E4},
+{0x0F12, 0x01F8},
+{0x0F12, 0x01FD},
+{0x0F12, 0x05B6},
+{0x0F12, 0x05BB},
+{0x0F12, 0x0000},
+{0x0F12, 0x0000},
+{0x0F12, 0x0000},
+{0x0F12, 0x0000},
+{0x0F12, 0x0000},
+{0x0F12, 0x0000},
+{0x0F12, 0x0000},
+{0x0F12, 0x0000},
+{0x0F12, 0x0000},
+{0x0F12, 0x0000},
+{0x0F12, 0x0000},
+{0x0F12, 0x0000},
+{0x0F12, 0x01F8},
+{0x0F12, 0x0000},
+{0x0F12, 0x0000},
+{0x0F12, 0x0077},
+{0x0F12, 0x007E},
+{0x0F12, 0x024F},
+{0x0F12, 0x025E},
+{0x0F12, 0x0000},
+{0x0F12, 0x0000},
+{0x0F12, 0x0000},
+{0x0F12, 0x0000},
 
- // For Capture 	
+ // For Capture
 
-{0x0F12, 0x0004},	
-{0x0F12, 0x09D1},	
-{0x0F12, 0x0000},	
-{0x0F12, 0x0000},	
-{0x0F12, 0x0001},	
-{0x0F12, 0x09D5},	
-{0x0F12, 0x0000},	
-{0x0F12, 0x0000},	
-{0x0F12, 0x0008},	
-{0x0F12, 0x09D5},	
-{0x0F12, 0x0000},	
-{0x0F12, 0x0000},	
-{0x0F12, 0x02AA},	
-{0x0F12, 0x0326},	
-{0x0F12, 0x0000},	
-{0x0F12, 0x0000},	
-{0x0F12, 0x02AA},	
-{0x0F12, 0x09D1},	
-{0x0F12, 0x0000},	
-{0x0F12, 0x0000},	
-{0x0F12, 0x02AA},	
-{0x0F12, 0x09D5},	
-{0x0F12, 0x0000},	
-{0x0F12, 0x0000},	
-{0x0F12, 0x02AA},	
-{0x0F12, 0x0327},	
-{0x0F12, 0x0000},	
-{0x0F12, 0x0000},	
-{0x0F12, 0x0000},	
-{0x0F12, 0x0000},	
-{0x0F12, 0x0000},	
-{0x0F12, 0x0000},	
-{0x0F12, 0x0008},	
-{0x0F12, 0x0084},	
-{0x0F12, 0x0000},	
-{0x0F12, 0x0000},	
-{0x0F12, 0x0008},	
-{0x0F12, 0x008D},	
-{0x0F12, 0x0000},	
-{0x0F12, 0x0000},	
-{0x0F12, 0x0008},	
-{0x0F12, 0x02AA},	
-{0x0F12, 0x0000},	
-{0x0F12, 0x0000},	
-{0x0F12, 0x00AA},	
-{0x0F12, 0x02AA},	
-{0x0F12, 0x03AD},	
-{0x0F12, 0x09CD},	
-{0x0F12, 0x0000},	
-{0x0F12, 0x0000},	
-{0x0F12, 0x0000},	
-{0x0F12, 0x0000},	
-{0x0F12, 0x02AE},	
-{0x0F12, 0x02DE},	
-{0x0F12, 0x0000},	
-{0x0F12, 0x0000},	
-{0x0F12, 0x0000},	
-{0x0F12, 0x0000},	
-{0x0F12, 0x02BE},	
-{0x0F12, 0x02EE},	
-{0x0F12, 0x0000},	
-{0x0F12, 0x0000},	
-{0x0F12, 0x0000},	
-{0x0F12, 0x0000},	
-{0x0F12, 0x02CE},	
-{0x0F12, 0x02EE},	
-{0x0F12, 0x0000},	
-{0x0F12, 0x0000},	
-{0x0F12, 0x0000},	
-{0x0F12, 0x0000},	
-{0x0F12, 0x0001},	
-{0x0F12, 0x0009},	
-{0x0F12, 0x0095},	
-{0x0F12, 0x09DB},	
-{0x0F12, 0x0000},	
-{0x0F12, 0x0000},	
-{0x0F12, 0x0096},	
-{0x0F12, 0x009B},	
-{0x0F12, 0x02AE},	
-{0x0F12, 0x02B3},	
-{0x0F12, 0x09D1},	
-{0x0F12, 0x09D6},	
-{0x0F12, 0x0000},	
-{0x0F12, 0x0000},	
-{0x0F12, 0x0000},	
-{0x0F12, 0x0000},	
-{0x0F12, 0x0000},	
-{0x0F12, 0x0000},	
-{0x0F12, 0x0000},	
-{0x0F12, 0x0000},	
-{0x0F12, 0x0000},	
-{0x0F12, 0x0000},	
-{0x0F12, 0x0000},	
-{0x0F12, 0x0000},	
-{0x0F12, 0x02AE},	
-{0x0F12, 0x0000},	
-{0x0F12, 0x0000},	
-{0x0F12, 0x0009},	
-{0x0F12, 0x0010},	
-{0x0F12, 0x0327},	
-{0x0F12, 0x0336},	
-{0x0F12, 0x0000},	
-{0x0F12, 0x0000},	
-{0x0F12, 0x0000},	
-{0x0F12, 0x0000},	     
-{0x002A, 0x1AF8},	
-{0x0F12, 0x5A3C},    //senHal_TuneStr_AngTuneData1_2_D000F400 register at subsampling	
-{0x002A, 0x1896},	
-{0x0F12, 0x0002},    //senHal_SamplingType	0002 03EE: PLA setting	
-{0x0F12, 0x0000},    //senHal_SamplingMode 0 : 2 PLA / 1 : 4PLA	
-{0x0F12, 0x0003},	
-{0x002A, 0x189E},	
-{0x0F12, 0x0FB0},	
-{0x002A, 0x18AC},	
-{0x0F12, 0x0060},	
-{0x0F12, 0x0060},	
-{0x0F12, 0x05C0},	
-{0x0F12, 0x05C0},	
-{0x002A, 0x1AEA},	
-{0x0F12, 0x8080},	
-{0x0F12, 0x0080},	
-{0x002A, 0x1AE0},	
-{0x0F12, 0x0000},	
-{0x002A, 0x1A72},	
-{0x0F12, 0x0000},	
-{0x002A, 0x18A2},	
-{0x0F12, 0x0004},	
-{0x002A, 0x1A6A},	
-{0x0F12, 0x009A},	
-{0x002A, 0x385E},	
-{0x0F12, 0x024C},	
-{0x002A, 0x0EE6},	
-{0x0F12, 0x0000},	
-{0x002A, 0x1B2A},	
-{0x0F12, 0x0300},	
-{0x0F12, 0x00D6},	
-{0x0F12, 0x008D},	
-{0x0F12, 0x00CF},	
-{0x0F12, 0x0084},	
+{0x0F12, 0x0004},
+{0x0F12, 0x09D1},
+{0x0F12, 0x0000},
+{0x0F12, 0x0000},
+{0x0F12, 0x0001},
+{0x0F12, 0x09D5},
+{0x0F12, 0x0000},
+{0x0F12, 0x0000},
+{0x0F12, 0x0008},
+{0x0F12, 0x09D5},
+{0x0F12, 0x0000},
+{0x0F12, 0x0000},
+{0x0F12, 0x02AA},
+{0x0F12, 0x0326},
+{0x0F12, 0x0000},
+{0x0F12, 0x0000},
+{0x0F12, 0x02AA},
+{0x0F12, 0x09D1},
+{0x0F12, 0x0000},
+{0x0F12, 0x0000},
+{0x0F12, 0x02AA},
+{0x0F12, 0x09D5},
+{0x0F12, 0x0000},
+{0x0F12, 0x0000},
+{0x0F12, 0x02AA},
+{0x0F12, 0x0327},
+{0x0F12, 0x0000},
+{0x0F12, 0x0000},
+{0x0F12, 0x0000},
+{0x0F12, 0x0000},
+{0x0F12, 0x0000},
+{0x0F12, 0x0000},
+{0x0F12, 0x0008},
+{0x0F12, 0x0084},
+{0x0F12, 0x0000},
+{0x0F12, 0x0000},
+{0x0F12, 0x0008},
+{0x0F12, 0x008D},
+{0x0F12, 0x0000},
+{0x0F12, 0x0000},
+{0x0F12, 0x0008},
+{0x0F12, 0x02AA},
+{0x0F12, 0x0000},
+{0x0F12, 0x0000},
+{0x0F12, 0x00AA},
+{0x0F12, 0x02AA},
+{0x0F12, 0x03AD},
+{0x0F12, 0x09CD},
+{0x0F12, 0x0000},
+{0x0F12, 0x0000},
+{0x0F12, 0x0000},
+{0x0F12, 0x0000},
+{0x0F12, 0x02AE},
+{0x0F12, 0x02DE},
+{0x0F12, 0x0000},
+{0x0F12, 0x0000},
+{0x0F12, 0x0000},
+{0x0F12, 0x0000},
+{0x0F12, 0x02BE},
+{0x0F12, 0x02EE},
+{0x0F12, 0x0000},
+{0x0F12, 0x0000},
+{0x0F12, 0x0000},
+{0x0F12, 0x0000},
+{0x0F12, 0x02CE},
+{0x0F12, 0x02EE},
+{0x0F12, 0x0000},
+{0x0F12, 0x0000},
+{0x0F12, 0x0000},
+{0x0F12, 0x0000},
+{0x0F12, 0x0001},
+{0x0F12, 0x0009},
+{0x0F12, 0x0095},
+{0x0F12, 0x09DB},
+{0x0F12, 0x0000},
+{0x0F12, 0x0000},
+{0x0F12, 0x0096},
+{0x0F12, 0x009B},
+{0x0F12, 0x02AE},
+{0x0F12, 0x02B3},
+{0x0F12, 0x09D1},
+{0x0F12, 0x09D6},
+{0x0F12, 0x0000},
+{0x0F12, 0x0000},
+{0x0F12, 0x0000},
+{0x0F12, 0x0000},
+{0x0F12, 0x0000},
+{0x0F12, 0x0000},
+{0x0F12, 0x0000},
+{0x0F12, 0x0000},
+{0x0F12, 0x0000},
+{0x0F12, 0x0000},
+{0x0F12, 0x0000},
+{0x0F12, 0x0000},
+{0x0F12, 0x02AE},
+{0x0F12, 0x0000},
+{0x0F12, 0x0000},
+{0x0F12, 0x0009},
+{0x0F12, 0x0010},
+{0x0F12, 0x0327},
+{0x0F12, 0x0336},
+{0x0F12, 0x0000},
+{0x0F12, 0x0000},
+{0x0F12, 0x0000},
+{0x0F12, 0x0000},
+{0x002A, 0x1AF8},
+{0x0F12, 0x5A3C},    //senHal_TuneStr_AngTuneData1_2_D000F400 register at subsampling
+{0x002A, 0x1896},
+{0x0F12, 0x0002},    //senHal_SamplingType	0002 03EE: PLA setting
+{0x0F12, 0x0000},    //senHal_SamplingMode 0 : 2 PLA / 1 : 4PLA
+{0x0F12, 0x0003},
+{0x002A, 0x189E},
+{0x0F12, 0x0FB0},
+{0x002A, 0x18AC},
+{0x0F12, 0x0060},
+{0x0F12, 0x0060},
+{0x0F12, 0x05C0},
+{0x0F12, 0x05C0},
+{0x002A, 0x1AEA},
+{0x0F12, 0x8080},
+{0x0F12, 0x0080},
+{0x002A, 0x1AE0},
+{0x0F12, 0x0000},
+{0x002A, 0x1A72},
+{0x0F12, 0x0000},
+{0x002A, 0x18A2},
+{0x0F12, 0x0004},
+{0x002A, 0x1A6A},
+{0x0F12, 0x009A},
+{0x002A, 0x385E},
+{0x0F12, 0x024C},
+{0x002A, 0x0EE6},
+{0x0F12, 0x0000},
+{0x002A, 0x1B2A},
+{0x0F12, 0x0300},
+{0x0F12, 0x00D6},
+{0x0F12, 0x008D},
+{0x0F12, 0x00CF},
+{0x0F12, 0x0084},
 
 //==================================================================================
-	
+
 
 //=================================================================================
 // 05.Trap and Patch
@@ -1685,8 +1685,8 @@ static struct regval_list sensor_default_regs[] = {
 {0x0F12, 0x0000},	 // 7000449E
 
 // End of Patch Data(Last : 7000449Eh)
-// Total Size 2472 (09A8)           
-// Addr : 3AF8  Size : 2470(9A6h)    
+// Total Size 2472 (09A8)
+// Addr : 3AF8  Size : 2470(9A6h)
 
 //TNP_USER_MBCV_CONTROL
 //TNP_4EC_MBR_TUNE
@@ -1699,8 +1699,8 @@ static struct regval_list sensor_default_regs[] = {
 //TNP_AWB_GRID_LOWBR
 //TNP_AWB_GRID_MODULECOMP
 
-{0x0028, 0xD000}, 
-{0x002A, 0x1000}, 
+{0x0028, 0xD000},
+{0x002A, 0x1000},
 {0x0F12, 0x0001},
 
 //==================================================================================
@@ -1733,7 +1733,7 @@ static struct regval_list sensor_default_regs[] = {
 {0x0F12, 0x0055},	 //REG_TC_AF_ScndWinSizeX
 {0x0F12, 0x0055},	 //REG_TC_AF_ScndWinSizeY
 {0x0F12, 0x0001},	 //REG_TC_AF_WinSizesUpdated
-     
+
 {0x002A, 0x070E},
 {0x0F12, 0x00FF},	 //skl_af_StatOvlpExpFactor
 {0x002A, 0x071E},
@@ -1747,7 +1747,7 @@ static struct regval_list sensor_default_regs[] = {
 {0x0F12, 0x0000},	 //af_search_usFineMaxScale
 {0x002A, 0x15E0},
 {0x0F12, 0x0902},	 //af_pos_usFineStepNumSize
-     
+
 {0x002A, 0x164C},
 {0x0F12, 0x0003},	 //af_search_usMinPeakSamples
 {0x002A, 0x163E},
@@ -1760,20 +1760,20 @@ static struct regval_list sensor_default_regs[] = {
 {0x0F12, 0xFF95},	 //af_search_usConfCheckOrder_1_
 {0x002A, 0x166A},
 {0x0F12, 0x0280},	 //af_search_usConfThr_4_
-{0x002A, 0x1676},	
+{0x002A, 0x1676},
 {0x0F12, 0x03FF},	 //af_search_usConfThr_10_
 {0x0F12, 0x0320},	 //af_search_usConfThr_11_
-{0x002A, 0x16BC},	
+{0x002A, 0x16BC},
 {0x0F12, 0x0030},	 //af_stat_usMinStatVal
-{0x002A, 0x16E0},	
+{0x002A, 0x16E0},
 {0x0F12, 0x0060},	 //af_scene_usSceneLowNormBrThr
-{0x002A, 0x16D4},	
+{0x002A, 0x16D4},
 {0x0F12, 0x0010},	 //af_stat_usBpfThresh
-{0x002A, 0x1656},	
+{0x002A, 0x1656},
 {0x0F12, 0x0000},	 //af_search_usCapturePolicy
 {0x002A, 0x15E6},
 {0x0F12, 0x003C},	 //af_pos_usCaptureFixedPos
-     
+
 {0x0F12, 0x0018},	 //af_pos_usTableLastInd
 {0x0F12, 0x002A},	 //af_pos_usTable_0_
 {0x0F12, 0x0030},	 //af_pos_usTable_1_
@@ -1800,7 +1800,7 @@ static struct regval_list sensor_default_regs[] = {
 {0x0F12, 0x00AE},	 //af_pos_usTable_22_
 {0x0F12, 0x00B4},	 //af_pos_usTable_23_
 {0x0F12, 0x00BA},	 //af_pos_usTable_24_
-     
+
 {0x002A, 0x1722},
 {0x0F12, 0x8000},	 //afd_usParam_0_
 {0x0F12, 0x0006},	 //afd_usParam_1_
@@ -1814,7 +1814,7 @@ static struct regval_list sensor_default_regs[] = {
 {0x0F12, 0x0080},	 //afd_usParam_9_
 {0x0F12, 0x00C0},	 //afd_usParam_10_
 {0x0F12, 0x00E0},	 //afd_usParam_11_
-     
+
 {0x002A, 0x028C},
 {0x0F12, 0x0003},	 //REG_TC_AF_AfCmd
 
@@ -1833,7 +1833,7 @@ static struct regval_list sensor_default_regs[] = {
 {0x0F12, 0x015F},	 //TVAR_ash_AwbAshCord_4_ 5250K
 {0x0F12, 0x017C},	 //TVAR_ash_AwbAshCord_5_ 6400K
 {0x0F12, 0x0194},	 //TVAR_ash_AwbAshCord_6_ 7500K
-         
+
 // GAS Alpha Table
 {0x002A, 0x08F6},
 {0x0F12, 0x4000},	 //TVAR_ash_GASAlpha_0__0_ R   // 2300K
@@ -1878,13 +1878,13 @@ static struct regval_list sensor_default_regs[] = {
 // 09.Auto Flicker Detection
 //==================================================================================
 
-{0x002A, 0x0F30}, 	
-{0x0F12, 0x0001},   	 //AFC_D_ConvAccelerPower 
-     
-// Auto Flicker (60Mhz start)	
-{0x002A, 0x0F2A},	
+{0x002A, 0x0F30},
+{0x0F12, 0x0001},   	 //AFC_D_ConvAccelerPower
+
+// Auto Flicker (60Mhz start)
+{0x002A, 0x0F2A},
 {0x0F12, 0x0000},	 //AFC_Default BIT[0] 1:60Hz 0:50Hz
-{0x002A, 0x04E6},	                                      
+{0x002A, 0x04E6},
 {0x0F12, 0x077F},	 //REG_TC_DBG 7F: 60Hz  5F:50Hz
 
 
@@ -1892,81 +1892,81 @@ static struct regval_list sensor_default_regs[] = {
 // 10.AE Setting
 //==================================================================================
 
-//AE Target	
-{0x002A, 0x1484},	
+//AE Target
+{0x002A, 0x1484},
 {0x0F12, 0x003C},   	 //TVAR_ae_BrAve
 
-//ae_StatMode bit[3] BLC has to be bypassed to prevent AE weight change especially backlight scene 
-{0x002A, 0x148A},	
+//ae_StatMode bit[3] BLC has to be bypassed to prevent AE weight change especially backlight scene
+{0x002A, 0x148A},
 {0x0F12, 0x000F},  	  //ae_StatMode
 
 {0x002A, 0x0588},
 {0x0F12, 0x0000},	 //lt_uInitPostToleranceCnt
-     
-//AE_state                	
-{0x002A, 0x0544},	
+
+//AE_state
+{0x002A, 0x0544},
 {0x0F12, 0x0111},  	  //lt_uLimitHigh
 {0x0F12, 0x00EF},  	  //lt_uLimitLow
 
-//AE Concept	
-{0x002A, 0x0608},                                	
+//AE Concept
+{0x002A, 0x0608},
 {0x0F12, 0x0001}, 	 //lt_ExpGain_uSubsamplingmode
 {0x0F12, 0x0001},	 //lt_ExpGain_uNonSubsampling
 {0x0F12, 0x0800},	 //lt_ExpGain_ExpCurveGainMaxStr
 {0x0F12, 0x0100},   	 //lt_ExpGain_ExpCurveGainMaxStr_0__uMaxDigGain
 
-//Exposure	
+//Exposure
 {0x002A, 0x0610},	 //lt_ExpGain_ExpCurveGainMaxStr_0__ulExpIn_0
 {0x0F12, 0x0001},
-{0x0F12, 0x0000},	
-{0x0F12, 0x0A3C},	
-{0x0F12, 0x0000},	
-{0x0F12, 0x0D04},	
-{0x0F12, 0x0000},	
-{0x0F12, 0x4008},	
-{0x0F12, 0x0000},	
-{0x0F12, 0x7000},	
-{0x0F12, 0x0000},	
-{0x0F12, 0x9C00},	
-{0x0F12, 0x0000},	
-{0x0F12, 0xAD00},	
-{0x0F12, 0x0001},	
-{0x0F12, 0xF1D4},	
-{0x0F12, 0x0002},	
-{0x0F12, 0xDC00},	
-{0x0F12, 0x0005},	
-{0x0F12, 0xDC00},	
-{0x0F12, 0x0005},	
-     
-{0x002A, 0x0638},	 //lt_ExpGain_ExpCurveGainMaxStr_0__ulExpOut_0_
-{0x0F12, 0x0001},	
-{0x0F12, 0x0000},	
-{0x0F12, 0x0A3C},	
-{0x0F12, 0x0000},	
-{0x0F12, 0x0D05},	
-{0x0F12, 0x0000},	
-{0x0F12, 0x3408},	
-{0x0F12, 0x0000},	
-{0x0F12, 0x3408},	
-{0x0F12, 0x0000},	
-{0x0F12, 0x6810},	
-{0x0F12, 0x0000},	
-{0x0F12, 0x8214},	
-{0x0F12, 0x0000},	
-{0x0F12, 0xC350},	
-{0x0F12, 0x0000},	
-{0x0F12, 0xC350},	
-{0x0F12, 0x0000},	
-{0x0F12, 0xC350},	
-{0x0F12, 0x0000},	
+{0x0F12, 0x0000},
+{0x0F12, 0x0A3C},
+{0x0F12, 0x0000},
+{0x0F12, 0x0D04},
+{0x0F12, 0x0000},
+{0x0F12, 0x4008},
+{0x0F12, 0x0000},
+{0x0F12, 0x7000},
+{0x0F12, 0x0000},
+{0x0F12, 0x9C00},
+{0x0F12, 0x0000},
+{0x0F12, 0xAD00},
+{0x0F12, 0x0001},
+{0x0F12, 0xF1D4},
+{0x0F12, 0x0002},
+{0x0F12, 0xDC00},
+{0x0F12, 0x0005},
+{0x0F12, 0xDC00},
+{0x0F12, 0x0005},
 
-//Gain	
-{0x002A, 0x05A2},	
+{0x002A, 0x0638},	 //lt_ExpGain_ExpCurveGainMaxStr_0__ulExpOut_0_
+{0x0F12, 0x0001},
+{0x0F12, 0x0000},
+{0x0F12, 0x0A3C},
+{0x0F12, 0x0000},
+{0x0F12, 0x0D05},
+{0x0F12, 0x0000},
+{0x0F12, 0x3408},
+{0x0F12, 0x0000},
+{0x0F12, 0x3408},
+{0x0F12, 0x0000},
+{0x0F12, 0x6810},
+{0x0F12, 0x0000},
+{0x0F12, 0x8214},
+{0x0F12, 0x0000},
+{0x0F12, 0xC350},
+{0x0F12, 0x0000},
+{0x0F12, 0xC350},
+{0x0F12, 0x0000},
+{0x0F12, 0xC350},
+{0x0F12, 0x0000},
+
+//Gain
+{0x002A, 0x05A2},
 {0x0F12, 0x1000},	 //lt_uMaxTotGain
 
-// Lei Control	
-{0x002A, 0x06B8},               	
-{0x0F12, 0x452C},               	
+// Lei Control
+{0x002A, 0x06B8},
+{0x0F12, 0x452C},
 {0x0F12, 0x0005},  	  //lt_uMaxLei
 
 //==================================================================================
@@ -2022,33 +2022,33 @@ static struct regval_list sensor_default_regs[] = {
 {0x0F12, 0x0008},	 //awbb_WpFilterMinThr
 {0x0F12, 0x0190},	 //awbb_WpFilterMaxThr
 {0x0F12, 0x00A0},	 //awbb_WpFilterCoef
-{0x0F12, 0x0004},	 //awbb_WpFilterSize		
-{0x0F12, 0x0002},	 //awbb_GridEnable	
+{0x0F12, 0x0004},	 //awbb_WpFilterSize
+{0x0F12, 0x0002},	 //awbb_GridEnable
 
-{0x002A, 0x144E},			
-{0x0F12, 0x0000},	 //awbb_RGainOff 		
-{0x0F12, 0x0000},	 //awbb_BGainOff 		
-{0x0F12, 0x0000},	 //awbb_GGainOff 		
-{0x0f12, 0x00C2},	 //awbb_Alpha_Comp_Mode		
-{0x0F12, 0x0002},	 //awbb_Rpl_InvalidOutDoor		
-{0x0F12, 0x0001},	 //awbb_UseGrThrCorr		
-{0x0F12, 0x0074},	 //awbb_Use_Filters     		
-{0x0F12, 0x0001},	 //awbb_CorrectMinNumPatches		
+{0x002A, 0x144E},
+{0x0F12, 0x0000},	 //awbb_RGainOff
+{0x0F12, 0x0000},	 //awbb_BGainOff
+{0x0F12, 0x0000},	 //awbb_GGainOff
+{0x0f12, 0x00C2},	 //awbb_Alpha_Comp_Mode
+{0x0F12, 0x0002},	 //awbb_Rpl_InvalidOutDoor
+{0x0F12, 0x0001},	 //awbb_UseGrThrCorr
+{0x0F12, 0x0074},	 //awbb_Use_Filters
+{0x0F12, 0x0001},	 //awbb_CorrectMinNumPatches
 
 // White Locus
 {0x002A, 0x11F0},
 {0x0F12, 0x012C},	 //awbb_IntcR
 {0x0F12, 0x0121},	 //awbb_IntcB
-{0x0F12, 0x02DF},	 //awbb_GLocusR		
-{0x0F12, 0x0314},	 //awbb_GLocusB	
-     
+{0x0F12, 0x02DF},	 //awbb_GLocusR
+{0x0F12, 0x0314},	 //awbb_GLocusB
+
 {0x002A, 0x120E},
 {0x0F12, 0x0000},	 //awbb_MovingScale10
 {0x0F12, 0x05FD},	 //awbb_GamutWidthThr1
 {0x0F12, 0x036B},	 //awbb_GamutHeightThr1
 {0x0F12, 0x0020},	 //awbb_GamutWidthThr2
 {0x0F12, 0x001A},	 //awbb_GamutHeightThr2
-     
+
 {0x002A, 0x1278},
 {0x0F12, 0xFEF7},	 //awbb_SCDetectionMap_SEC_StartR_B
 {0x0F12, 0x0021},	 //awbb_SCDetectionMap_SEC_StepR_B
@@ -2066,13 +2066,13 @@ static struct regval_list sensor_default_regs[] = {
 {0x0F12, 0x0002},	 //awbb_YThreshLow_Low
 {0x002A, 0x2BA4},
 {0x0F12, 0x0002},	         //Mon_AWB_ByPassMode
-	
-{0x002A, 0x11FC},			
-{0x0F12, 0x000C},	 //awbb_MinNumOfFinalPatches  		
-     
-{0x002A, 0x1208},  
+
+{0x002A, 0x11FC},
+{0x0F12, 0x000C},	 //awbb_MinNumOfFinalPatches
+
+{0x002A, 0x1208},
 {0x0F12, 0x0020},          //awbb_MinNumOfChromaclassifpatches
-     
+
 // Indoor Zone
 {0x002A, 0x101C},
 {0x0F12, 0x0360},	 //awbb_IndoorGrZones_m_BGrid_0__m_left
@@ -2115,7 +2115,7 @@ static struct regval_list sensor_default_regs[] = {
 {0x0F12, 0x01D8},	 //awbb_IndoorGrZones_m_BGrid_18__m_right
 {0x0F12, 0x0000},	 //awbb_IndoorGrZones_m_BGrid_19__m_left
 {0x0F12, 0x0000},	 //awbb_IndoorGrZones_m_BGrid_19__m_right
-     
+
 {0x0F12, 0x0005},	 //awbb_IndoorGrZones_m_GridStep
 {0x002A, 0x1070},
 {0x0F12, 0x0013},	 //awbb_IndoorGrZones_ZInfo_m_GridSz
@@ -2148,7 +2148,7 @@ static struct regval_list sensor_default_regs[] = {
 {0x0F12, 0x0248},	 //awbb_OutdoorGrZones_m_BGrid_10__m_right
 {0x0F12, 0x01F4},	 //awbb_OutdoorGrZones_m_BGrid_11__m_left
 {0x0F12, 0x021A},	 //awbb_OutdoorGrZones_m_BGrid_11__m_right
-     
+
 {0x0F12, 0x0004},	 //awbb_OutdoorGrZones_m_GridStep
 {0x002A, 0x10AC},
 {0x0F12, 0x000C},	 //awbb_OutdoorGrZones_ZInfo_m_GridSz
@@ -2181,7 +2181,7 @@ static struct regval_list sensor_default_regs[] = {
 {0x0F12, 0x0212},	 //awbb_LowBrGrZones_m_BGrid_10__m_right
 {0x0F12, 0x0000},	 //awbb_LowBrGrZones_m_BGrid_11__m_left
 {0x0F12, 0x0000},	 //awbb_LowBrGrZones_m_BGrid_11__m_right
-     
+
 {0x0F12, 0x0006},	 //awbb_LowBrGrZones_m_GridStep
 {0x002A, 0x10E8},
 {0x0F12, 0x000B},	 //awbb_LowBrGrZones_ZInfo_m_GridSz
@@ -2195,9 +2195,9 @@ static struct regval_list sensor_default_regs[] = {
 {0x0F12, 0x00FE},
 {0x0F12, 0x0000},	 //awbb_CrclLowT_B_c
 {0x0F12, 0x2284},
-{0x0F12, 0x0000},	         //awbb_CrclLowT_Rad_c      				
+{0x0F12, 0x0000},	         //awbb_CrclLowT_Rad_c
 
-//AWB - GridCorrection			
+//AWB - GridCorrection
 {0x002A, 0x1434},
 {0x0F12, 0x02C1},	 //awbb_GridConst_1_0_
 {0x0F12, 0x033A},	 //awbb_GridConst_1_1_
@@ -2213,7 +2213,7 @@ static struct regval_list sensor_default_regs[] = {
 {0x0F12, 0x00CA},	 //awbb_GridCoeff_R_2
 {0x0F12, 0x009D},	 //awbb_GridCoeff_B_2
 
-// Indoor Grid Offset			
+// Indoor Grid Offset
 {0x002A, 0x13A4},
 {0x0F12, 0xFFE0},	 //awbb_GridCorr_R_0__0_
 {0x0F12, 0xFFE0},	 //awbb_GridCorr_R_0__1_
@@ -2301,16 +2301,16 @@ static struct regval_list sensor_default_regs[] = {
 {0x0F12, 0x0120},	 //SARR_AwbCcmCord_3_
 {0x0F12, 0x0130},	 //SARR_AwbCcmCord_4_
 {0x0F12, 0x0162},	 //SARR_AwbCcmCord_5_
-     
+
 {0x0F12, 0x0001},	 //wbt_bUseOutdoorCCM
-     
-{0x002A, 0x0898},	
+
+{0x002A, 0x0898},
 {0x0F12, 0x4800},	 //TVAR_wbt_pBaseCcms
-{0x0F12, 0x7000},	
-{0x002A, 0x08A0},	
+{0x0F12, 0x7000},
+{0x002A, 0x08A0},
 {0x0F12, 0x48D8},	 //TVAR_wbt_pOutdoorCcm
-{0x0F12, 0x7000},	
-     
+{0x0F12, 0x7000},
+
 {0x002A, 0x4800},
 {0x0F12, 0x0119},	 //TVAR_wbt_pBaseCcms[0]  // Horizon
 {0x0F12, 0xFFA9},	 //TVAR_wbt_pBaseCcms[1]
@@ -2330,7 +2330,7 @@ static struct regval_list sensor_default_regs[] = {
 {0x0F12, 0xFF40},	 //TVAR_wbt_pBaseCcms[15]
 {0x0F12, 0x0114},	 //TVAR_wbt_pBaseCcms[16]
 {0x0F12, 0x00F4},	 //TVAR_wbt_pBaseCcms[17]
-     
+
 {0x0F12, 0x0119},	 //TVAR_wbt_pBaseCcms[18]  // IncandA
 {0x0F12, 0xFFA9},	 //TVAR_wbt_pBaseCcms[19]
 {0x0F12, 0xFF9D},	 //TVAR_wbt_pBaseCcms[20]
@@ -2349,7 +2349,7 @@ static struct regval_list sensor_default_regs[] = {
 {0x0F12, 0xFF40},	 //TVAR_wbt_pBaseCcms[33]
 {0x0F12, 0x0114},	 //TVAR_wbt_pBaseCcms[34]
 {0x0F12, 0x00F4},	 //TVAR_wbt_pBaseCcms[35]
-     
+
 {0x0F12, 0x0204},	 //TVAR_wbt_pBaseCcms[36]  // WW
 {0x0F12, 0xFFB2},	 //TVAR_wbt_pBaseCcms[37]
 {0x0F12, 0xFFF5},	 //TVAR_wbt_pBaseCcms[38]
@@ -2368,7 +2368,7 @@ static struct regval_list sensor_default_regs[] = {
 {0x0F12, 0xFF75},	 //TVAR_wbt_pBaseCcms[51]
 {0x0F12, 0x01BA},	 //TVAR_wbt_pBaseCcms[52]
 {0x0F12, 0x018C},	 //TVAR_wbt_pBaseCcms[53]
-     
+
 {0x0F12, 0x0204},	 //TVAR_wbt_pBaseCcms[54]  // CW
 {0x0F12, 0xFFB2},	 //TVAR_wbt_pBaseCcms[55]
 {0x0F12, 0xFFF5},	 //TVAR_wbt_pBaseCcms[56]
@@ -2387,7 +2387,7 @@ static struct regval_list sensor_default_regs[] = {
 {0x0F12, 0xFF75},	 //TVAR_wbt_pBaseCcms[69]
 {0x0F12, 0x0187},	 //TVAR_wbt_pBaseCcms[70]
 {0x0F12, 0x01BF},	 //TVAR_wbt_pBaseCcms[71]
-     
+
 {0x0F12, 0x0204},	 //TVAR_wbt_pBaseCcms[72]  // D50
 {0x0F12, 0xFFB2},	 //TVAR_wbt_pBaseCcms[73]
 {0x0F12, 0xFFF5},	 //TVAR_wbt_pBaseCcms[74]
@@ -2406,7 +2406,7 @@ static struct regval_list sensor_default_regs[] = {
 {0x0F12, 0xFF75},	 //TVAR_wbt_pBaseCcms[87]
 {0x0F12, 0x0187},	 //TVAR_wbt_pBaseCcms[88]
 {0x0F12, 0x01BF},	 //TVAR_wbt_pBaseCcms[89]
-     
+
 {0x0F12, 0x0204},	 //TVAR_wbt_pBaseCcms[90]  // D65
 {0x0F12, 0xFFB2},	 //TVAR_wbt_pBaseCcms[91]
 {0x0F12, 0xFFF5},	 //TVAR_wbt_pBaseCcms[92]
@@ -2425,7 +2425,7 @@ static struct regval_list sensor_default_regs[] = {
 {0x0F12, 0xFF75},	 //TVAR_wbt_pBaseCcms[105]
 {0x0F12, 0x0187},	 //TVAR_wbt_pBaseCcms[106]
 {0x0F12, 0x01BF},	 //TVAR_wbt_pBaseCcms[107]
-     
+
 {0x0F12, 0x01E5},	 //TVAR_wbt_pOutdoorCcm[0]
 {0x0F12, 0xFFA4},	 //TVAR_wbt_pOutdoorCcm[1]
 {0x0F12, 0xFFDC},	 //TVAR_wbt_pOutdoorCcm[2]
@@ -2573,570 +2573,570 @@ static struct regval_list sensor_default_regs[] = {
 {0x0F12, 0x036A},	 //SARR_usGammaLutRGBOutdoor_2__16_
 {0x0F12, 0x039F},	 //SARR_usGammaLutRGBOutdoor_2__17_
 {0x0F12, 0x03CC},	 //SARR_usGammaLutRGBOutdoor_2__18_
-{0x0F12, 0x03F9},	 //SARR_usGammaLutRGBOutdoor_2__19_                             
-      
+{0x0F12, 0x03F9},	 //SARR_usGammaLutRGBOutdoor_2__19_
+
 //==================================================================================
 // 17.AFIT
 //==================================================================================
-{0x002A, 0x0944},	
+{0x002A, 0x0944},
 {0x0F12, 0x0050},	 //afit_uNoiseIndInDoor
 {0x0F12, 0x00B0},	 //afit_uNoiseIndInDoor
 {0x0F12, 0x0196},	 //afit_uNoiseIndInDoor
 {0x0F12, 0x0245},	 //afit_uNoiseIndInDoor
 {0x0F12, 0x0300},	 //afit_uNoiseIndInDoor
-     
-{0x002A, 0x0938},	
+
+{0x002A, 0x0938},
 {0x0F12, 0x0000},	 // on/off AFIT by NB option
 {0x0F12, 0x0014},	 //SARR_uNormBrInDoor
 {0x0F12, 0x00D2},	 //SARR_uNormBrInDoor
 {0x0F12, 0x0384},	 //SARR_uNormBrInDoor
 {0x0F12, 0x07D0},	 //SARR_uNormBrInDoor
 {0x0F12, 0x1388},	 //SARR_uNormBrInDoor
-     
-{0x002A, 0x0976},	
-{0x0F12, 0x0070},	 //afit_usGamutTh       
+
+{0x002A, 0x0976},
+{0x0F12, 0x0070},	 //afit_usGamutTh
 {0x0F12, 0x0005},	 //afit_usNeargrayOffset
-{0x0F12, 0x0000},	 //afit_bUseSenBpr         
-{0x0F12, 0x01CC},	 //afit_usBprThr_0_        
-{0x0F12, 0x01CC},	 //afit_usBprThr_1_        
-{0x0F12, 0x01CC},	 //afit_usBprThr_2_        
-{0x0F12, 0x01CC},	 //afit_usBprThr_3_        
-{0x0F12, 0x01CC},	 //afit_usBprThr_4_        
+{0x0F12, 0x0000},	 //afit_bUseSenBpr
+{0x0F12, 0x01CC},	 //afit_usBprThr_0_
+{0x0F12, 0x01CC},	 //afit_usBprThr_1_
+{0x0F12, 0x01CC},	 //afit_usBprThr_2_
+{0x0F12, 0x01CC},	 //afit_usBprThr_3_
+{0x0F12, 0x01CC},	 //afit_usBprThr_4_
 {0x0F12, 0x0180},	 //afit_NIContrastAFITValue
-{0x0F12, 0x0196},	 //afit_NIContrastTh       
-     
+{0x0F12, 0x0196},	 //afit_NIContrastTh
+
 {0x002A, 0x098C},
-{0x0F12, 0x0000},	 //7000098C	 //_BRIGHTNESS	AFIT 0                                  
-{0x0F12, 0x0000},	 //7000098E	 //_CONTRAST                                           
-{0x0F12, 0x0000},	 //70000990	 //_SATURATION                                         
-{0x0F12, 0x0000},	 //70000992	 //_SHARP_BLUR                                         
-{0x0F12, 0x0000},	 //70000994	 //_GLAMOUR                                            
-{0x0F12, 0x00C0},	 //70000996	 //_bnr_edge_high                                      
-{0x0F12, 0x0064},	 //70000998	 //_postdmsc_iLowBright                                
-{0x0F12, 0x0384},	 //7000099A	 //_postdmsc_iHighBright                               
-{0x0F12, 0x005F},	 //7000099C	 //_postdmsc_iLowSat                                   
-{0x0F12, 0x01F4},	 //7000099E	 //_postdmsc_iHighSat                                  
-{0x0F12, 0x0070},	 //700009A0	 //_postdmsc_iTune                                     
-{0x0F12, 0x0040},	 //700009A2	 //_yuvemix_mNegRanges_0                               
-{0x0F12, 0x00A0},	 //700009A4	 //_yuvemix_mNegRanges_1                               
-{0x0F12, 0x0100},	 //700009A6	 //_yuvemix_mNegRanges_2                               
-{0x0F12, 0x0010},	 //700009A8	 //_yuvemix_mPosRanges_0                               
-{0x0F12, 0x0040},	 //700009AA	 //_yuvemix_mPosRanges_1                               
-{0x0F12, 0x00A0},	 //700009AC	 //_yuvemix_mPosRanges_2                               
-{0x0F12, 0x1430},	 //700009AE	 //_bnr_edge_low  [7:0] AFIT8_bnr_repl_thresh          
-{0x0F12, 0x0201},	 //700009B0	 //_bnr_repl_force  [7:0] AFIT8_bnr_iHotThreshHigh     
+{0x0F12, 0x0000},	 //7000098C	 //_BRIGHTNESS	AFIT 0
+{0x0F12, 0x0000},	 //7000098E	 //_CONTRAST
+{0x0F12, 0x0000},	 //70000990	 //_SATURATION
+{0x0F12, 0x0000},	 //70000992	 //_SHARP_BLUR
+{0x0F12, 0x0000},	 //70000994	 //_GLAMOUR
+{0x0F12, 0x00C0},	 //70000996	 //_bnr_edge_high
+{0x0F12, 0x0064},	 //70000998	 //_postdmsc_iLowBright
+{0x0F12, 0x0384},	 //7000099A	 //_postdmsc_iHighBright
+{0x0F12, 0x005F},	 //7000099C	 //_postdmsc_iLowSat
+{0x0F12, 0x01F4},	 //7000099E	 //_postdmsc_iHighSat
+{0x0F12, 0x0070},	 //700009A0	 //_postdmsc_iTune
+{0x0F12, 0x0040},	 //700009A2	 //_yuvemix_mNegRanges_0
+{0x0F12, 0x00A0},	 //700009A4	 //_yuvemix_mNegRanges_1
+{0x0F12, 0x0100},	 //700009A6	 //_yuvemix_mNegRanges_2
+{0x0F12, 0x0010},	 //700009A8	 //_yuvemix_mPosRanges_0
+{0x0F12, 0x0040},	 //700009AA	 //_yuvemix_mPosRanges_1
+{0x0F12, 0x00A0},	 //700009AC	 //_yuvemix_mPosRanges_2
+{0x0F12, 0x1430},	 //700009AE	 //_bnr_edge_low  [7:0] AFIT8_bnr_repl_thresh
+{0x0F12, 0x0201},	 //700009B0	 //_bnr_repl_force  [7:0] AFIT8_bnr_iHotThreshHigh
 {0x0F12, 0x0204},	 //700009B2	 //_bnr_iHotThreshLow   [7:0] AFIT8_bnr_iColdThreshHigh
-{0x0F12, 0x3604},	 //700009B4	 //_bnr_iColdThreshLow   [7:0] AFIT8_bnr_DispTH_Low    
-{0x0F12, 0x032A},	 //700009B6	 //_bnr_DispTH_High   [7:0] AFIT8_bnr_DISP_Limit_Low   
+{0x0F12, 0x3604},	 //700009B4	 //_bnr_iColdThreshLow   [7:0] AFIT8_bnr_DispTH_Low
+{0x0F12, 0x032A},	 //700009B6	 //_bnr_DispTH_High   [7:0] AFIT8_bnr_DISP_Limit_Low
 {0x0F12, 0x0403},	 //700009B8	 //_bnr_DISP_Limit_High   [7:0] AFIT8_bnr_iDistSigmaMin
-{0x0F12, 0x1B06},	 //700009BA	 //_bnr_iDistSigmaMax   [7:0] AFIT8_bnr_iDiffSigmaLow  
-{0x0F12, 0x6015},	 //700009BC	 //_bnr_iDiffSigmaHigh   [7:0] AFIT8_bnr_iNormalizedSTD_TH        
-{0x0F12, 0x00C0},	 //700009BE	 //_bnr_iNormalizedSTD_Limit   [7:0] AFIT8_bnr_iDirNRTune         
-{0x0F12, 0x6080},	 //700009C0	 //_bnr_iDirMinThres   [7:0] AFIT8_bnr_iDirFltDiffThresHigh       
-{0x0F12, 0x4080},	 //700009C2	 //_bnr_iDirFltDiffThresLow   [7:0] AFIT8_bnr_iDirSmoothPowerHigh 
-{0x0F12, 0x0640},	 //700009C4	 //_bnr_iDirSmoothPowerLow   [7:0] AFIT8_bnr_iLowMaxSlopeAllowed  
-{0x0F12, 0x0306},	 //700009C6	 //_bnr_iHighMaxSlopeAllowed   [7:0] AFIT8_bnr_iLowSlopeThresh    
+{0x0F12, 0x1B06},	 //700009BA	 //_bnr_iDistSigmaMax   [7:0] AFIT8_bnr_iDiffSigmaLow
+{0x0F12, 0x6015},	 //700009BC	 //_bnr_iDiffSigmaHigh   [7:0] AFIT8_bnr_iNormalizedSTD_TH
+{0x0F12, 0x00C0},	 //700009BE	 //_bnr_iNormalizedSTD_Limit   [7:0] AFIT8_bnr_iDirNRTune
+{0x0F12, 0x6080},	 //700009C0	 //_bnr_iDirMinThres   [7:0] AFIT8_bnr_iDirFltDiffThresHigh
+{0x0F12, 0x4080},	 //700009C2	 //_bnr_iDirFltDiffThresLow   [7:0] AFIT8_bnr_iDirSmoothPowerHigh
+{0x0F12, 0x0640},	 //700009C4	 //_bnr_iDirSmoothPowerLow   [7:0] AFIT8_bnr_iLowMaxSlopeAllowed
+{0x0F12, 0x0306},	 //700009C6	 //_bnr_iHighMaxSlopeAllowed   [7:0] AFIT8_bnr_iLowSlopeThresh
 {0x0F12, 0x2003},	 //700009C8	 //_bnr_iHighSlopeThresh   [7:0] AFIT8_bnr_iSlopenessTH
-{0x0F12, 0xFF01},	 //700009CA	 //_bnr_iSlopeBlurStrength   [7:0] AFIT8_bnr_iSlopenessLimit      
+{0x0F12, 0xFF01},	 //700009CA	 //_bnr_iSlopeBlurStrength   [7:0] AFIT8_bnr_iSlopenessLimit
 {0x0F12, 0x0000},	 //700009CC	 //_bnr_AddNoisePower1   [7:0] AFIT8_bnr_AddNoisePower2
-{0x0F12, 0x0400},	 //700009CE	 //_bnr_iRadialTune   [7:0] AFIT8_bnr_iRadialPower     
-{0x0F12, 0x365A},	 //700009D0	 //_bnr_iRadialLimit   [7:0] AFIT8_ee_iFSMagThLow      
-{0x0F12, 0x102A},	 //700009D2	 //_ee_iFSMagThHigh   [7:0] AFIT8_ee_iFSVarThLow       
-{0x0F12, 0x000B},	 //700009D4	 //_ee_iFSVarThHigh   [7:0] AFIT8_ee_iFSThLow          
-{0x0F12, 0x0600},	 //700009D6	 //_ee_iFSThHigh   [7:0] AFIT8_ee_iFSmagPower          
-{0x0F12, 0x5A0F},	 //700009D8	 //_ee_iFSVarCountTh   [7:0] AFIT8_ee_iRadialLimit     
-{0x0F12, 0x0505},	 //700009DA	 //_ee_iRadialPower   [7:0] AFIT8_ee_iSmoothEdgeSlope  
-{0x0F12, 0x1802},	 //700009DC	 //_ee_iROADThres   [7:0] AFIT8_ee_iROADMaxNR          
-{0x0F12, 0x0000},	 //700009DE	 //_ee_iROADSubMaxNR   [7:0] AFIT8_ee_iROADSubThres    
-{0x0F12, 0x2006},	 //700009E0	 //_ee_iROADNeiThres   [7:0] AFIT8_ee_iROADNeiMaxNR    
-{0x0F12, 0x3028},	 //700009E2	 //_ee_iSmoothEdgeThres   [7:0] AFIT8_ee_iMSharpen     
-{0x0F12, 0x0418},	 //700009E4	 //_ee_iWSharpen   [7:0] AFIT8_ee_iMShThresh           
-{0x0F12, 0x0101},	 //700009E6	 //_ee_iWShThresh   [7:0] AFIT8_ee_iReduceNegative     
-{0x0F12, 0x0800},	 //700009E8	 //_ee_iEmbossCentAdd   [7:0] AFIT8_ee_iShDespeckle    
-{0x0F12, 0x1804},	 //700009EA	 //_ee_iReduceEdgeThresh   [7:0] AFIT8_dmsc_iEnhThresh 
-{0x0F12, 0x4008},	 //700009EC	 //_dmsc_iDesatThresh   [7:0] AFIT8_dmsc_iDemBlurHigh  
-{0x0F12, 0x0540},	 //700009EE	 //_dmsc_iDemBlurLow   [7:0] AFIT8_dmsc_iDemBlurRange  
-{0x0F12, 0x8006},	 //700009F0	 //_dmsc_iDecisionThresh   [7:0] AFIT8_dmsc_iCentGrad  
-{0x0F12, 0x0020},	 //700009F2	 //_dmsc_iMonochrom   [7:0] AFIT8_dmsc_iGBDenoiseVal   
-{0x0F12, 0x0000},	 //700009F4	 //_dmsc_iGRDenoiseVal   [7:0] AFIT8_dmsc_iEdgeDesatThrHigh       
+{0x0F12, 0x0400},	 //700009CE	 //_bnr_iRadialTune   [7:0] AFIT8_bnr_iRadialPower
+{0x0F12, 0x365A},	 //700009D0	 //_bnr_iRadialLimit   [7:0] AFIT8_ee_iFSMagThLow
+{0x0F12, 0x102A},	 //700009D2	 //_ee_iFSMagThHigh   [7:0] AFIT8_ee_iFSVarThLow
+{0x0F12, 0x000B},	 //700009D4	 //_ee_iFSVarThHigh   [7:0] AFIT8_ee_iFSThLow
+{0x0F12, 0x0600},	 //700009D6	 //_ee_iFSThHigh   [7:0] AFIT8_ee_iFSmagPower
+{0x0F12, 0x5A0F},	 //700009D8	 //_ee_iFSVarCountTh   [7:0] AFIT8_ee_iRadialLimit
+{0x0F12, 0x0505},	 //700009DA	 //_ee_iRadialPower   [7:0] AFIT8_ee_iSmoothEdgeSlope
+{0x0F12, 0x1802},	 //700009DC	 //_ee_iROADThres   [7:0] AFIT8_ee_iROADMaxNR
+{0x0F12, 0x0000},	 //700009DE	 //_ee_iROADSubMaxNR   [7:0] AFIT8_ee_iROADSubThres
+{0x0F12, 0x2006},	 //700009E0	 //_ee_iROADNeiThres   [7:0] AFIT8_ee_iROADNeiMaxNR
+{0x0F12, 0x3028},	 //700009E2	 //_ee_iSmoothEdgeThres   [7:0] AFIT8_ee_iMSharpen
+{0x0F12, 0x0418},	 //700009E4	 //_ee_iWSharpen   [7:0] AFIT8_ee_iMShThresh
+{0x0F12, 0x0101},	 //700009E6	 //_ee_iWShThresh   [7:0] AFIT8_ee_iReduceNegative
+{0x0F12, 0x0800},	 //700009E8	 //_ee_iEmbossCentAdd   [7:0] AFIT8_ee_iShDespeckle
+{0x0F12, 0x1804},	 //700009EA	 //_ee_iReduceEdgeThresh   [7:0] AFIT8_dmsc_iEnhThresh
+{0x0F12, 0x4008},	 //700009EC	 //_dmsc_iDesatThresh   [7:0] AFIT8_dmsc_iDemBlurHigh
+{0x0F12, 0x0540},	 //700009EE	 //_dmsc_iDemBlurLow   [7:0] AFIT8_dmsc_iDemBlurRange
+{0x0F12, 0x8006},	 //700009F0	 //_dmsc_iDecisionThresh   [7:0] AFIT8_dmsc_iCentGrad
+{0x0F12, 0x0020},	 //700009F2	 //_dmsc_iMonochrom   [7:0] AFIT8_dmsc_iGBDenoiseVal
+{0x0F12, 0x0000},	 //700009F4	 //_dmsc_iGRDenoiseVal   [7:0] AFIT8_dmsc_iEdgeDesatThrHigh
 {0x0F12, 0x2000},	 //700009F6	 //_dmsc_iEdgeDesatThrLow   [7:0] AFIT8_dmsc_iEdgeDesat
-{0x0F12, 0x0000},	 //700009F8	 //_dmsc_iNearGrayDesat   [7:0] AFIT8_dmsc_iEdgeDesatLimit        
-{0x0F12, 0x1E10},	 //700009FA	 //_postdmsc_iBCoeff   [7:0] AFIT8_postdmsc_iGCoeff    
-{0x0F12, 0x000B},	 //700009FC	 //_postdmsc_iWideMult   [7:0] AFIT8_yuvemix_mNegSlopes_0         
-{0x0F12, 0x0607},	 //700009FE	 //_yuvemix_mNegSlopes_1   [7:0] AFIT8_yuvemix_mNegSlopes_2       
-{0x0F12, 0x0005},	 //70000A00	 //_yuvemix_mNegSlopes_3   [7:0] AFIT8_yuvemix_mPosSlopes_0       
-{0x0F12, 0x0607},	 //70000A02	 //_yuvemix_mPosSlopes_1   [7:0] AFIT8_yuvemix_mPosSlopes_2       
-{0x0F12, 0x0705},	 //70000A04	 //_yuvemix_mPosSlopes_3   [7:0] AFIT8_yuviirnr_iXSupportY        
-{0x0F12, 0x0206},	 //70000A06	 //_yuviirnr_iXSupportUV   [7:0] AFIT8_yuviirnr_iLowYNorm         
-{0x0F12, 0x0304},	 //70000A08	 //_yuviirnr_iHighYNorm   [7:0] AFIT8_yuviirnr_iLowUVNorm         
-{0x0F12, 0x0309},	 //70000A0A	 //_yuviirnr_iHighUVNorm   [7:0] AFIT8_yuviirnr_iYNormShift       
-{0x0F12, 0x0305},	 //70000A0C	 //_yuviirnr_iUVNormShift   [7:0] AFIT8_yuviirnr_iVertLength_Y    
-{0x0F12, 0x2006},	 //70000A0E	 //_yuviirnr_iVertLength_UV   [7:0] AFIT8_yuviirnr_iDiffThreshL_Y 
+{0x0F12, 0x0000},	 //700009F8	 //_dmsc_iNearGrayDesat   [7:0] AFIT8_dmsc_iEdgeDesatLimit
+{0x0F12, 0x1E10},	 //700009FA	 //_postdmsc_iBCoeff   [7:0] AFIT8_postdmsc_iGCoeff
+{0x0F12, 0x000B},	 //700009FC	 //_postdmsc_iWideMult   [7:0] AFIT8_yuvemix_mNegSlopes_0
+{0x0F12, 0x0607},	 //700009FE	 //_yuvemix_mNegSlopes_1   [7:0] AFIT8_yuvemix_mNegSlopes_2
+{0x0F12, 0x0005},	 //70000A00	 //_yuvemix_mNegSlopes_3   [7:0] AFIT8_yuvemix_mPosSlopes_0
+{0x0F12, 0x0607},	 //70000A02	 //_yuvemix_mPosSlopes_1   [7:0] AFIT8_yuvemix_mPosSlopes_2
+{0x0F12, 0x0705},	 //70000A04	 //_yuvemix_mPosSlopes_3   [7:0] AFIT8_yuviirnr_iXSupportY
+{0x0F12, 0x0206},	 //70000A06	 //_yuviirnr_iXSupportUV   [7:0] AFIT8_yuviirnr_iLowYNorm
+{0x0F12, 0x0304},	 //70000A08	 //_yuviirnr_iHighYNorm   [7:0] AFIT8_yuviirnr_iLowUVNorm
+{0x0F12, 0x0309},	 //70000A0A	 //_yuviirnr_iHighUVNorm   [7:0] AFIT8_yuviirnr_iYNormShift
+{0x0F12, 0x0305},	 //70000A0C	 //_yuviirnr_iUVNormShift   [7:0] AFIT8_yuviirnr_iVertLength_Y
+{0x0F12, 0x2006},	 //70000A0E	 //_yuviirnr_iVertLength_UV   [7:0] AFIT8_yuviirnr_iDiffThreshL_Y
 {0x0F12, 0x1320},	 //70000A10	 //_yuviirnr_iDiffThreshH_Y   [7:0] AFIT8_yuviirnr_iDiffThreshL_UV
-{0x0F12, 0x1014},	 //70000A12	 //_yuviirnr_iDiffThreshH_UV   [7:0] AFIT8_yuviirnr_iMaxThreshL_Y 
-{0x0F12, 0x1010},	 //70000A14	 //_yuviirnr_iMaxThreshH_Y   [7:0] AFIT8_yuviirnr_iMaxThreshL_UV  
-{0x0F12, 0x0C10},	 //70000A16	 //_yuviirnr_iMaxThreshH_UV   [7:0] AFIT8_yuviirnr_iYNRStrengthL  
-{0x0F12, 0x1A0C},	 //70000A18	 //_yuviirnr_iYNRStrengthH   [7:0] AFIT8_yuviirnr_iUVNRStrengthL  
-{0x0F12, 0x4A18},	 //70000A1A	 //_yuviirnr_iUVNRStrengthH   [7:0] AFIT8_byr_gras_iShadingPower  
-{0x0F12, 0x0080},	 //70000A1C	 //_RGBGamma2_iLinearity   [7:0] AFIT8_RGBGamma2_iDarkReduce      
+{0x0F12, 0x1014},	 //70000A12	 //_yuviirnr_iDiffThreshH_UV   [7:0] AFIT8_yuviirnr_iMaxThreshL_Y
+{0x0F12, 0x1010},	 //70000A14	 //_yuviirnr_iMaxThreshH_Y   [7:0] AFIT8_yuviirnr_iMaxThreshL_UV
+{0x0F12, 0x0C10},	 //70000A16	 //_yuviirnr_iMaxThreshH_UV   [7:0] AFIT8_yuviirnr_iYNRStrengthL
+{0x0F12, 0x1A0C},	 //70000A18	 //_yuviirnr_iYNRStrengthH   [7:0] AFIT8_yuviirnr_iUVNRStrengthL
+{0x0F12, 0x4A18},	 //70000A1A	 //_yuviirnr_iUVNRStrengthH   [7:0] AFIT8_byr_gras_iShadingPower
+{0x0F12, 0x0080},	 //70000A1C	 //_RGBGamma2_iLinearity   [7:0] AFIT8_RGBGamma2_iDarkReduce
 {0x0F12, 0x0350},	 //70000A1E	 //_ccm_oscar_iSaturation   [7:0] AFIT8_RGB2YUV_iYOffset
-{0x0F12, 0x0180},	 //70000A20	 //_RGB2YUV_iRGBGain   [7:0] AFIT8_bnr_nClustLevel_H   
-{0x0F12, 0x0A0A},	 //70000A22	 //_bnr_iClustMulT_H   [7:0] AFIT8_bnr_iClustMulT_C    
+{0x0F12, 0x0180},	 //70000A20	 //_RGB2YUV_iRGBGain   [7:0] AFIT8_bnr_nClustLevel_H
+{0x0F12, 0x0A0A},	 //70000A22	 //_bnr_iClustMulT_H   [7:0] AFIT8_bnr_iClustMulT_C
 {0x0F12, 0x0101},	 //70000A24	 //_bnr_iClustThresh_H   [7:0] AFIT8_bnr_iClustThresh_C
-{0x0F12, 0x2A36},	 //70000A26	 //_bnr_iDenThreshLow   [7:0] AFIT8_bnr_iDenThreshHigh 
-{0x0F12, 0x6024},	 //70000A28	 //_ee_iLowSharpPower   [7:0] AFIT8_ee_iHighSharpPower 
-{0x0F12, 0x2A36},	 //70000A2A	 //_ee_iLowShDenoise   [7:0] AFIT8_ee_iHighShDenoise   
-{0x0F12, 0xFFFF},	 //70000A2C	 //_ee_iLowSharpClamp   [7:0] AFIT8_ee_iHighSharpClamp 
-{0x0F12, 0x0808},	 //70000A2E	 //_ee_iReduceEdgeMinMult   [7:0] AFIT8_ee_iReduceEdgeSlope       
-{0x0F12, 0x0A01},	 //70000A30	 //_bnr_nClustLevel_H_Bin   [7:0] AFIT8_bnr_iClustMulT_H_Bin      
-{0x0F12, 0x010A},	 //70000A32	 //_bnr_iClustMulT_C_Bin   [7:0] AFIT8_bnr_iClustThresh_H_Bin     
-{0x0F12, 0x2701},	 //70000A34	 //_bnr_iClustThresh_C_Bin   [7:0] AFIT8_bnr_iDenThreshLow_Bin    
-{0x0F12, 0x241E},	 //70000A36	 //_bnr_iDenThreshHigh_Bin   [7:0] AFIT8_ee_iLowSharpPower_Bin    
-{0x0F12, 0x2E60},	 //70000A38	 //_ee_iHighSharpPower_Bin   [7:0] AFIT8_ee_iLowShDenoise_Bin     
-{0x0F12, 0xFF22},	 //70000A3A	 //_ee_iHighShDenoise_Bin   [7:0] AFIT8_ee_iLowSharpClamp_Bin     
+{0x0F12, 0x2A36},	 //70000A26	 //_bnr_iDenThreshLow   [7:0] AFIT8_bnr_iDenThreshHigh
+{0x0F12, 0x6024},	 //70000A28	 //_ee_iLowSharpPower   [7:0] AFIT8_ee_iHighSharpPower
+{0x0F12, 0x2A36},	 //70000A2A	 //_ee_iLowShDenoise   [7:0] AFIT8_ee_iHighShDenoise
+{0x0F12, 0xFFFF},	 //70000A2C	 //_ee_iLowSharpClamp   [7:0] AFIT8_ee_iHighSharpClamp
+{0x0F12, 0x0808},	 //70000A2E	 //_ee_iReduceEdgeMinMult   [7:0] AFIT8_ee_iReduceEdgeSlope
+{0x0F12, 0x0A01},	 //70000A30	 //_bnr_nClustLevel_H_Bin   [7:0] AFIT8_bnr_iClustMulT_H_Bin
+{0x0F12, 0x010A},	 //70000A32	 //_bnr_iClustMulT_C_Bin   [7:0] AFIT8_bnr_iClustThresh_H_Bin
+{0x0F12, 0x2701},	 //70000A34	 //_bnr_iClustThresh_C_Bin   [7:0] AFIT8_bnr_iDenThreshLow_Bin
+{0x0F12, 0x241E},	 //70000A36	 //_bnr_iDenThreshHigh_Bin   [7:0] AFIT8_ee_iLowSharpPower_Bin
+{0x0F12, 0x2E60},	 //70000A38	 //_ee_iHighSharpPower_Bin   [7:0] AFIT8_ee_iLowShDenoise_Bin
+{0x0F12, 0xFF22},	 //70000A3A	 //_ee_iHighShDenoise_Bin   [7:0] AFIT8_ee_iLowSharpClamp_Bin
 {0x0F12, 0x40FF},	 //70000A3C	 //_ee_iHighSharpClamp_Bin   [7:0] AFIT8_ee_iReduceEdgeMinMult_Bin
-{0x0F12, 0x0009},	 //70000A3E	 //_ee_iReduceEdgeSlope_Bin [7:0]                      
-{0x0F12, 0x0001},	 //70000A40	 //_bnr_nClustLevel_C      [0]                         
-{0x0F12, 0x0000},	 //70000A42	 //_BRIGHTNESS	AFIT 1                                  
-{0x0F12, 0x0000},	 //70000A44	 //_CONTRAST                                           
-{0x0F12, 0x0000},	 //70000A46	 //_SATURATION                                         
-{0x0F12, 0x0000},	 //70000A48	 //_SHARP_BLUR                                         
-{0x0F12, 0x0000},	 //70000A4A	 //_GLAMOUR                                            
-{0x0F12, 0x00C0},	 //70000A4C	 //_bnr_edge_high                                      
-{0x0F12, 0x0064},	 //70000A4E	 //_postdmsc_iLowBright                                
-{0x0F12, 0x0384},	 //70000A50	 //_postdmsc_iHighBright                               
-{0x0F12, 0x0051},	 //70000A52	 //_postdmsc_iLowSat                                   
-{0x0F12, 0x01F4},	 //70000A54	 //_postdmsc_iHighSat                                  
-{0x0F12, 0x0070},	 //70000A56	 //_postdmsc_iTune                                     
-{0x0F12, 0x0040},	 //70000A58	 //_yuvemix_mNegRanges_0                               
-{0x0F12, 0x00A0},	 //70000A5A	 //_yuvemix_mNegRanges_1                               
-{0x0F12, 0x0100},	 //70000A5C	 //_yuvemix_mNegRanges_2                               
-{0x0F12, 0x0010},	 //70000A5E	 //_yuvemix_mPosRanges_0                               
-{0x0F12, 0x0060},	 //70000A60	 //_yuvemix_mPosRanges_1                               
-{0x0F12, 0x0100},	 //70000A62	 //_yuvemix_mPosRanges_2                               
-{0x0F12, 0x1430},	 //70000A64	 //_bnr_edge_low  [7:0] AFIT8_bnr_repl_thresh          
-{0x0F12, 0x0201},	 //70000A66	 //_bnr_repl_force  [7:0] AFIT8_bnr_iHotThreshHigh     
+{0x0F12, 0x0009},	 //70000A3E	 //_ee_iReduceEdgeSlope_Bin [7:0]
+{0x0F12, 0x0001},	 //70000A40	 //_bnr_nClustLevel_C      [0]
+{0x0F12, 0x0000},	 //70000A42	 //_BRIGHTNESS	AFIT 1
+{0x0F12, 0x0000},	 //70000A44	 //_CONTRAST
+{0x0F12, 0x0000},	 //70000A46	 //_SATURATION
+{0x0F12, 0x0000},	 //70000A48	 //_SHARP_BLUR
+{0x0F12, 0x0000},	 //70000A4A	 //_GLAMOUR
+{0x0F12, 0x00C0},	 //70000A4C	 //_bnr_edge_high
+{0x0F12, 0x0064},	 //70000A4E	 //_postdmsc_iLowBright
+{0x0F12, 0x0384},	 //70000A50	 //_postdmsc_iHighBright
+{0x0F12, 0x0051},	 //70000A52	 //_postdmsc_iLowSat
+{0x0F12, 0x01F4},	 //70000A54	 //_postdmsc_iHighSat
+{0x0F12, 0x0070},	 //70000A56	 //_postdmsc_iTune
+{0x0F12, 0x0040},	 //70000A58	 //_yuvemix_mNegRanges_0
+{0x0F12, 0x00A0},	 //70000A5A	 //_yuvemix_mNegRanges_1
+{0x0F12, 0x0100},	 //70000A5C	 //_yuvemix_mNegRanges_2
+{0x0F12, 0x0010},	 //70000A5E	 //_yuvemix_mPosRanges_0
+{0x0F12, 0x0060},	 //70000A60	 //_yuvemix_mPosRanges_1
+{0x0F12, 0x0100},	 //70000A62	 //_yuvemix_mPosRanges_2
+{0x0F12, 0x1430},	 //70000A64	 //_bnr_edge_low  [7:0] AFIT8_bnr_repl_thresh
+{0x0F12, 0x0201},	 //70000A66	 //_bnr_repl_force  [7:0] AFIT8_bnr_iHotThreshHigh
 {0x0F12, 0x0204},	 //70000A68	 //_bnr_iHotThreshLow   [7:0] AFIT8_bnr_iColdThreshHigh
-{0x0F12, 0x2404},	 //70000A6A	 //_bnr_iColdThreshLow   [7:0] AFIT8_bnr_DispTH_Low    
-{0x0F12, 0x031B},	 //70000A6C	 //_bnr_DispTH_High   [7:0] AFIT8_bnr_DISP_Limit_Low   
+{0x0F12, 0x2404},	 //70000A6A	 //_bnr_iColdThreshLow   [7:0] AFIT8_bnr_DispTH_Low
+{0x0F12, 0x031B},	 //70000A6C	 //_bnr_DispTH_High   [7:0] AFIT8_bnr_DISP_Limit_Low
 {0x0F12, 0x0103},	 //70000A6E	 //_bnr_DISP_Limit_High   [7:0] AFIT8_bnr_iDistSigmaMin
-{0x0F12, 0x1205},	 //70000A70	 //_bnr_iDistSigmaMax   [7:0] AFIT8_bnr_iDiffSigmaLow  
-{0x0F12, 0x400D},	 //70000A72	 //_bnr_iDiffSigmaHigh   [7:0] AFIT8_bnr_iNormalizedSTD_TH        
-{0x0F12, 0x0080},	 //70000A74	 //_bnr_iNormalizedSTD_Limit   [7:0] AFIT8_bnr_iDirNRTune         
-{0x0F12, 0x1980},	 //70000A76	 //_bnr_iDirMinThres   [7:0] AFIT8_bnr_iDirFltDiffThresHigh       
-{0x0F12, 0x272E},	 //70000A78	 //_bnr_iDirFltDiffThresLow   [7:0] AFIT8_bnr_iDirSmoothPowerHigh 
-{0x0F12, 0x0629},	 //70000A7A	 //_bnr_iDirSmoothPowerLow   [7:0] AFIT8_bnr_iLowMaxSlopeAllowed  
-{0x0F12, 0x0306},	 //70000A7C	 //_bnr_iHighMaxSlopeAllowed   [7:0] AFIT8_bnr_iLowSlopeThresh    
+{0x0F12, 0x1205},	 //70000A70	 //_bnr_iDistSigmaMax   [7:0] AFIT8_bnr_iDiffSigmaLow
+{0x0F12, 0x400D},	 //70000A72	 //_bnr_iDiffSigmaHigh   [7:0] AFIT8_bnr_iNormalizedSTD_TH
+{0x0F12, 0x0080},	 //70000A74	 //_bnr_iNormalizedSTD_Limit   [7:0] AFIT8_bnr_iDirNRTune
+{0x0F12, 0x1980},	 //70000A76	 //_bnr_iDirMinThres   [7:0] AFIT8_bnr_iDirFltDiffThresHigh
+{0x0F12, 0x272E},	 //70000A78	 //_bnr_iDirFltDiffThresLow   [7:0] AFIT8_bnr_iDirSmoothPowerHigh
+{0x0F12, 0x0629},	 //70000A7A	 //_bnr_iDirSmoothPowerLow   [7:0] AFIT8_bnr_iLowMaxSlopeAllowed
+{0x0F12, 0x0306},	 //70000A7C	 //_bnr_iHighMaxSlopeAllowed   [7:0] AFIT8_bnr_iLowSlopeThresh
 {0x0F12, 0x2003},	 //70000A7E	 //_bnr_iHighSlopeThresh   [7:0] AFIT8_bnr_iSlopenessTH
-{0x0F12, 0xFF01},	 //70000A80	 //_bnr_iSlopeBlurStrength   [7:0] AFIT8_bnr_iSlopenessLimit      
+{0x0F12, 0xFF01},	 //70000A80	 //_bnr_iSlopeBlurStrength   [7:0] AFIT8_bnr_iSlopenessLimit
 {0x0F12, 0x0404},	 //70000A82	 //_bnr_AddNoisePower1   [7:0] AFIT8_bnr_AddNoisePower2
-{0x0F12, 0x0300},	 //70000A84	 //_bnr_iRadialTune   [7:0] AFIT8_bnr_iRadialPower     
-{0x0F12, 0x245A},	 //70000A86	 //_bnr_iRadialLimit   [7:0] AFIT8_ee_iFSMagThLow      
-{0x0F12, 0x1018},	 //70000A88	 //_ee_iFSMagThHigh   [7:0] AFIT8_ee_iFSVarThLow       
-{0x0F12, 0x000B},	 //70000A8A	 //_ee_iFSVarThHigh   [7:0] AFIT8_ee_iFSThLow          
-{0x0F12, 0x0B00},	 //70000A8C	 //_ee_iFSThHigh   [7:0] AFIT8_ee_iFSmagPower          
-{0x0F12, 0x5A0F},	 //70000A8E	 //_ee_iFSVarCountTh   [7:0] AFIT8_ee_iRadialLimit     
-{0x0F12, 0x0505},	 //70000A90	 //_ee_iRadialPower   [7:0] AFIT8_ee_iSmoothEdgeSlope  
-{0x0F12, 0x1802},	 //70000A92	 //_ee_iROADThres   [7:0] AFIT8_ee_iROADMaxNR          
-{0x0F12, 0x0000},	 //70000A94	 //_ee_iROADSubMaxNR   [7:0] AFIT8_ee_iROADSubThres    
-{0x0F12, 0x2006},	 //70000A96	 //_ee_iROADNeiThres   [7:0] AFIT8_ee_iROADNeiMaxNR    
-{0x0F12, 0x3828},	 //70000A98	 //_ee_iSmoothEdgeThres   [7:0] AFIT8_ee_iMSharpen     
-{0x0F12, 0x0425},	 //70000A9A	 //_ee_iWSharpen   [7:0] AFIT8_ee_iMShThresh           
-{0x0F12, 0x0101},	 //70000A9C	 //_ee_iWShThresh   [7:0] AFIT8_ee_iReduceNegative     
-{0x0F12, 0x0800},	 //70000A9E	 //_ee_iEmbossCentAdd   [7:0] AFIT8_ee_iShDespeckle    
-{0x0F12, 0x1004},	 //70000AA0	 //_ee_iReduceEdgeThresh   [7:0] AFIT8_dmsc_iEnhThresh 
-{0x0F12, 0x4008},	 //70000AA2	 //_dmsc_iDesatThresh   [7:0] AFIT8_dmsc_iDemBlurHigh  
-{0x0F12, 0x0540},	 //70000AA4	 //_dmsc_iDemBlurLow   [7:0] AFIT8_dmsc_iDemBlurRange  
-{0x0F12, 0x8006},	 //70000AA6	 //_dmsc_iDecisionThresh   [7:0] AFIT8_dmsc_iCentGrad  
-{0x0F12, 0x0020},	 //70000AA8	 //_dmsc_iMonochrom   [7:0] AFIT8_dmsc_iGBDenoiseVal   
-{0x0F12, 0x0000},	 //70000AAA	 //_dmsc_iGRDenoiseVal   [7:0] AFIT8_dmsc_iEdgeDesatThrHigh       
+{0x0F12, 0x0300},	 //70000A84	 //_bnr_iRadialTune   [7:0] AFIT8_bnr_iRadialPower
+{0x0F12, 0x245A},	 //70000A86	 //_bnr_iRadialLimit   [7:0] AFIT8_ee_iFSMagThLow
+{0x0F12, 0x1018},	 //70000A88	 //_ee_iFSMagThHigh   [7:0] AFIT8_ee_iFSVarThLow
+{0x0F12, 0x000B},	 //70000A8A	 //_ee_iFSVarThHigh   [7:0] AFIT8_ee_iFSThLow
+{0x0F12, 0x0B00},	 //70000A8C	 //_ee_iFSThHigh   [7:0] AFIT8_ee_iFSmagPower
+{0x0F12, 0x5A0F},	 //70000A8E	 //_ee_iFSVarCountTh   [7:0] AFIT8_ee_iRadialLimit
+{0x0F12, 0x0505},	 //70000A90	 //_ee_iRadialPower   [7:0] AFIT8_ee_iSmoothEdgeSlope
+{0x0F12, 0x1802},	 //70000A92	 //_ee_iROADThres   [7:0] AFIT8_ee_iROADMaxNR
+{0x0F12, 0x0000},	 //70000A94	 //_ee_iROADSubMaxNR   [7:0] AFIT8_ee_iROADSubThres
+{0x0F12, 0x2006},	 //70000A96	 //_ee_iROADNeiThres   [7:0] AFIT8_ee_iROADNeiMaxNR
+{0x0F12, 0x3828},	 //70000A98	 //_ee_iSmoothEdgeThres   [7:0] AFIT8_ee_iMSharpen
+{0x0F12, 0x0425},	 //70000A9A	 //_ee_iWSharpen   [7:0] AFIT8_ee_iMShThresh
+{0x0F12, 0x0101},	 //70000A9C	 //_ee_iWShThresh   [7:0] AFIT8_ee_iReduceNegative
+{0x0F12, 0x0800},	 //70000A9E	 //_ee_iEmbossCentAdd   [7:0] AFIT8_ee_iShDespeckle
+{0x0F12, 0x1004},	 //70000AA0	 //_ee_iReduceEdgeThresh   [7:0] AFIT8_dmsc_iEnhThresh
+{0x0F12, 0x4008},	 //70000AA2	 //_dmsc_iDesatThresh   [7:0] AFIT8_dmsc_iDemBlurHigh
+{0x0F12, 0x0540},	 //70000AA4	 //_dmsc_iDemBlurLow   [7:0] AFIT8_dmsc_iDemBlurRange
+{0x0F12, 0x8006},	 //70000AA6	 //_dmsc_iDecisionThresh   [7:0] AFIT8_dmsc_iCentGrad
+{0x0F12, 0x0020},	 //70000AA8	 //_dmsc_iMonochrom   [7:0] AFIT8_dmsc_iGBDenoiseVal
+{0x0F12, 0x0000},	 //70000AAA	 //_dmsc_iGRDenoiseVal   [7:0] AFIT8_dmsc_iEdgeDesatThrHigh
 {0x0F12, 0x2000},	 //70000AAC	 //_dmsc_iEdgeDesatThrLow   [7:0] AFIT8_dmsc_iEdgeDesat
-{0x0F12, 0x0000},	 //70000AAE	 //_dmsc_iNearGrayDesat   [7:0] AFIT8_dmsc_iEdgeDesatLimit        
-{0x0F12, 0x1E10},	 //70000AB0	 //_postdmsc_iBCoeff   [7:0] AFIT8_postdmsc_iGCoeff    
-{0x0F12, 0x000B},	 //70000AB2	 //_postdmsc_iWideMult   [7:0] AFIT8_yuvemix_mNegSlopes_0         
-{0x0F12, 0x0607},	 //70000AB4	 //_yuvemix_mNegSlopes_1   [7:0] AFIT8_yuvemix_mNegSlopes_2       
-{0x0F12, 0x0005},	 //70000AB6	 //_yuvemix_mNegSlopes_3   [7:0] AFIT8_yuvemix_mPosSlopes_0       
-{0x0F12, 0x0607},	 //70000AB8	 //_yuvemix_mPosSlopes_1   [7:0] AFIT8_yuvemix_mPosSlopes_2       
-{0x0F12, 0x0405},	 //70000ABA	 //_yuvemix_mPosSlopes_3   [7:0] AFIT8_yuviirnr_iXSupportY        
-{0x0F12, 0x0205},	 //70000ABC	 //_yuviirnr_iXSupportUV   [7:0] AFIT8_yuviirnr_iLowYNorm         
-{0x0F12, 0x0304},	 //70000ABE	 //_yuviirnr_iHighYNorm   [7:0] AFIT8_yuviirnr_iLowUVNorm         
-{0x0F12, 0x0409},	 //70000AC0	 //_yuviirnr_iHighUVNorm   [7:0] AFIT8_yuviirnr_iYNormShift       
-{0x0F12, 0x0306},	 //70000AC2	 //_yuviirnr_iUVNormShift   [7:0] AFIT8_yuviirnr_iVertLength_Y    
-{0x0F12, 0x0407},	 //70000AC4	 //_yuviirnr_iVertLength_UV   [7:0] AFIT8_yuviirnr_iDiffThreshL_Y 
+{0x0F12, 0x0000},	 //70000AAE	 //_dmsc_iNearGrayDesat   [7:0] AFIT8_dmsc_iEdgeDesatLimit
+{0x0F12, 0x1E10},	 //70000AB0	 //_postdmsc_iBCoeff   [7:0] AFIT8_postdmsc_iGCoeff
+{0x0F12, 0x000B},	 //70000AB2	 //_postdmsc_iWideMult   [7:0] AFIT8_yuvemix_mNegSlopes_0
+{0x0F12, 0x0607},	 //70000AB4	 //_yuvemix_mNegSlopes_1   [7:0] AFIT8_yuvemix_mNegSlopes_2
+{0x0F12, 0x0005},	 //70000AB6	 //_yuvemix_mNegSlopes_3   [7:0] AFIT8_yuvemix_mPosSlopes_0
+{0x0F12, 0x0607},	 //70000AB8	 //_yuvemix_mPosSlopes_1   [7:0] AFIT8_yuvemix_mPosSlopes_2
+{0x0F12, 0x0405},	 //70000ABA	 //_yuvemix_mPosSlopes_3   [7:0] AFIT8_yuviirnr_iXSupportY
+{0x0F12, 0x0205},	 //70000ABC	 //_yuviirnr_iXSupportUV   [7:0] AFIT8_yuviirnr_iLowYNorm
+{0x0F12, 0x0304},	 //70000ABE	 //_yuviirnr_iHighYNorm   [7:0] AFIT8_yuviirnr_iLowUVNorm
+{0x0F12, 0x0409},	 //70000AC0	 //_yuviirnr_iHighUVNorm   [7:0] AFIT8_yuviirnr_iYNormShift
+{0x0F12, 0x0306},	 //70000AC2	 //_yuviirnr_iUVNormShift   [7:0] AFIT8_yuviirnr_iVertLength_Y
+{0x0F12, 0x0407},	 //70000AC4	 //_yuviirnr_iVertLength_UV   [7:0] AFIT8_yuviirnr_iDiffThreshL_Y
 {0x0F12, 0x2204},	 //70000AC6	 //_yuviirnr_iDiffThreshH_Y   [7:0] AFIT8_yuviirnr_iDiffThreshL_UV
-{0x0F12, 0x021C},	 //70000AC8	 //_yuviirnr_iDiffThreshH_UV   [7:0] AFIT8_yuviirnr_iMaxThreshL_Y 
-{0x0F12, 0x1102},	 //70000ACA	 //_yuviirnr_iMaxThreshH_Y   [7:0] AFIT8_yuviirnr_iMaxThreshL_UV  
-{0x0F12, 0x0611},	 //70000ACC	 //_yuviirnr_iMaxThreshH_UV   [7:0] AFIT8_yuviirnr_iYNRStrengthL  
-{0x0F12, 0x1A02},	 //70000ACE	 //_yuviirnr_iYNRStrengthH   [7:0] AFIT8_yuviirnr_iUVNRStrengthL  
-{0x0F12, 0x8018},	 //70000AD0	 //_yuviirnr_iUVNRStrengthH   [7:0] AFIT8_byr_gras_iShadingPower  
-{0x0F12, 0x0080},	 //70000AD2	 //_RGBGamma2_iLinearity   [7:0] AFIT8_RGBGamma2_iDarkReduce      
+{0x0F12, 0x021C},	 //70000AC8	 //_yuviirnr_iDiffThreshH_UV   [7:0] AFIT8_yuviirnr_iMaxThreshL_Y
+{0x0F12, 0x1102},	 //70000ACA	 //_yuviirnr_iMaxThreshH_Y   [7:0] AFIT8_yuviirnr_iMaxThreshL_UV
+{0x0F12, 0x0611},	 //70000ACC	 //_yuviirnr_iMaxThreshH_UV   [7:0] AFIT8_yuviirnr_iYNRStrengthL
+{0x0F12, 0x1A02},	 //70000ACE	 //_yuviirnr_iYNRStrengthH   [7:0] AFIT8_yuviirnr_iUVNRStrengthL
+{0x0F12, 0x8018},	 //70000AD0	 //_yuviirnr_iUVNRStrengthH   [7:0] AFIT8_byr_gras_iShadingPower
+{0x0F12, 0x0080},	 //70000AD2	 //_RGBGamma2_iLinearity   [7:0] AFIT8_RGBGamma2_iDarkReduce
 {0x0F12, 0x0374},	 //70000AD4	 //_ccm_oscar_iSaturation   [7:0] AFIT8_RGB2YUV_iYOffset //
-{0x0F12, 0x0180},	 //70000AD6	 //_RGB2YUV_iRGBGain   [7:0] AFIT8_bnr_nClustLevel_H   
-{0x0F12, 0x0A0A},	 //70000AD8	 //_bnr_iClustMulT_H   [7:0] AFIT8_bnr_iClustMulT_C    
+{0x0F12, 0x0180},	 //70000AD6	 //_RGB2YUV_iRGBGain   [7:0] AFIT8_bnr_nClustLevel_H
+{0x0F12, 0x0A0A},	 //70000AD8	 //_bnr_iClustMulT_H   [7:0] AFIT8_bnr_iClustMulT_C
 {0x0F12, 0x0101},	 //70000ADA	 //_bnr_iClustThresh_H   [7:0] AFIT8_bnr_iClustThresh_C
-{0x0F12, 0x141D},	 //70000ADC	 //_bnr_iDenThreshLow   [7:0] AFIT8_bnr_iDenThreshHigh 
-{0x0F12, 0x6024},	 //70000ADE	 //_ee_iLowSharpPower   [7:0] AFIT8_ee_iHighSharpPower 
-{0x0F12, 0x1217},	 //70000AE0	 //_ee_iLowShDenoise   [7:0] AFIT8_ee_iHighShDenoise   
-{0x0F12, 0xFFFF},	 //70000AE2	 //_ee_iLowSharpClamp   [7:0] AFIT8_ee_iHighSharpClamp 
-{0x0F12, 0x0808},	 //70000AE4	 //_ee_iReduceEdgeMinMult   [7:0] AFIT8_ee_iReduceEdgeSlope       
-{0x0F12, 0x0A01},	 //70000AE6	 //_bnr_nClustLevel_H_Bin   [7:0] AFIT8_bnr_iClustMulT_H_Bin      
-{0x0F12, 0x010A},	 //70000AE8	 //_bnr_iClustMulT_C_Bin   [7:0] AFIT8_bnr_iClustThresh_H_Bin     
-{0x0F12, 0x0001},	 //70000AEA	 //_bnr_iClustThresh_C_Bin   [7:0] AFIT8_bnr_iDenThreshLow_Bin    
-{0x0F12, 0x2400},	 //70000AEC	 //_bnr_iDenThreshHigh_Bin   [7:0] AFIT8_ee_iLowSharpPower_Bin    
-{0x0F12, 0x1660},	 //70000AEE	 //_ee_iHighSharpPower_Bin   [7:0] AFIT8_ee_iLowShDenoise_Bin     
-{0x0F12, 0xFF10},	 //70000AF0	 //_ee_iHighShDenoise_Bin   [7:0] AFIT8_ee_iLowSharpClamp_Bin     
+{0x0F12, 0x141D},	 //70000ADC	 //_bnr_iDenThreshLow   [7:0] AFIT8_bnr_iDenThreshHigh
+{0x0F12, 0x6024},	 //70000ADE	 //_ee_iLowSharpPower   [7:0] AFIT8_ee_iHighSharpPower
+{0x0F12, 0x1217},	 //70000AE0	 //_ee_iLowShDenoise   [7:0] AFIT8_ee_iHighShDenoise
+{0x0F12, 0xFFFF},	 //70000AE2	 //_ee_iLowSharpClamp   [7:0] AFIT8_ee_iHighSharpClamp
+{0x0F12, 0x0808},	 //70000AE4	 //_ee_iReduceEdgeMinMult   [7:0] AFIT8_ee_iReduceEdgeSlope
+{0x0F12, 0x0A01},	 //70000AE6	 //_bnr_nClustLevel_H_Bin   [7:0] AFIT8_bnr_iClustMulT_H_Bin
+{0x0F12, 0x010A},	 //70000AE8	 //_bnr_iClustMulT_C_Bin   [7:0] AFIT8_bnr_iClustThresh_H_Bin
+{0x0F12, 0x0001},	 //70000AEA	 //_bnr_iClustThresh_C_Bin   [7:0] AFIT8_bnr_iDenThreshLow_Bin
+{0x0F12, 0x2400},	 //70000AEC	 //_bnr_iDenThreshHigh_Bin   [7:0] AFIT8_ee_iLowSharpPower_Bin
+{0x0F12, 0x1660},	 //70000AEE	 //_ee_iHighSharpPower_Bin   [7:0] AFIT8_ee_iLowShDenoise_Bin
+{0x0F12, 0xFF10},	 //70000AF0	 //_ee_iHighShDenoise_Bin   [7:0] AFIT8_ee_iLowSharpClamp_Bin
 {0x0F12, 0x40FF},	 //70000AF2	 //_ee_iHighSharpClamp_Bin   [7:0] AFIT8_ee_iReduceEdgeMinMult_Bin
-{0x0F12, 0x0009},	 //70000AF4	 //_ee_iReduceEdgeSlope_Bin [7:0]                      
-{0x0F12, 0x0001},	 //70000AF6	 //_bnr_nClustLevel_C      [0]                         
-{0x0F12, 0x0000},	 //70000AF8	 //_BRIGHTNESS	AFIT 2                                  
-{0x0F12, 0x0000},	 //70000AFA	 //_CONTRAST                                           
-{0x0F12, 0x0000},	 //70000AFC	 //_SATURATION                                         
-{0x0F12, 0x0000},	 //70000AFE	 //_SHARP_BLUR                                         
-{0x0F12, 0x0000},	 //70000B00	 //_GLAMOUR                                            
-{0x0F12, 0x00C0},	 //70000B02	 //_bnr_edge_high                                      
-{0x0F12, 0x0064},	 //70000B04	 //_postdmsc_iLowBright                                
-{0x0F12, 0x0384},	 //70000B06	 //_postdmsc_iHighBright                               
-{0x0F12, 0x0043},	 //70000B08	 //_postdmsc_iLowSat                                   
-{0x0F12, 0x01F4},	 //70000B0A	 //_postdmsc_iHighSat                                  
-{0x0F12, 0x0070},	 //70000B0C	 //_postdmsc_iTune                                     
-{0x0F12, 0x0040},	 //70000B0E	 //_yuvemix_mNegRanges_0                               
-{0x0F12, 0x00A0},	 //70000B10	 //_yuvemix_mNegRanges_1                               
-{0x0F12, 0x0100},	 //70000B12	 //_yuvemix_mNegRanges_2                               
-{0x0F12, 0x0010},	 //70000B14	 //_yuvemix_mPosRanges_0                               
-{0x0F12, 0x0060},	 //70000B16	 //_yuvemix_mPosRanges_1                               
-{0x0F12, 0x0100},	 //70000B18	 //_yuvemix_mPosRanges_2                               
-{0x0F12, 0x1430},	 //70000B1A	 //_bnr_edge_low  [7:0] AFIT8_bnr_repl_thresh          
-{0x0F12, 0x0201},	 //70000B1C	 //_bnr_repl_force  [7:0] AFIT8_bnr_iHotThreshHigh     
+{0x0F12, 0x0009},	 //70000AF4	 //_ee_iReduceEdgeSlope_Bin [7:0]
+{0x0F12, 0x0001},	 //70000AF6	 //_bnr_nClustLevel_C      [0]
+{0x0F12, 0x0000},	 //70000AF8	 //_BRIGHTNESS	AFIT 2
+{0x0F12, 0x0000},	 //70000AFA	 //_CONTRAST
+{0x0F12, 0x0000},	 //70000AFC	 //_SATURATION
+{0x0F12, 0x0000},	 //70000AFE	 //_SHARP_BLUR
+{0x0F12, 0x0000},	 //70000B00	 //_GLAMOUR
+{0x0F12, 0x00C0},	 //70000B02	 //_bnr_edge_high
+{0x0F12, 0x0064},	 //70000B04	 //_postdmsc_iLowBright
+{0x0F12, 0x0384},	 //70000B06	 //_postdmsc_iHighBright
+{0x0F12, 0x0043},	 //70000B08	 //_postdmsc_iLowSat
+{0x0F12, 0x01F4},	 //70000B0A	 //_postdmsc_iHighSat
+{0x0F12, 0x0070},	 //70000B0C	 //_postdmsc_iTune
+{0x0F12, 0x0040},	 //70000B0E	 //_yuvemix_mNegRanges_0
+{0x0F12, 0x00A0},	 //70000B10	 //_yuvemix_mNegRanges_1
+{0x0F12, 0x0100},	 //70000B12	 //_yuvemix_mNegRanges_2
+{0x0F12, 0x0010},	 //70000B14	 //_yuvemix_mPosRanges_0
+{0x0F12, 0x0060},	 //70000B16	 //_yuvemix_mPosRanges_1
+{0x0F12, 0x0100},	 //70000B18	 //_yuvemix_mPosRanges_2
+{0x0F12, 0x1430},	 //70000B1A	 //_bnr_edge_low  [7:0] AFIT8_bnr_repl_thresh
+{0x0F12, 0x0201},	 //70000B1C	 //_bnr_repl_force  [7:0] AFIT8_bnr_iHotThreshHigh
 {0x0F12, 0x0204},	 //70000B1E	 //_bnr_iHotThreshLow   [7:0] AFIT8_bnr_iColdThreshHigh
-{0x0F12, 0x1B04},	 //70000B20	 //_bnr_iColdThreshLow   [7:0] AFIT8_bnr_DispTH_Low    
-{0x0F12, 0x0312},	 //70000B22	 //_bnr_DispTH_High   [7:0] AFIT8_bnr_DISP_Limit_Low   
+{0x0F12, 0x1B04},	 //70000B20	 //_bnr_iColdThreshLow   [7:0] AFIT8_bnr_DispTH_Low
+{0x0F12, 0x0312},	 //70000B22	 //_bnr_DispTH_High   [7:0] AFIT8_bnr_DISP_Limit_Low
 {0x0F12, 0x0003},	 //70000B24	 //_bnr_DISP_Limit_High   [7:0] AFIT8_bnr_iDistSigmaMin
-{0x0F12, 0x0C03},	 //70000B26	 //_bnr_iDistSigmaMax   [7:0] AFIT8_bnr_iDiffSigmaLow  
-{0x0F12, 0x2806},	 //70000B28	 //_bnr_iDiffSigmaHigh   [7:0] AFIT8_bnr_iNormalizedSTD_TH        
-{0x0F12, 0x0060},	 //70000B2A	 //_bnr_iNormalizedSTD_Limit   [7:0] AFIT8_bnr_iDirNRTune         
-{0x0F12, 0x1580},	 //70000B2C	 //_bnr_iDirMinThres   [7:0] AFIT8_bnr_iDirFltDiffThresHigh       
-{0x0F12, 0x2020},	 //70000B2E	 //_bnr_iDirFltDiffThresLow   [7:0] AFIT8_bnr_iDirSmoothPowerHigh 
-{0x0F12, 0x0620},	 //70000B30	 //_bnr_iDirSmoothPowerLow   [7:0] AFIT8_bnr_iLowMaxSlopeAllowed  
-{0x0F12, 0x0306},	 //70000B32	 //_bnr_iHighMaxSlopeAllowed   [7:0] AFIT8_bnr_iLowSlopeThresh    
+{0x0F12, 0x0C03},	 //70000B26	 //_bnr_iDistSigmaMax   [7:0] AFIT8_bnr_iDiffSigmaLow
+{0x0F12, 0x2806},	 //70000B28	 //_bnr_iDiffSigmaHigh   [7:0] AFIT8_bnr_iNormalizedSTD_TH
+{0x0F12, 0x0060},	 //70000B2A	 //_bnr_iNormalizedSTD_Limit   [7:0] AFIT8_bnr_iDirNRTune
+{0x0F12, 0x1580},	 //70000B2C	 //_bnr_iDirMinThres   [7:0] AFIT8_bnr_iDirFltDiffThresHigh
+{0x0F12, 0x2020},	 //70000B2E	 //_bnr_iDirFltDiffThresLow   [7:0] AFIT8_bnr_iDirSmoothPowerHigh
+{0x0F12, 0x0620},	 //70000B30	 //_bnr_iDirSmoothPowerLow   [7:0] AFIT8_bnr_iLowMaxSlopeAllowed
+{0x0F12, 0x0306},	 //70000B32	 //_bnr_iHighMaxSlopeAllowed   [7:0] AFIT8_bnr_iLowSlopeThresh
 {0x0F12, 0x2003},	 //70000B34	 //_bnr_iHighSlopeThresh   [7:0] AFIT8_bnr_iSlopenessTH
-{0x0F12, 0xFF01},	 //70000B36	 //_bnr_iSlopeBlurStrength   [7:0] AFIT8_bnr_iSlopenessLimit      
+{0x0F12, 0xFF01},	 //70000B36	 //_bnr_iSlopeBlurStrength   [7:0] AFIT8_bnr_iSlopenessLimit
 {0x0F12, 0x0404},	 //70000B38	 //_bnr_AddNoisePower1   [7:0] AFIT8_bnr_AddNoisePower2
-{0x0F12, 0x0300},	 //70000B3A	 //_bnr_iRadialTune   [7:0] AFIT8_bnr_iRadialPower     
-{0x0F12, 0x145A},	 //70000B3C	 //_bnr_iRadialLimit   [7:0] AFIT8_ee_iFSMagThLow      
-{0x0F12, 0x1010},	 //70000B3E	 //_ee_iFSMagThHigh   [7:0] AFIT8_ee_iFSVarThLow       
-{0x0F12, 0x000B},	 //70000B40	 //_ee_iFSVarThHigh   [7:0] AFIT8_ee_iFSThLow          
-{0x0F12, 0x0E00},	 //70000B42	 //_ee_iFSThHigh   [7:0] AFIT8_ee_iFSmagPower          
-{0x0F12, 0x5A0F},	 //70000B44	 //_ee_iFSVarCountTh   [7:0] AFIT8_ee_iRadialLimit     
-{0x0F12, 0x0504},	 //70000B46	 //_ee_iRadialPower   [7:0] AFIT8_ee_iSmoothEdgeSlope  
-{0x0F12, 0x1802},	 //70000B48	 //_ee_iROADThres   [7:0] AFIT8_ee_iROADMaxNR          
-{0x0F12, 0x0000},	 //70000B4A	 //_ee_iROADSubMaxNR   [7:0] AFIT8_ee_iROADSubThres    
-{0x0F12, 0x2006},	 //70000B4C	 //_ee_iROADNeiThres   [7:0] AFIT8_ee_iROADNeiMaxNR    
-{0x0F12, 0x3828},	 //70000B4E	 //_ee_iSmoothEdgeThres   [7:0] AFIT8_ee_iMSharpen     
-{0x0F12, 0x0428},	 //70000B50	 //_ee_iWSharpen   [7:0] AFIT8_ee_iMShThresh           
-{0x0F12, 0x0101},	 //70000B52	 //_ee_iWShThresh   [7:0] AFIT8_ee_iReduceNegative     
-{0x0F12, 0x8000},	 //70000B54	 //_ee_iEmbossCentAdd   [7:0] AFIT8_ee_iShDespeckle    
-{0x0F12, 0x0A04},	 //70000B56	 //_ee_iReduceEdgeThresh   [7:0] AFIT8_dmsc_iEnhThresh 
-{0x0F12, 0x4008},	 //70000B58	 //_dmsc_iDesatThresh   [7:0] AFIT8_dmsc_iDemBlurHigh  
-{0x0F12, 0x0540},	 //70000B5A	 //_dmsc_iDemBlurLow   [7:0] AFIT8_dmsc_iDemBlurRange  
-{0x0F12, 0x8006},	 //70000B5C	 //_dmsc_iDecisionThresh   [7:0] AFIT8_dmsc_iCentGrad  
-{0x0F12, 0x0020},	 //70000B5E	 //_dmsc_iMonochrom   [7:0] AFIT8_dmsc_iGBDenoiseVal   
-{0x0F12, 0x0000},	 //70000B60	 //_dmsc_iGRDenoiseVal   [7:0] AFIT8_dmsc_iEdgeDesatThrHigh       
+{0x0F12, 0x0300},	 //70000B3A	 //_bnr_iRadialTune   [7:0] AFIT8_bnr_iRadialPower
+{0x0F12, 0x145A},	 //70000B3C	 //_bnr_iRadialLimit   [7:0] AFIT8_ee_iFSMagThLow
+{0x0F12, 0x1010},	 //70000B3E	 //_ee_iFSMagThHigh   [7:0] AFIT8_ee_iFSVarThLow
+{0x0F12, 0x000B},	 //70000B40	 //_ee_iFSVarThHigh   [7:0] AFIT8_ee_iFSThLow
+{0x0F12, 0x0E00},	 //70000B42	 //_ee_iFSThHigh   [7:0] AFIT8_ee_iFSmagPower
+{0x0F12, 0x5A0F},	 //70000B44	 //_ee_iFSVarCountTh   [7:0] AFIT8_ee_iRadialLimit
+{0x0F12, 0x0504},	 //70000B46	 //_ee_iRadialPower   [7:0] AFIT8_ee_iSmoothEdgeSlope
+{0x0F12, 0x1802},	 //70000B48	 //_ee_iROADThres   [7:0] AFIT8_ee_iROADMaxNR
+{0x0F12, 0x0000},	 //70000B4A	 //_ee_iROADSubMaxNR   [7:0] AFIT8_ee_iROADSubThres
+{0x0F12, 0x2006},	 //70000B4C	 //_ee_iROADNeiThres   [7:0] AFIT8_ee_iROADNeiMaxNR
+{0x0F12, 0x3828},	 //70000B4E	 //_ee_iSmoothEdgeThres   [7:0] AFIT8_ee_iMSharpen
+{0x0F12, 0x0428},	 //70000B50	 //_ee_iWSharpen   [7:0] AFIT8_ee_iMShThresh
+{0x0F12, 0x0101},	 //70000B52	 //_ee_iWShThresh   [7:0] AFIT8_ee_iReduceNegative
+{0x0F12, 0x8000},	 //70000B54	 //_ee_iEmbossCentAdd   [7:0] AFIT8_ee_iShDespeckle
+{0x0F12, 0x0A04},	 //70000B56	 //_ee_iReduceEdgeThresh   [7:0] AFIT8_dmsc_iEnhThresh
+{0x0F12, 0x4008},	 //70000B58	 //_dmsc_iDesatThresh   [7:0] AFIT8_dmsc_iDemBlurHigh
+{0x0F12, 0x0540},	 //70000B5A	 //_dmsc_iDemBlurLow   [7:0] AFIT8_dmsc_iDemBlurRange
+{0x0F12, 0x8006},	 //70000B5C	 //_dmsc_iDecisionThresh   [7:0] AFIT8_dmsc_iCentGrad
+{0x0F12, 0x0020},	 //70000B5E	 //_dmsc_iMonochrom   [7:0] AFIT8_dmsc_iGBDenoiseVal
+{0x0F12, 0x0000},	 //70000B60	 //_dmsc_iGRDenoiseVal   [7:0] AFIT8_dmsc_iEdgeDesatThrHigh
 {0x0F12, 0x2000},	 //70000B62	 //_dmsc_iEdgeDesatThrLow   [7:0] AFIT8_dmsc_iEdgeDesat
-{0x0F12, 0x0000},	 //70000B64	 //_dmsc_iNearGrayDesat   [7:0] AFIT8_dmsc_iEdgeDesatLimit        
-{0x0F12, 0x1E10},	 //70000B66	 //_postdmsc_iBCoeff   [7:0] AFIT8_postdmsc_iGCoeff    
-{0x0F12, 0x000B},	 //70000B68	 //_postdmsc_iWideMult   [7:0] AFIT8_yuvemix_mNegSlopes_0         
-{0x0F12, 0x0607},	 //70000B6A	 //_yuvemix_mNegSlopes_1   [7:0] AFIT8_yuvemix_mNegSlopes_2       
-{0x0F12, 0x0005},	 //70000B6C	 //_yuvemix_mNegSlopes_3   [7:0] AFIT8_yuvemix_mPosSlopes_0       
-{0x0F12, 0x0607},	 //70000B6E	 //_yuvemix_mPosSlopes_1   [7:0] AFIT8_yuvemix_mPosSlopes_2       
-{0x0F12, 0x0405},	 //70000B70	 //_yuvemix_mPosSlopes_3   [7:0] AFIT8_yuviirnr_iXSupportY        
-{0x0F12, 0x0207},	 //70000B72	 //_yuviirnr_iXSupportUV   [7:0] AFIT8_yuviirnr_iLowYNorm         
-{0x0F12, 0x0304},	 //70000B74	 //_yuviirnr_iHighYNorm   [7:0] AFIT8_yuviirnr_iLowUVNorm         
-{0x0F12, 0x0409},	 //70000B76	 //_yuviirnr_iHighUVNorm   [7:0] AFIT8_yuviirnr_iYNormShift       
-{0x0F12, 0x0306},	 //70000B78	 //_yuviirnr_iUVNormShift   [7:0] AFIT8_yuviirnr_iVertLength_Y    
-{0x0F12, 0x0407},	 //70000B7A	 //_yuviirnr_iVertLength_UV   [7:0] AFIT8_yuviirnr_iDiffThreshL_Y 
+{0x0F12, 0x0000},	 //70000B64	 //_dmsc_iNearGrayDesat   [7:0] AFIT8_dmsc_iEdgeDesatLimit
+{0x0F12, 0x1E10},	 //70000B66	 //_postdmsc_iBCoeff   [7:0] AFIT8_postdmsc_iGCoeff
+{0x0F12, 0x000B},	 //70000B68	 //_postdmsc_iWideMult   [7:0] AFIT8_yuvemix_mNegSlopes_0
+{0x0F12, 0x0607},	 //70000B6A	 //_yuvemix_mNegSlopes_1   [7:0] AFIT8_yuvemix_mNegSlopes_2
+{0x0F12, 0x0005},	 //70000B6C	 //_yuvemix_mNegSlopes_3   [7:0] AFIT8_yuvemix_mPosSlopes_0
+{0x0F12, 0x0607},	 //70000B6E	 //_yuvemix_mPosSlopes_1   [7:0] AFIT8_yuvemix_mPosSlopes_2
+{0x0F12, 0x0405},	 //70000B70	 //_yuvemix_mPosSlopes_3   [7:0] AFIT8_yuviirnr_iXSupportY
+{0x0F12, 0x0207},	 //70000B72	 //_yuviirnr_iXSupportUV   [7:0] AFIT8_yuviirnr_iLowYNorm
+{0x0F12, 0x0304},	 //70000B74	 //_yuviirnr_iHighYNorm   [7:0] AFIT8_yuviirnr_iLowUVNorm
+{0x0F12, 0x0409},	 //70000B76	 //_yuviirnr_iHighUVNorm   [7:0] AFIT8_yuviirnr_iYNormShift
+{0x0F12, 0x0306},	 //70000B78	 //_yuviirnr_iUVNormShift   [7:0] AFIT8_yuviirnr_iVertLength_Y
+{0x0F12, 0x0407},	 //70000B7A	 //_yuviirnr_iVertLength_UV   [7:0] AFIT8_yuviirnr_iDiffThreshL_Y
 {0x0F12, 0x2404},	 //70000B7C	 //_yuviirnr_iDiffThreshH_Y   [7:0] AFIT8_yuviirnr_iDiffThreshL_UV
-{0x0F12, 0x0221},	 //70000B7E	 //_yuviirnr_iDiffThreshH_UV   [7:0] AFIT8_yuviirnr_iMaxThreshL_Y 
-{0x0F12, 0x1202},	 //70000B80	 //_yuviirnr_iMaxThreshH_Y   [7:0] AFIT8_yuviirnr_iMaxThreshL_UV  
-{0x0F12, 0x0613},	 //70000B82	 //_yuviirnr_iMaxThreshH_UV   [7:0] AFIT8_yuviirnr_iYNRStrengthL  
-{0x0F12, 0x1A02},	 //70000B84	 //_yuviirnr_iYNRStrengthH   [7:0] AFIT8_yuviirnr_iUVNRStrengthL  
-{0x0F12, 0x8018},	 //70000B86	 //_yuviirnr_iUVNRStrengthH   [7:0] AFIT8_byr_gras_iShadingPower  
-{0x0F12, 0x0080},	 //70000B88	 //_RGBGamma2_iLinearity   [7:0] AFIT8_RGBGamma2_iDarkReduce      
+{0x0F12, 0x0221},	 //70000B7E	 //_yuviirnr_iDiffThreshH_UV   [7:0] AFIT8_yuviirnr_iMaxThreshL_Y
+{0x0F12, 0x1202},	 //70000B80	 //_yuviirnr_iMaxThreshH_Y   [7:0] AFIT8_yuviirnr_iMaxThreshL_UV
+{0x0F12, 0x0613},	 //70000B82	 //_yuviirnr_iMaxThreshH_UV   [7:0] AFIT8_yuviirnr_iYNRStrengthL
+{0x0F12, 0x1A02},	 //70000B84	 //_yuviirnr_iYNRStrengthH   [7:0] AFIT8_yuviirnr_iUVNRStrengthL
+{0x0F12, 0x8018},	 //70000B86	 //_yuviirnr_iUVNRStrengthH   [7:0] AFIT8_byr_gras_iShadingPower
+{0x0F12, 0x0080},	 //70000B88	 //_RGBGamma2_iLinearity   [7:0] AFIT8_RGBGamma2_iDarkReduce
 {0x0F12, 0x0080},	 //70000B8A	 //_ccm_oscar_iSaturation   [7:0] AFIT8_RGB2YUV_iYOffset //
-{0x0F12, 0x0180},	 //70000B8C	 //_RGB2YUV_iRGBGain   [7:0] AFIT8_bnr_nClustLevel_H   
-{0x0F12, 0x0A0A},	 //70000B8E	 //_bnr_iClustMulT_H   [7:0] AFIT8_bnr_iClustMulT_C    
+{0x0F12, 0x0180},	 //70000B8C	 //_RGB2YUV_iRGBGain   [7:0] AFIT8_bnr_nClustLevel_H
+{0x0F12, 0x0A0A},	 //70000B8E	 //_bnr_iClustMulT_H   [7:0] AFIT8_bnr_iClustMulT_C
 {0x0F12, 0x0101},	 //70000B90	 //_bnr_iClustThresh_H   [7:0] AFIT8_bnr_iClustThresh_C
-{0x0F12, 0x121B},	 //70000B92	 //_bnr_iDenThreshLow   [7:0] AFIT8_bnr_iDenThreshHigh 
-{0x0F12, 0x6024},	 //70000B94	 //_ee_iLowSharpPower   [7:0] AFIT8_ee_iHighSharpPower 
-{0x0F12, 0x0C0C},	 //70000B96	 //_ee_iLowShDenoise   [7:0] AFIT8_ee_iHighShDenoise   
-{0x0F12, 0xFFFF},	 //70000B98	 //_ee_iLowSharpClamp   [7:0] AFIT8_ee_iHighSharpClamp 
-{0x0F12, 0x0808},	 //70000B9A	 //_ee_iReduceEdgeMinMult   [7:0] AFIT8_ee_iReduceEdgeSlope       
-{0x0F12, 0x0A01},	 //70000B9C	 //_bnr_nClustLevel_H_Bin   [7:0] AFIT8_bnr_iClustMulT_H_Bin      
-{0x0F12, 0x010A},	 //70000B9E	 //_bnr_iClustMulT_C_Bin   [7:0] AFIT8_bnr_iClustThresh_H_Bin     
-{0x0F12, 0x0001},	 //70000BA0	 //_bnr_iClustThresh_C_Bin   [7:0] AFIT8_bnr_iDenThreshLow_Bin    
-{0x0F12, 0x2400},	 //70000BA2	 //_bnr_iDenThreshHigh_Bin   [7:0] AFIT8_ee_iLowSharpPower_Bin    
-{0x0F12, 0x0460},	 //70000BA4	 //_ee_iHighSharpPower_Bin   [7:0] AFIT8_ee_iLowShDenoise_Bin     
-{0x0F12, 0xFF04},	 //70000BA6	 //_ee_iHighShDenoise_Bin   [7:0] AFIT8_ee_iLowSharpClamp_Bin     
+{0x0F12, 0x121B},	 //70000B92	 //_bnr_iDenThreshLow   [7:0] AFIT8_bnr_iDenThreshHigh
+{0x0F12, 0x6024},	 //70000B94	 //_ee_iLowSharpPower   [7:0] AFIT8_ee_iHighSharpPower
+{0x0F12, 0x0C0C},	 //70000B96	 //_ee_iLowShDenoise   [7:0] AFIT8_ee_iHighShDenoise
+{0x0F12, 0xFFFF},	 //70000B98	 //_ee_iLowSharpClamp   [7:0] AFIT8_ee_iHighSharpClamp
+{0x0F12, 0x0808},	 //70000B9A	 //_ee_iReduceEdgeMinMult   [7:0] AFIT8_ee_iReduceEdgeSlope
+{0x0F12, 0x0A01},	 //70000B9C	 //_bnr_nClustLevel_H_Bin   [7:0] AFIT8_bnr_iClustMulT_H_Bin
+{0x0F12, 0x010A},	 //70000B9E	 //_bnr_iClustMulT_C_Bin   [7:0] AFIT8_bnr_iClustThresh_H_Bin
+{0x0F12, 0x0001},	 //70000BA0	 //_bnr_iClustThresh_C_Bin   [7:0] AFIT8_bnr_iDenThreshLow_Bin
+{0x0F12, 0x2400},	 //70000BA2	 //_bnr_iDenThreshHigh_Bin   [7:0] AFIT8_ee_iLowSharpPower_Bin
+{0x0F12, 0x0460},	 //70000BA4	 //_ee_iHighSharpPower_Bin   [7:0] AFIT8_ee_iLowShDenoise_Bin
+{0x0F12, 0xFF04},	 //70000BA6	 //_ee_iHighShDenoise_Bin   [7:0] AFIT8_ee_iLowSharpClamp_Bin
 {0x0F12, 0x40FF},	 //70000BA8	 //_ee_iHighSharpClamp_Bin   [7:0] AFIT8_ee_iReduceEdgeMinMult_Bin
-{0x0F12, 0x0009},	 //70000BAA	 //_ee_iReduceEdgeSlope_Bin [7:0]                      
-{0x0F12, 0x0001},	 //70000BAC	 //_bnr_nClustLevel_C      [0]                         
-{0x0F12, 0x0000},	 //70000BAE	 //_BRIGHTNESS	AFIT 3                                  
-{0x0F12, 0x0000},	 //70000BB0	 //_CONTRAST                                           
-{0x0F12, 0x0000},	 //70000BB2	 //_SATURATION                                         
-{0x0F12, 0x0000},	 //70000BB4	 //_SHARP_BLUR                                         
-{0x0F12, 0x0000},	 //70000BB6	 //_GLAMOUR                                            
-{0x0F12, 0x00C0},	 //70000BB8	 //_bnr_edge_high                                      
-{0x0F12, 0x0064},	 //70000BBA	 //_postdmsc_iLowBright                                
-{0x0F12, 0x0384},	 //70000BBC	 //_postdmsc_iHighBright                               
-{0x0F12, 0x0032},	 //70000BBE	 //_postdmsc_iLowSat                                   
-{0x0F12, 0x01F4},	 //70000BC0	 //_postdmsc_iHighSat                                  
-{0x0F12, 0x0070},	 //70000BC2	 //_postdmsc_iTune                                     
-{0x0F12, 0x0040},	 //70000BC4	 //_yuvemix_mNegRanges_0                               
-{0x0F12, 0x00A0},	 //70000BC6	 //_yuvemix_mNegRanges_1                               
-{0x0F12, 0x0100},	 //70000BC8	 //_yuvemix_mNegRanges_2                               
-{0x0F12, 0x0010},	 //70000BCA	 //_yuvemix_mPosRanges_0                               
-{0x0F12, 0x0060},	 //70000BCC	 //_yuvemix_mPosRanges_1                               
-{0x0F12, 0x0100},	 //70000BCE	 //_yuvemix_mPosRanges_2                               
-{0x0F12, 0x1430},	 //70000BD0	 //_bnr_edge_low  [7:0] AFIT8_bnr_repl_thresh          
-{0x0F12, 0x0201},	 //70000BD2	 //_bnr_repl_force  [7:0] AFIT8_bnr_iHotThreshHigh     
+{0x0F12, 0x0009},	 //70000BAA	 //_ee_iReduceEdgeSlope_Bin [7:0]
+{0x0F12, 0x0001},	 //70000BAC	 //_bnr_nClustLevel_C      [0]
+{0x0F12, 0x0000},	 //70000BAE	 //_BRIGHTNESS	AFIT 3
+{0x0F12, 0x0000},	 //70000BB0	 //_CONTRAST
+{0x0F12, 0x0000},	 //70000BB2	 //_SATURATION
+{0x0F12, 0x0000},	 //70000BB4	 //_SHARP_BLUR
+{0x0F12, 0x0000},	 //70000BB6	 //_GLAMOUR
+{0x0F12, 0x00C0},	 //70000BB8	 //_bnr_edge_high
+{0x0F12, 0x0064},	 //70000BBA	 //_postdmsc_iLowBright
+{0x0F12, 0x0384},	 //70000BBC	 //_postdmsc_iHighBright
+{0x0F12, 0x0032},	 //70000BBE	 //_postdmsc_iLowSat
+{0x0F12, 0x01F4},	 //70000BC0	 //_postdmsc_iHighSat
+{0x0F12, 0x0070},	 //70000BC2	 //_postdmsc_iTune
+{0x0F12, 0x0040},	 //70000BC4	 //_yuvemix_mNegRanges_0
+{0x0F12, 0x00A0},	 //70000BC6	 //_yuvemix_mNegRanges_1
+{0x0F12, 0x0100},	 //70000BC8	 //_yuvemix_mNegRanges_2
+{0x0F12, 0x0010},	 //70000BCA	 //_yuvemix_mPosRanges_0
+{0x0F12, 0x0060},	 //70000BCC	 //_yuvemix_mPosRanges_1
+{0x0F12, 0x0100},	 //70000BCE	 //_yuvemix_mPosRanges_2
+{0x0F12, 0x1430},	 //70000BD0	 //_bnr_edge_low  [7:0] AFIT8_bnr_repl_thresh
+{0x0F12, 0x0201},	 //70000BD2	 //_bnr_repl_force  [7:0] AFIT8_bnr_iHotThreshHigh
 {0x0F12, 0x0204},	 //70000BD4	 //_bnr_iHotThreshLow   [7:0] AFIT8_bnr_iColdThreshHigh
-{0x0F12, 0x1504},	 //70000BD6	 //_bnr_iColdThreshLow   [7:0] AFIT8_bnr_DispTH_Low    
-{0x0F12, 0x030F},	 //70000BD8	 //_bnr_DispTH_High   [7:0] AFIT8_bnr_DISP_Limit_Low   
+{0x0F12, 0x1504},	 //70000BD6	 //_bnr_iColdThreshLow   [7:0] AFIT8_bnr_DispTH_Low
+{0x0F12, 0x030F},	 //70000BD8	 //_bnr_DispTH_High   [7:0] AFIT8_bnr_DISP_Limit_Low
 {0x0F12, 0x0003},	 //70000BDA	 //_bnr_DISP_Limit_High   [7:0] AFIT8_bnr_iDistSigmaMin
-{0x0F12, 0x0902},	 //70000BDC	 //_bnr_iDistSigmaMax   [7:0] AFIT8_bnr_iDiffSigmaLow  
-{0x0F12, 0x2004},	 //70000BDE	 //_bnr_iDiffSigmaHigh   [7:0] AFIT8_bnr_iNormalizedSTD_TH        
-{0x0F12, 0x0050},	 //70000BE0	 //_bnr_iNormalizedSTD_Limit   [7:0] AFIT8_bnr_iDirNRTune         
-{0x0F12, 0x1140},	 //70000BE2	 //_bnr_iDirMinThres   [7:0] AFIT8_bnr_iDirFltDiffThresHigh       
-{0x0F12, 0x201C},	 //70000BE4	 //_bnr_iDirFltDiffThresLow   [7:0] AFIT8_bnr_iDirSmoothPowerHigh 
-{0x0F12, 0x0620},	 //70000BE6	 //_bnr_iDirSmoothPowerLow   [7:0] AFIT8_bnr_iLowMaxSlopeAllowed  
-{0x0F12, 0x0306},	 //70000BE8	 //_bnr_iHighMaxSlopeAllowed   [7:0] AFIT8_bnr_iLowSlopeThresh    
+{0x0F12, 0x0902},	 //70000BDC	 //_bnr_iDistSigmaMax   [7:0] AFIT8_bnr_iDiffSigmaLow
+{0x0F12, 0x2004},	 //70000BDE	 //_bnr_iDiffSigmaHigh   [7:0] AFIT8_bnr_iNormalizedSTD_TH
+{0x0F12, 0x0050},	 //70000BE0	 //_bnr_iNormalizedSTD_Limit   [7:0] AFIT8_bnr_iDirNRTune
+{0x0F12, 0x1140},	 //70000BE2	 //_bnr_iDirMinThres   [7:0] AFIT8_bnr_iDirFltDiffThresHigh
+{0x0F12, 0x201C},	 //70000BE4	 //_bnr_iDirFltDiffThresLow   [7:0] AFIT8_bnr_iDirSmoothPowerHigh
+{0x0F12, 0x0620},	 //70000BE6	 //_bnr_iDirSmoothPowerLow   [7:0] AFIT8_bnr_iLowMaxSlopeAllowed
+{0x0F12, 0x0306},	 //70000BE8	 //_bnr_iHighMaxSlopeAllowed   [7:0] AFIT8_bnr_iLowSlopeThresh
 {0x0F12, 0x2003},	 //70000BEA	 //_bnr_iHighSlopeThresh   [7:0] AFIT8_bnr_iSlopenessTH
-{0x0F12, 0xFF01},	 //70000BEC	 //_bnr_iSlopeBlurStrength   [7:0] AFIT8_bnr_iSlopenessLimit      
+{0x0F12, 0xFF01},	 //70000BEC	 //_bnr_iSlopeBlurStrength   [7:0] AFIT8_bnr_iSlopenessLimit
 {0x0F12, 0x0404},	 //70000BEE	 //_bnr_AddNoisePower1   [7:0] AFIT8_bnr_AddNoisePower2
-{0x0F12, 0x0300},	 //70000BF0	 //_bnr_iRadialTune   [7:0] AFIT8_bnr_iRadialPower     
-{0x0F12, 0x145A},	 //70000BF2	 //_bnr_iRadialLimit   [7:0] AFIT8_ee_iFSMagThLow      
-{0x0F12, 0x1010},	 //70000BF4	 //_ee_iFSMagThHigh   [7:0] AFIT8_ee_iFSVarThLow       
-{0x0F12, 0x000B},	 //70000BF6	 //_ee_iFSVarThHigh   [7:0] AFIT8_ee_iFSThLow          
-{0x0F12, 0x1000},	 //70000BF8	 //_ee_iFSThHigh   [7:0] AFIT8_ee_iFSmagPower          
-{0x0F12, 0x5A0F},	 //70000BFA	 //_ee_iFSVarCountTh   [7:0] AFIT8_ee_iRadialLimit     
-{0x0F12, 0x0503},	 //70000BFC	 //_ee_iRadialPower   [7:0] AFIT8_ee_iSmoothEdgeSlope  
-{0x0F12, 0x1802},	 //70000BFE	 //_ee_iROADThres   [7:0] AFIT8_ee_iROADMaxNR          
-{0x0F12, 0x0000},	 //70000C00	 //_ee_iROADSubMaxNR   [7:0] AFIT8_ee_iROADSubThres    
-{0x0F12, 0x2006},	 //70000C02	 //_ee_iROADNeiThres   [7:0] AFIT8_ee_iROADNeiMaxNR    
-{0x0F12, 0x3C28},	 //70000C04	 //_ee_iSmoothEdgeThres   [7:0] AFIT8_ee_iMSharpen     
-{0x0F12, 0x042C},	 //70000C06	 //_ee_iWSharpen   [7:0] AFIT8_ee_iMShThresh           
-{0x0F12, 0x0101},	 //70000C08	 //_ee_iWShThresh   [7:0] AFIT8_ee_iReduceNegative     
-{0x0F12, 0xFF00},	 //70000C0A	 //_ee_iEmbossCentAdd   [7:0] AFIT8_ee_iShDespeckle    
-{0x0F12, 0x0904},	 //70000C0C	 //_ee_iReduceEdgeThresh   [7:0] AFIT8_dmsc_iEnhThresh 
-{0x0F12, 0x4008},	 //70000C0E	 //_dmsc_iDesatThresh   [7:0] AFIT8_dmsc_iDemBlurHigh  
-{0x0F12, 0x0540},	 //70000C10	 //_dmsc_iDemBlurLow   [7:0] AFIT8_dmsc_iDemBlurRange  
-{0x0F12, 0x8006},	 //70000C12	 //_dmsc_iDecisionThresh   [7:0] AFIT8_dmsc_iCentGrad  
-{0x0F12, 0x0020},	 //70000C14	 //_dmsc_iMonochrom   [7:0] AFIT8_dmsc_iGBDenoiseVal   
-{0x0F12, 0x0000},	 //70000C16	 //_dmsc_iGRDenoiseVal   [7:0] AFIT8_dmsc_iEdgeDesatThrHigh       
+{0x0F12, 0x0300},	 //70000BF0	 //_bnr_iRadialTune   [7:0] AFIT8_bnr_iRadialPower
+{0x0F12, 0x145A},	 //70000BF2	 //_bnr_iRadialLimit   [7:0] AFIT8_ee_iFSMagThLow
+{0x0F12, 0x1010},	 //70000BF4	 //_ee_iFSMagThHigh   [7:0] AFIT8_ee_iFSVarThLow
+{0x0F12, 0x000B},	 //70000BF6	 //_ee_iFSVarThHigh   [7:0] AFIT8_ee_iFSThLow
+{0x0F12, 0x1000},	 //70000BF8	 //_ee_iFSThHigh   [7:0] AFIT8_ee_iFSmagPower
+{0x0F12, 0x5A0F},	 //70000BFA	 //_ee_iFSVarCountTh   [7:0] AFIT8_ee_iRadialLimit
+{0x0F12, 0x0503},	 //70000BFC	 //_ee_iRadialPower   [7:0] AFIT8_ee_iSmoothEdgeSlope
+{0x0F12, 0x1802},	 //70000BFE	 //_ee_iROADThres   [7:0] AFIT8_ee_iROADMaxNR
+{0x0F12, 0x0000},	 //70000C00	 //_ee_iROADSubMaxNR   [7:0] AFIT8_ee_iROADSubThres
+{0x0F12, 0x2006},	 //70000C02	 //_ee_iROADNeiThres   [7:0] AFIT8_ee_iROADNeiMaxNR
+{0x0F12, 0x3C28},	 //70000C04	 //_ee_iSmoothEdgeThres   [7:0] AFIT8_ee_iMSharpen
+{0x0F12, 0x042C},	 //70000C06	 //_ee_iWSharpen   [7:0] AFIT8_ee_iMShThresh
+{0x0F12, 0x0101},	 //70000C08	 //_ee_iWShThresh   [7:0] AFIT8_ee_iReduceNegative
+{0x0F12, 0xFF00},	 //70000C0A	 //_ee_iEmbossCentAdd   [7:0] AFIT8_ee_iShDespeckle
+{0x0F12, 0x0904},	 //70000C0C	 //_ee_iReduceEdgeThresh   [7:0] AFIT8_dmsc_iEnhThresh
+{0x0F12, 0x4008},	 //70000C0E	 //_dmsc_iDesatThresh   [7:0] AFIT8_dmsc_iDemBlurHigh
+{0x0F12, 0x0540},	 //70000C10	 //_dmsc_iDemBlurLow   [7:0] AFIT8_dmsc_iDemBlurRange
+{0x0F12, 0x8006},	 //70000C12	 //_dmsc_iDecisionThresh   [7:0] AFIT8_dmsc_iCentGrad
+{0x0F12, 0x0020},	 //70000C14	 //_dmsc_iMonochrom   [7:0] AFIT8_dmsc_iGBDenoiseVal
+{0x0F12, 0x0000},	 //70000C16	 //_dmsc_iGRDenoiseVal   [7:0] AFIT8_dmsc_iEdgeDesatThrHigh
 {0x0F12, 0x2000},	 //70000C18	 //_dmsc_iEdgeDesatThrLow   [7:0] AFIT8_dmsc_iEdgeDesat
-{0x0F12, 0x0000},	 //70000C1A	 //_dmsc_iNearGrayDesat   [7:0] AFIT8_dmsc_iEdgeDesatLimit        
-{0x0F12, 0x1E10},	 //70000C1C	 //_postdmsc_iBCoeff   [7:0] AFIT8_postdmsc_iGCoeff    
-{0x0F12, 0x000B},	 //70000C1E	 //_postdmsc_iWideMult   [7:0] AFIT8_yuvemix_mNegSlopes_0         
-{0x0F12, 0x0607},	 //70000C20	 //_yuvemix_mNegSlopes_1   [7:0] AFIT8_yuvemix_mNegSlopes_2       
-{0x0F12, 0x0005},	 //70000C22	 //_yuvemix_mNegSlopes_3   [7:0] AFIT8_yuvemix_mPosSlopes_0       
-{0x0F12, 0x0607},	 //70000C24	 //_yuvemix_mPosSlopes_1   [7:0] AFIT8_yuvemix_mPosSlopes_2       
-{0x0F12, 0x0405},	 //70000C26	 //_yuvemix_mPosSlopes_3   [7:0] AFIT8_yuviirnr_iXSupportY        
-{0x0F12, 0x0206},	 //70000C28	 //_yuviirnr_iXSupportUV   [7:0] AFIT8_yuviirnr_iLowYNorm         
-{0x0F12, 0x0304},	 //70000C2A	 //_yuviirnr_iHighYNorm   [7:0] AFIT8_yuviirnr_iLowUVNorm         
-{0x0F12, 0x0409},	 //70000C2C	 //_yuviirnr_iHighUVNorm   [7:0] AFIT8_yuviirnr_iYNormShift       
-{0x0F12, 0x0305},	 //70000C2E	 //_yuviirnr_iUVNormShift   [7:0] AFIT8_yuviirnr_iVertLength_Y    
-{0x0F12, 0x0406},	 //70000C30	 //_yuviirnr_iVertLength_UV   [7:0] AFIT8_yuviirnr_iDiffThreshL_Y 
+{0x0F12, 0x0000},	 //70000C1A	 //_dmsc_iNearGrayDesat   [7:0] AFIT8_dmsc_iEdgeDesatLimit
+{0x0F12, 0x1E10},	 //70000C1C	 //_postdmsc_iBCoeff   [7:0] AFIT8_postdmsc_iGCoeff
+{0x0F12, 0x000B},	 //70000C1E	 //_postdmsc_iWideMult   [7:0] AFIT8_yuvemix_mNegSlopes_0
+{0x0F12, 0x0607},	 //70000C20	 //_yuvemix_mNegSlopes_1   [7:0] AFIT8_yuvemix_mNegSlopes_2
+{0x0F12, 0x0005},	 //70000C22	 //_yuvemix_mNegSlopes_3   [7:0] AFIT8_yuvemix_mPosSlopes_0
+{0x0F12, 0x0607},	 //70000C24	 //_yuvemix_mPosSlopes_1   [7:0] AFIT8_yuvemix_mPosSlopes_2
+{0x0F12, 0x0405},	 //70000C26	 //_yuvemix_mPosSlopes_3   [7:0] AFIT8_yuviirnr_iXSupportY
+{0x0F12, 0x0206},	 //70000C28	 //_yuviirnr_iXSupportUV   [7:0] AFIT8_yuviirnr_iLowYNorm
+{0x0F12, 0x0304},	 //70000C2A	 //_yuviirnr_iHighYNorm   [7:0] AFIT8_yuviirnr_iLowUVNorm
+{0x0F12, 0x0409},	 //70000C2C	 //_yuviirnr_iHighUVNorm   [7:0] AFIT8_yuviirnr_iYNormShift
+{0x0F12, 0x0305},	 //70000C2E	 //_yuviirnr_iUVNormShift   [7:0] AFIT8_yuviirnr_iVertLength_Y
+{0x0F12, 0x0406},	 //70000C30	 //_yuviirnr_iVertLength_UV   [7:0] AFIT8_yuviirnr_iDiffThreshL_Y
 {0x0F12, 0x2804},	 //70000C32	 //_yuviirnr_iDiffThreshH_Y   [7:0] AFIT8_yuviirnr_iDiffThreshL_UV
-{0x0F12, 0x0228},	 //70000C34	 //_yuviirnr_iDiffThreshH_UV   [7:0] AFIT8_yuviirnr_iMaxThreshL_Y 
-{0x0F12, 0x1402},	 //70000C36	 //_yuviirnr_iMaxThreshH_Y   [7:0] AFIT8_yuviirnr_iMaxThreshL_UV  
-{0x0F12, 0x0618},	 //70000C38	 //_yuviirnr_iMaxThreshH_UV   [7:0] AFIT8_yuviirnr_iYNRStrengthL  
-{0x0F12, 0x1A02},	 //70000C3A	 //_yuviirnr_iYNRStrengthH   [7:0] AFIT8_yuviirnr_iUVNRStrengthL  
-{0x0F12, 0x8018},	 //70000C3C	 //_yuviirnr_iUVNRStrengthH   [7:0] AFIT8_byr_gras_iShadingPower  
-{0x0F12, 0x0080},	 //70000C3E	 //_RGBGamma2_iLinearity   [7:0] AFIT8_RGBGamma2_iDarkReduce      
+{0x0F12, 0x0228},	 //70000C34	 //_yuviirnr_iDiffThreshH_UV   [7:0] AFIT8_yuviirnr_iMaxThreshL_Y
+{0x0F12, 0x1402},	 //70000C36	 //_yuviirnr_iMaxThreshH_Y   [7:0] AFIT8_yuviirnr_iMaxThreshL_UV
+{0x0F12, 0x0618},	 //70000C38	 //_yuviirnr_iMaxThreshH_UV   [7:0] AFIT8_yuviirnr_iYNRStrengthL
+{0x0F12, 0x1A02},	 //70000C3A	 //_yuviirnr_iYNRStrengthH   [7:0] AFIT8_yuviirnr_iUVNRStrengthL
+{0x0F12, 0x8018},	 //70000C3C	 //_yuviirnr_iUVNRStrengthH   [7:0] AFIT8_byr_gras_iShadingPower
+{0x0F12, 0x0080},	 //70000C3E	 //_RGBGamma2_iLinearity   [7:0] AFIT8_RGBGamma2_iDarkReduce
 {0x0F12, 0x0080},	 //70000C40	 //_ccm_oscar_iSaturation   [7:0] AFIT8_RGB2YUV_iYOffset //
-{0x0F12, 0x0180},	 //70000C42	 //_RGB2YUV_iRGBGain   [7:0] AFIT8_bnr_nClustLevel_H   
-{0x0F12, 0x0A0A},	 //70000C44	 //_bnr_iClustMulT_H   [7:0] AFIT8_bnr_iClustMulT_C    
+{0x0F12, 0x0180},	 //70000C42	 //_RGB2YUV_iRGBGain   [7:0] AFIT8_bnr_nClustLevel_H
+{0x0F12, 0x0A0A},	 //70000C44	 //_bnr_iClustMulT_H   [7:0] AFIT8_bnr_iClustMulT_C
 {0x0F12, 0x0101},	 //70000C46	 //_bnr_iClustThresh_H   [7:0] AFIT8_bnr_iClustThresh_C
-{0x0F12, 0x0F15},	 //70000C48	 //_bnr_iDenThreshLow   [7:0] AFIT8_bnr_iDenThreshHigh 
-{0x0F12, 0x6024},	 //70000C4A	 //_ee_iLowSharpPower   [7:0] AFIT8_ee_iHighSharpPower 
-{0x0F12, 0x0A0A},	 //70000C4C	 //_ee_iLowShDenoise   [7:0] AFIT8_ee_iHighShDenoise   
-{0x0F12, 0xFFFF},	 //70000C4E	 //_ee_iLowSharpClamp   [7:0] AFIT8_ee_iHighSharpClamp 
-{0x0F12, 0x0808},	 //70000C50	 //_ee_iReduceEdgeMinMult   [7:0] AFIT8_ee_iReduceEdgeSlope       
-{0x0F12, 0x0A01},	 //70000C52	 //_bnr_nClustLevel_H_Bin   [7:0] AFIT8_bnr_iClustMulT_H_Bin      
-{0x0F12, 0x010A},	 //70000C54	 //_bnr_iClustMulT_C_Bin   [7:0] AFIT8_bnr_iClustThresh_H_Bin     
-{0x0F12, 0x0001},	 //70000C56	 //_bnr_iClustThresh_C_Bin   [7:0] AFIT8_bnr_iDenThreshLow_Bin    
-{0x0F12, 0x2400},	 //70000C58	 //_bnr_iDenThreshHigh_Bin   [7:0] AFIT8_ee_iLowSharpPower_Bin    
-{0x0F12, 0x0260},	 //70000C5A	 //_ee_iHighSharpPower_Bin   [7:0] AFIT8_ee_iLowShDenoise_Bin     
-{0x0F12, 0xFF02},	 //70000C5C	 //_ee_iHighShDenoise_Bin   [7:0] AFIT8_ee_iLowSharpClamp_Bin     
+{0x0F12, 0x0F15},	 //70000C48	 //_bnr_iDenThreshLow   [7:0] AFIT8_bnr_iDenThreshHigh
+{0x0F12, 0x6024},	 //70000C4A	 //_ee_iLowSharpPower   [7:0] AFIT8_ee_iHighSharpPower
+{0x0F12, 0x0A0A},	 //70000C4C	 //_ee_iLowShDenoise   [7:0] AFIT8_ee_iHighShDenoise
+{0x0F12, 0xFFFF},	 //70000C4E	 //_ee_iLowSharpClamp   [7:0] AFIT8_ee_iHighSharpClamp
+{0x0F12, 0x0808},	 //70000C50	 //_ee_iReduceEdgeMinMult   [7:0] AFIT8_ee_iReduceEdgeSlope
+{0x0F12, 0x0A01},	 //70000C52	 //_bnr_nClustLevel_H_Bin   [7:0] AFIT8_bnr_iClustMulT_H_Bin
+{0x0F12, 0x010A},	 //70000C54	 //_bnr_iClustMulT_C_Bin   [7:0] AFIT8_bnr_iClustThresh_H_Bin
+{0x0F12, 0x0001},	 //70000C56	 //_bnr_iClustThresh_C_Bin   [7:0] AFIT8_bnr_iDenThreshLow_Bin
+{0x0F12, 0x2400},	 //70000C58	 //_bnr_iDenThreshHigh_Bin   [7:0] AFIT8_ee_iLowSharpPower_Bin
+{0x0F12, 0x0260},	 //70000C5A	 //_ee_iHighSharpPower_Bin   [7:0] AFIT8_ee_iLowShDenoise_Bin
+{0x0F12, 0xFF02},	 //70000C5C	 //_ee_iHighShDenoise_Bin   [7:0] AFIT8_ee_iLowSharpClamp_Bin
 {0x0F12, 0x40FF},	 //70000C5E	 //_ee_iHighSharpClamp_Bin   [7:0] AFIT8_ee_iReduceEdgeMinMult_Bin
-{0x0F12, 0x0009},	 //70000C60	 //_ee_iReduceEdgeSlope_Bin [7:0]                      
-{0x0F12, 0x0001},	 //70000C62	 //_bnr_nClustLevel_C      [0]                         
-{0x0F12, 0x0000},	 //70000C64	 //_BRIGHTNESS	AFIT 4                                  
-{0x0F12, 0x0000},	 //70000C66	 //_CONTRAST                                           
-{0x0F12, 0x0000},	 //70000C68	 //_SATURATION                                         
-{0x0F12, 0x0000},	 //70000C6A	 //_SHARP_BLUR                                         
-{0x0F12, 0x0000},	 //70000C6C	 //_GLAMOUR                                            
-{0x0F12, 0x00C0},	 //70000C6E	 //_bnr_edge_high                                      
-{0x0F12, 0x0064},	 //70000C70	 //_postdmsc_iLowBright                                
-{0x0F12, 0x0384},	 //70000C72	 //_postdmsc_iHighBright                               
-{0x0F12, 0x0032},	 //70000C74	 //_postdmsc_iLowSat                                   
-{0x0F12, 0x01F4},	 //70000C76	 //_postdmsc_iHighSat                                  
-{0x0F12, 0x0070},	 //70000C78	 //_postdmsc_iTune                                     
-{0x0F12, 0x0040},	 //70000C7A	 //_yuvemix_mNegRanges_0                               
-{0x0F12, 0x00A0},	 //70000C7C	 //_yuvemix_mNegRanges_1                               
-{0x0F12, 0x0100},	 //70000C7E	 //_yuvemix_mNegRanges_2                               
-{0x0F12, 0x0010},	 //70000C80	 //_yuvemix_mPosRanges_0                               
-{0x0F12, 0x0060},	 //70000C82	 //_yuvemix_mPosRanges_1                               
-{0x0F12, 0x0100},	 //70000C84	 //_yuvemix_mPosRanges_2                               
-{0x0F12, 0x1430},	 //70000C86	 //_bnr_edge_low  [7:0] AFIT8_bnr_repl_thresh          
-{0x0F12, 0x0201},	 //70000C88	 //_bnr_repl_force  [7:0] AFIT8_bnr_iHotThreshHigh     
+{0x0F12, 0x0009},	 //70000C60	 //_ee_iReduceEdgeSlope_Bin [7:0]
+{0x0F12, 0x0001},	 //70000C62	 //_bnr_nClustLevel_C      [0]
+{0x0F12, 0x0000},	 //70000C64	 //_BRIGHTNESS	AFIT 4
+{0x0F12, 0x0000},	 //70000C66	 //_CONTRAST
+{0x0F12, 0x0000},	 //70000C68	 //_SATURATION
+{0x0F12, 0x0000},	 //70000C6A	 //_SHARP_BLUR
+{0x0F12, 0x0000},	 //70000C6C	 //_GLAMOUR
+{0x0F12, 0x00C0},	 //70000C6E	 //_bnr_edge_high
+{0x0F12, 0x0064},	 //70000C70	 //_postdmsc_iLowBright
+{0x0F12, 0x0384},	 //70000C72	 //_postdmsc_iHighBright
+{0x0F12, 0x0032},	 //70000C74	 //_postdmsc_iLowSat
+{0x0F12, 0x01F4},	 //70000C76	 //_postdmsc_iHighSat
+{0x0F12, 0x0070},	 //70000C78	 //_postdmsc_iTune
+{0x0F12, 0x0040},	 //70000C7A	 //_yuvemix_mNegRanges_0
+{0x0F12, 0x00A0},	 //70000C7C	 //_yuvemix_mNegRanges_1
+{0x0F12, 0x0100},	 //70000C7E	 //_yuvemix_mNegRanges_2
+{0x0F12, 0x0010},	 //70000C80	 //_yuvemix_mPosRanges_0
+{0x0F12, 0x0060},	 //70000C82	 //_yuvemix_mPosRanges_1
+{0x0F12, 0x0100},	 //70000C84	 //_yuvemix_mPosRanges_2
+{0x0F12, 0x1430},	 //70000C86	 //_bnr_edge_low  [7:0] AFIT8_bnr_repl_thresh
+{0x0F12, 0x0201},	 //70000C88	 //_bnr_repl_force  [7:0] AFIT8_bnr_iHotThreshHigh
 {0x0F12, 0x0204},	 //70000C8A	 //_bnr_iHotThreshLow   [7:0] AFIT8_bnr_iColdThreshHigh
-{0x0F12, 0x0F04},	 //70000C8C	 //_bnr_iColdThreshLow   [7:0] AFIT8_bnr_DispTH_Low    
-{0x0F12, 0x030C},	 //70000C8E	 //_bnr_DispTH_High   [7:0] AFIT8_bnr_DISP_Limit_Low   
+{0x0F12, 0x0F04},	 //70000C8C	 //_bnr_iColdThreshLow   [7:0] AFIT8_bnr_DispTH_Low
+{0x0F12, 0x030C},	 //70000C8E	 //_bnr_DispTH_High   [7:0] AFIT8_bnr_DISP_Limit_Low
 {0x0F12, 0x0003},	 //70000C90	 //_bnr_DISP_Limit_High   [7:0] AFIT8_bnr_iDistSigmaMin
-{0x0F12, 0x0602},	 //70000C92	 //_bnr_iDistSigmaMax   [7:0] AFIT8_bnr_iDiffSigmaLow  
-{0x0F12, 0x1803},	 //70000C94	 //_bnr_iDiffSigmaHigh   [7:0] AFIT8_bnr_iNormalizedSTD_TH        
-{0x0F12, 0x0040},	 //70000C96	 //_bnr_iNormalizedSTD_Limit   [7:0] AFIT8_bnr_iDirNRTune         
-{0x0F12, 0x0E20},	 //70000C98	 //_bnr_iDirMinThres   [7:0] AFIT8_bnr_iDirFltDiffThresHigh       
-{0x0F12, 0x2018},	 //70000C9A	 //_bnr_iDirFltDiffThresLow   [7:0] AFIT8_bnr_iDirSmoothPowerHigh 
-{0x0F12, 0x0620},	 //70000C9C	 //_bnr_iDirSmoothPowerLow   [7:0] AFIT8_bnr_iLowMaxSlopeAllowed  
-{0x0F12, 0x0306},	 //70000C9E	 //_bnr_iHighMaxSlopeAllowed   [7:0] AFIT8_bnr_iLowSlopeThresh    
+{0x0F12, 0x0602},	 //70000C92	 //_bnr_iDistSigmaMax   [7:0] AFIT8_bnr_iDiffSigmaLow
+{0x0F12, 0x1803},	 //70000C94	 //_bnr_iDiffSigmaHigh   [7:0] AFIT8_bnr_iNormalizedSTD_TH
+{0x0F12, 0x0040},	 //70000C96	 //_bnr_iNormalizedSTD_Limit   [7:0] AFIT8_bnr_iDirNRTune
+{0x0F12, 0x0E20},	 //70000C98	 //_bnr_iDirMinThres   [7:0] AFIT8_bnr_iDirFltDiffThresHigh
+{0x0F12, 0x2018},	 //70000C9A	 //_bnr_iDirFltDiffThresLow   [7:0] AFIT8_bnr_iDirSmoothPowerHigh
+{0x0F12, 0x0620},	 //70000C9C	 //_bnr_iDirSmoothPowerLow   [7:0] AFIT8_bnr_iLowMaxSlopeAllowed
+{0x0F12, 0x0306},	 //70000C9E	 //_bnr_iHighMaxSlopeAllowed   [7:0] AFIT8_bnr_iLowSlopeThresh
 {0x0F12, 0x2003},	 //70000CA0	 //_bnr_iHighSlopeThresh   [7:0] AFIT8_bnr_iSlopenessTH
-{0x0F12, 0xFF01},	 //70000CA2	 //_bnr_iSlopeBlurStrength   [7:0] AFIT8_bnr_iSlopenessLimit      
+{0x0F12, 0xFF01},	 //70000CA2	 //_bnr_iSlopeBlurStrength   [7:0] AFIT8_bnr_iSlopenessLimit
 {0x0F12, 0x0404},	 //70000CA4	 //_bnr_AddNoisePower1   [7:0] AFIT8_bnr_AddNoisePower2
-{0x0F12, 0x0200},	 //70000CA6	 //_bnr_iRadialTune   [7:0] AFIT8_bnr_iRadialPower     
-{0x0F12, 0x145A},	 //70000CA8	 //_bnr_iRadialLimit   [7:0] AFIT8_ee_iFSMagThLow      
-{0x0F12, 0x1010},	 //70000CAA	 //_ee_iFSMagThHigh   [7:0] AFIT8_ee_iFSVarThLow       
-{0x0F12, 0x000B},	 //70000CAC	 //_ee_iFSVarThHigh   [7:0] AFIT8_ee_iFSThLow          
-{0x0F12, 0x1200},	 //70000CAE	 //_ee_iFSThHigh   [7:0] AFIT8_ee_iFSmagPower          
-{0x0F12, 0x5A0F},	 //70000CB0	 //_ee_iFSVarCountTh   [7:0] AFIT8_ee_iRadialLimit     
-{0x0F12, 0x0502},	 //70000CB2	 //_ee_iRadialPower   [7:0] AFIT8_ee_iSmoothEdgeSlope  
-{0x0F12, 0x1802},	 //70000CB4	 //_ee_iROADThres   [7:0] AFIT8_ee_iROADMaxNR          
-{0x0F12, 0x0000},	 //70000CB6	 //_ee_iROADSubMaxNR   [7:0] AFIT8_ee_iROADSubThres    
-{0x0F12, 0x2006},	 //70000CB8	 //_ee_iROADNeiThres   [7:0] AFIT8_ee_iROADNeiMaxNR    
-{0x0F12, 0x4028},	 //70000CBA	 //_ee_iSmoothEdgeThres   [7:0] AFIT8_ee_iMSharpen     
-{0x0F12, 0x0430},	 //70000CBC	 //_ee_iWSharpen   [7:0] AFIT8_ee_iMShThresh           
-{0x0F12, 0x0101},	 //70000CBE	 //_ee_iWShThresh   [7:0] AFIT8_ee_iReduceNegative     
-{0x0F12, 0xFF00},	 //70000CC0	 //_ee_iEmbossCentAdd   [7:0] AFIT8_ee_iShDespeckle    
-{0x0F12, 0x0804},	 //70000CC2	 //_ee_iReduceEdgeThresh   [7:0] AFIT8_dmsc_iEnhThresh 
-{0x0F12, 0x4008},	 //70000CC4	 //_dmsc_iDesatThresh   [7:0] AFIT8_dmsc_iDemBlurHigh  
-{0x0F12, 0x0540},	 //70000CC6	 //_dmsc_iDemBlurLow   [7:0] AFIT8_dmsc_iDemBlurRange  
-{0x0F12, 0x8006},	 //70000CC8	 //_dmsc_iDecisionThresh   [7:0] AFIT8_dmsc_iCentGrad  
-{0x0F12, 0x0020},	 //70000CCA	 //_dmsc_iMonochrom   [7:0] AFIT8_dmsc_iGBDenoiseVal   
-{0x0F12, 0x0000},	 //70000CCC	 //_dmsc_iGRDenoiseVal   [7:0] AFIT8_dmsc_iEdgeDesatThrHigh       
+{0x0F12, 0x0200},	 //70000CA6	 //_bnr_iRadialTune   [7:0] AFIT8_bnr_iRadialPower
+{0x0F12, 0x145A},	 //70000CA8	 //_bnr_iRadialLimit   [7:0] AFIT8_ee_iFSMagThLow
+{0x0F12, 0x1010},	 //70000CAA	 //_ee_iFSMagThHigh   [7:0] AFIT8_ee_iFSVarThLow
+{0x0F12, 0x000B},	 //70000CAC	 //_ee_iFSVarThHigh   [7:0] AFIT8_ee_iFSThLow
+{0x0F12, 0x1200},	 //70000CAE	 //_ee_iFSThHigh   [7:0] AFIT8_ee_iFSmagPower
+{0x0F12, 0x5A0F},	 //70000CB0	 //_ee_iFSVarCountTh   [7:0] AFIT8_ee_iRadialLimit
+{0x0F12, 0x0502},	 //70000CB2	 //_ee_iRadialPower   [7:0] AFIT8_ee_iSmoothEdgeSlope
+{0x0F12, 0x1802},	 //70000CB4	 //_ee_iROADThres   [7:0] AFIT8_ee_iROADMaxNR
+{0x0F12, 0x0000},	 //70000CB6	 //_ee_iROADSubMaxNR   [7:0] AFIT8_ee_iROADSubThres
+{0x0F12, 0x2006},	 //70000CB8	 //_ee_iROADNeiThres   [7:0] AFIT8_ee_iROADNeiMaxNR
+{0x0F12, 0x4028},	 //70000CBA	 //_ee_iSmoothEdgeThres   [7:0] AFIT8_ee_iMSharpen
+{0x0F12, 0x0430},	 //70000CBC	 //_ee_iWSharpen   [7:0] AFIT8_ee_iMShThresh
+{0x0F12, 0x0101},	 //70000CBE	 //_ee_iWShThresh   [7:0] AFIT8_ee_iReduceNegative
+{0x0F12, 0xFF00},	 //70000CC0	 //_ee_iEmbossCentAdd   [7:0] AFIT8_ee_iShDespeckle
+{0x0F12, 0x0804},	 //70000CC2	 //_ee_iReduceEdgeThresh   [7:0] AFIT8_dmsc_iEnhThresh
+{0x0F12, 0x4008},	 //70000CC4	 //_dmsc_iDesatThresh   [7:0] AFIT8_dmsc_iDemBlurHigh
+{0x0F12, 0x0540},	 //70000CC6	 //_dmsc_iDemBlurLow   [7:0] AFIT8_dmsc_iDemBlurRange
+{0x0F12, 0x8006},	 //70000CC8	 //_dmsc_iDecisionThresh   [7:0] AFIT8_dmsc_iCentGrad
+{0x0F12, 0x0020},	 //70000CCA	 //_dmsc_iMonochrom   [7:0] AFIT8_dmsc_iGBDenoiseVal
+{0x0F12, 0x0000},	 //70000CCC	 //_dmsc_iGRDenoiseVal   [7:0] AFIT8_dmsc_iEdgeDesatThrHigh
 {0x0F12, 0x2000},	 //70000CCE	 //_dmsc_iEdgeDesatThrLow   [7:0] AFIT8_dmsc_iEdgeDesat
-{0x0F12, 0x0000},	 //70000CD0	 //_dmsc_iNearGrayDesat   [7:0] AFIT8_dmsc_iEdgeDesatLimit        
-{0x0F12, 0x1E10},	 //70000CD2	 //_postdmsc_iBCoeff   [7:0] AFIT8_postdmsc_iGCoeff    
-{0x0F12, 0x000B},	 //70000CD4	 //_postdmsc_iWideMult   [7:0] AFIT8_yuvemix_mNegSlopes_0         
-{0x0F12, 0x0607},	 //70000CD6	 //_yuvemix_mNegSlopes_1   [7:0] AFIT8_yuvemix_mNegSlopes_2       
-{0x0F12, 0x0005},	 //70000CD8	 //_yuvemix_mNegSlopes_3   [7:0] AFIT8_yuvemix_mPosSlopes_0       
-{0x0F12, 0x0607},	 //70000CDA	 //_yuvemix_mPosSlopes_1   [7:0] AFIT8_yuvemix_mPosSlopes_2       
-{0x0F12, 0x0405},	 //70000CDC	 //_yuvemix_mPosSlopes_3   [7:0] AFIT8_yuviirnr_iXSupportY        
-{0x0F12, 0x0205},	 //70000CDE	 //_yuviirnr_iXSupportUV   [7:0] AFIT8_yuviirnr_iLowYNorm         
-{0x0F12, 0x0304},	 //70000CE0	 //_yuviirnr_iHighYNorm   [7:0] AFIT8_yuviirnr_iLowUVNorm         
-{0x0F12, 0x0409},	 //70000CE2	 //_yuviirnr_iHighUVNorm   [7:0] AFIT8_yuviirnr_iYNormShift       
-{0x0F12, 0x0306},	 //70000CE4	 //_yuviirnr_iUVNormShift   [7:0] AFIT8_yuviirnr_iVertLength_Y    
-{0x0F12, 0x0407},	 //70000CE6	 //_yuviirnr_iVertLength_UV   [7:0] AFIT8_yuviirnr_iDiffThreshL_Y 
+{0x0F12, 0x0000},	 //70000CD0	 //_dmsc_iNearGrayDesat   [7:0] AFIT8_dmsc_iEdgeDesatLimit
+{0x0F12, 0x1E10},	 //70000CD2	 //_postdmsc_iBCoeff   [7:0] AFIT8_postdmsc_iGCoeff
+{0x0F12, 0x000B},	 //70000CD4	 //_postdmsc_iWideMult   [7:0] AFIT8_yuvemix_mNegSlopes_0
+{0x0F12, 0x0607},	 //70000CD6	 //_yuvemix_mNegSlopes_1   [7:0] AFIT8_yuvemix_mNegSlopes_2
+{0x0F12, 0x0005},	 //70000CD8	 //_yuvemix_mNegSlopes_3   [7:0] AFIT8_yuvemix_mPosSlopes_0
+{0x0F12, 0x0607},	 //70000CDA	 //_yuvemix_mPosSlopes_1   [7:0] AFIT8_yuvemix_mPosSlopes_2
+{0x0F12, 0x0405},	 //70000CDC	 //_yuvemix_mPosSlopes_3   [7:0] AFIT8_yuviirnr_iXSupportY
+{0x0F12, 0x0205},	 //70000CDE	 //_yuviirnr_iXSupportUV   [7:0] AFIT8_yuviirnr_iLowYNorm
+{0x0F12, 0x0304},	 //70000CE0	 //_yuviirnr_iHighYNorm   [7:0] AFIT8_yuviirnr_iLowUVNorm
+{0x0F12, 0x0409},	 //70000CE2	 //_yuviirnr_iHighUVNorm   [7:0] AFIT8_yuviirnr_iYNormShift
+{0x0F12, 0x0306},	 //70000CE4	 //_yuviirnr_iUVNormShift   [7:0] AFIT8_yuviirnr_iVertLength_Y
+{0x0F12, 0x0407},	 //70000CE6	 //_yuviirnr_iVertLength_UV   [7:0] AFIT8_yuviirnr_iDiffThreshL_Y
 {0x0F12, 0x2C04},	 //70000CE8	 //_yuviirnr_iDiffThreshH_Y   [7:0] AFIT8_yuviirnr_iDiffThreshL_UV
-{0x0F12, 0x022C},	 //70000CEA	 //_yuviirnr_iDiffThreshH_UV   [7:0] AFIT8_yuviirnr_iMaxThreshL_Y 
-{0x0F12, 0x1402},	 //70000CEC	 //_yuviirnr_iMaxThreshH_Y   [7:0] AFIT8_yuviirnr_iMaxThreshL_UV  
-{0x0F12, 0x0618},	 //70000CEE	 //_yuviirnr_iMaxThreshH_UV   [7:0] AFIT8_yuviirnr_iYNRStrengthL  
-{0x0F12, 0x1A02},	 //70000CF0	 //_yuviirnr_iYNRStrengthH   [7:0] AFIT8_yuviirnr_iUVNRStrengthL  
-{0x0F12, 0x8018},	 //70000CF2	 //_yuviirnr_iUVNRStrengthH   [7:0] AFIT8_byr_gras_iShadingPower  
-{0x0F12, 0x0080},	 //70000CF4	 //_RGBGamma2_iLinearity   [7:0] AFIT8_RGBGamma2_iDarkReduce      
+{0x0F12, 0x022C},	 //70000CEA	 //_yuviirnr_iDiffThreshH_UV   [7:0] AFIT8_yuviirnr_iMaxThreshL_Y
+{0x0F12, 0x1402},	 //70000CEC	 //_yuviirnr_iMaxThreshH_Y   [7:0] AFIT8_yuviirnr_iMaxThreshL_UV
+{0x0F12, 0x0618},	 //70000CEE	 //_yuviirnr_iMaxThreshH_UV   [7:0] AFIT8_yuviirnr_iYNRStrengthL
+{0x0F12, 0x1A02},	 //70000CF0	 //_yuviirnr_iYNRStrengthH   [7:0] AFIT8_yuviirnr_iUVNRStrengthL
+{0x0F12, 0x8018},	 //70000CF2	 //_yuviirnr_iUVNRStrengthH   [7:0] AFIT8_byr_gras_iShadingPower
+{0x0F12, 0x0080},	 //70000CF4	 //_RGBGamma2_iLinearity   [7:0] AFIT8_RGBGamma2_iDarkReduce
 {0x0F12, 0x0080},	 //70000CF6	 //_ccm_oscar_iSaturation   [7:0] AFIT8_RGB2YUV_iYOffset //
-{0x0F12, 0x0180},	 //70000CF8	 //_RGB2YUV_iRGBGain   [7:0] AFIT8_bnr_nClustLevel_H   
-{0x0F12, 0x0A0A},	 //70000CFA	 //_bnr_iClustMulT_H   [7:0] AFIT8_bnr_iClustMulT_C    
+{0x0F12, 0x0180},	 //70000CF8	 //_RGB2YUV_iRGBGain   [7:0] AFIT8_bnr_nClustLevel_H
+{0x0F12, 0x0A0A},	 //70000CFA	 //_bnr_iClustMulT_H   [7:0] AFIT8_bnr_iClustMulT_C
 {0x0F12, 0x0101},	 //70000CFC	 //_bnr_iClustThresh_H   [7:0] AFIT8_bnr_iClustThresh_C
-{0x0F12, 0x0C0F},	 //70000CFE	 //_bnr_iDenThreshLow   [7:0] AFIT8_bnr_iDenThreshHigh 
-{0x0F12, 0x6024},	 //70000D00	 //_ee_iLowSharpPower   [7:0] AFIT8_ee_iHighSharpPower 
-{0x0F12, 0x0808},	 //70000D02	 //_ee_iLowShDenoise   [7:0] AFIT8_ee_iHighShDenoise   
-{0x0F12, 0xFFFF},	 //70000D04	 //_ee_iLowSharpClamp   [7:0] AFIT8_ee_iHighSharpClamp 
-{0x0F12, 0x0808},	 //70000D06	 //_ee_iReduceEdgeMinMult   [7:0] AFIT8_ee_iReduceEdgeSlope       
-{0x0F12, 0x0A01},	 //70000D08	 //_bnr_nClustLevel_H_Bin   [7:0] AFIT8_bnr_iClustMulT_H_Bin      
-{0x0F12, 0x010A},	 //70000D0A	 //_bnr_iClustMulT_C_Bin   [7:0] AFIT8_bnr_iClustThresh_H_Bin     
-{0x0F12, 0x0001},	 //70000D0C	 //_bnr_iClustThresh_C_Bin   [7:0] AFIT8_bnr_iDenThreshLow_Bin    
-{0x0F12, 0x2400},	 //70000D0E	 //_bnr_iDenThreshHigh_Bin   [7:0] AFIT8_ee_iLowSharpPower_Bin    
-{0x0F12, 0x0060},	 //70000D10	 //_ee_iHighSharpPower_Bin   [7:0] AFIT8_ee_iLowShDenoise_Bin     
-{0x0F12, 0xFF00},	 //70000D12	 //_ee_iHighShDenoise_Bin   [7:0] AFIT8_ee_iLowSharpClamp_Bin     
+{0x0F12, 0x0C0F},	 //70000CFE	 //_bnr_iDenThreshLow   [7:0] AFIT8_bnr_iDenThreshHigh
+{0x0F12, 0x6024},	 //70000D00	 //_ee_iLowSharpPower   [7:0] AFIT8_ee_iHighSharpPower
+{0x0F12, 0x0808},	 //70000D02	 //_ee_iLowShDenoise   [7:0] AFIT8_ee_iHighShDenoise
+{0x0F12, 0xFFFF},	 //70000D04	 //_ee_iLowSharpClamp   [7:0] AFIT8_ee_iHighSharpClamp
+{0x0F12, 0x0808},	 //70000D06	 //_ee_iReduceEdgeMinMult   [7:0] AFIT8_ee_iReduceEdgeSlope
+{0x0F12, 0x0A01},	 //70000D08	 //_bnr_nClustLevel_H_Bin   [7:0] AFIT8_bnr_iClustMulT_H_Bin
+{0x0F12, 0x010A},	 //70000D0A	 //_bnr_iClustMulT_C_Bin   [7:0] AFIT8_bnr_iClustThresh_H_Bin
+{0x0F12, 0x0001},	 //70000D0C	 //_bnr_iClustThresh_C_Bin   [7:0] AFIT8_bnr_iDenThreshLow_Bin
+{0x0F12, 0x2400},	 //70000D0E	 //_bnr_iDenThreshHigh_Bin   [7:0] AFIT8_ee_iLowSharpPower_Bin
+{0x0F12, 0x0060},	 //70000D10	 //_ee_iHighSharpPower_Bin   [7:0] AFIT8_ee_iLowShDenoise_Bin
+{0x0F12, 0xFF00},	 //70000D12	 //_ee_iHighShDenoise_Bin   [7:0] AFIT8_ee_iLowSharpClamp_Bin
 {0x0F12, 0x40FF},	 //70000D14	 //_ee_iHighSharpClamp_Bin   [7:0] AFIT8_ee_iReduceEdgeMinMult_Bin
-{0x0F12, 0x0009},	 //70000D16	 //_ee_iReduceEdgeSlope_Bin [7:0]							        
-{0x0F12, 0x0001},	 //70000D18	 //_bnr_nClustLevel_C      [0]   bWideWide[1]  
-     
-{0x0F12, 0x23CE},	 //70000D1A	 //[0]CAFITB_bnr_bypass                                
-{0x0F12, 0xFDC8},	 //70000D1C	 //[0]CAFITB_bnr_bSlopenessTune                        
-{0x0F12, 0x112E},	 //70000D1E	 //[0]CAFITB_ee_bReduceNegMedSh                        
-{0x0F12, 0x93A5},	 //70000D20	 //[0]CAFITB_dmsc_bDoDesat                             
-{0x0F12, 0xFE67},	 //70000D22	 //[0]CAFITB_postdmsc_bSat                             
-{0x0F12, 0x0000},	 //70000D24	 //[0]CAFITB_yuviirnr_bWideY	
+{0x0F12, 0x0009},	 //70000D16	 //_ee_iReduceEdgeSlope_Bin [7:0]
+{0x0F12, 0x0001},	 //70000D18	 //_bnr_nClustLevel_C      [0]   bWideWide[1]
+
+{0x0F12, 0x23CE},	 //70000D1A	 //[0]CAFITB_bnr_bypass
+{0x0F12, 0xFDC8},	 //70000D1C	 //[0]CAFITB_bnr_bSlopenessTune
+{0x0F12, 0x112E},	 //70000D1E	 //[0]CAFITB_ee_bReduceNegMedSh
+{0x0F12, 0x93A5},	 //70000D20	 //[0]CAFITB_dmsc_bDoDesat
+{0x0F12, 0xFE67},	 //70000D22	 //[0]CAFITB_postdmsc_bSat
+{0x0F12, 0x0000},	 //70000D24	 //[0]CAFITB_yuviirnr_bWideY
 
 //==================================================================================
 // 06.Clock Setting
 //==================================================================================
-//Input Clock (Mclk)		
-{0x002A, 0x01F8},	
+//Input Clock (Mclk)
+{0x002A, 0x01F8},
 {0x0F12, 0x5DC0},	 //REG_TC_IPRM_InClockLSBs
-{0x002A, 0x0212},	                                     
-{0x0F12, 0x0000},	 //REG_TC_IPRM_UseNPviClocks          
-{0x0F12, 0x0002},	 //REG_TC_IPRM_UseNMipiClocks         
+{0x002A, 0x0212},
+{0x0F12, 0x0000},	 //REG_TC_IPRM_UseNPviClocks
+{0x0F12, 0x0002},	 //REG_TC_IPRM_UseNMipiClocks
 {0x0F12, 0x0002},	 //REG_TC_IPRM_NumberOfMipiLanes
 
-//System Clock & Output clock (Pclk)	
+//System Clock & Output clock (Pclk)
 
-{0x002A, 0x021A},	
-{0x0F12, 0x3A98},	 //REG_TC_IPRM_OpClk4KHz_0 
+{0x002A, 0x021A},
+{0x0F12, 0x3A98},	 //REG_TC_IPRM_OpClk4KHz_0
 {0x0F12, 0x278D},	 //4F1A	 //REG_TC_IPRM_MinOutRate4KHz_0
 {0x0F12, 0x278D},	 //4F1A	 //REG_TC_IPRM_MaxOutRate4KHz_0
-     
+
 {0x0F12, 0x4F1A},	 //REG_TC_IPRM_OpClk4KHz_11
 {0x0F12, 0x278D},	 //4F1A	 //REG_TC_IPRM_MinOutRate4KHz_1
 {0x0F12, 0x278D},	 //4F1A	 //REG_TC_IPRM_MaxOutRate4KHz_1
 
-{0x002A, 0x022C},	
-{0x0F12, 0x0001},	 //REG_TC_IPRM_InitParamsUpdated	
+{0x002A, 0x022C},
+{0x0F12, 0x0001},	 //REG_TC_IPRM_InitParamsUpdated
 
-     
+
 //==================================================================================
 // 08.Preview & Capture Configration Setting
 //==================================================================================
-//Preview config[0] 64480  7.5~15fps	
-{0x002A, 0x02A6},	
-{0x0F12, 0x0280},	 //REG_0TC_PCFG_usWidth              	
-{0x0F12, 0x01E0},	 //REG_0TC_PCFG_usHeight             	
-{0x0F12, 0x0005},	 //REG_0TC_PCFG_Format	                
-{0x0F12, 0x278D},	 //4F1A	 //REG_0TC_PCFG_usMaxOut4KHzRate     	
-{0x0F12, 0x278D},	 //4F1A	 //REG_0TC_PCFG_usMinOut4KHzRate     	
-{0x0F12, 0x0100},	 //REG_0TC_PCFG_OutClkPerPix88       	
-{0x0F12, 0x0300},	 //REG_0TC_PCFG_uBpp88               	
-{0x0F12, 0x0002},	 //REG_0TC_PCFG_PVIMask              	
-{0x0F12, 0x0000},	 //REG_0TC_PCFG_OIFMask              	
-{0x0F12, 0x01E0},	 //REG_0TC_PCFG_usJpegPacketSize     	
-{0x0F12, 0x0000},	 //REG_0TC_PCFG_usJpegTotalPackets   	
-{0x0F12, 0x0000},	 //REG_0TC_PCFG_uClockInd            	
-{0x0F12, 0x0000},	 //REG_0TC_PCFG_usFrTimeType         	
-{0x0F12, 0x0001},	 //REG_0TC_PCFG_FrRateQualityType    	
-{0x0F12, 0x03E8},	 //029A  //REG_0TC_PCFG_usMaxFrTimeMsecMult10	
-{0x0F12, 0x014A},	 //REG_0TC_PCFG_usMinFrTimeMsecMult10	
-{0x002A, 0x02D0},	
+//Preview config[0] 64480  7.5~15fps
+{0x002A, 0x02A6},
+{0x0F12, 0x0280},	 //REG_0TC_PCFG_usWidth
+{0x0F12, 0x01E0},	 //REG_0TC_PCFG_usHeight
+{0x0F12, 0x0005},	 //REG_0TC_PCFG_Format
+{0x0F12, 0x278D},	 //4F1A	 //REG_0TC_PCFG_usMaxOut4KHzRate
+{0x0F12, 0x278D},	 //4F1A	 //REG_0TC_PCFG_usMinOut4KHzRate
+{0x0F12, 0x0100},	 //REG_0TC_PCFG_OutClkPerPix88
+{0x0F12, 0x0300},	 //REG_0TC_PCFG_uBpp88
+{0x0F12, 0x0002},	 //REG_0TC_PCFG_PVIMask
+{0x0F12, 0x0000},	 //REG_0TC_PCFG_OIFMask
+{0x0F12, 0x01E0},	 //REG_0TC_PCFG_usJpegPacketSize
+{0x0F12, 0x0000},	 //REG_0TC_PCFG_usJpegTotalPackets
+{0x0F12, 0x0000},	 //REG_0TC_PCFG_uClockInd
+{0x0F12, 0x0000},	 //REG_0TC_PCFG_usFrTimeType
+{0x0F12, 0x0001},	 //REG_0TC_PCFG_FrRateQualityType
+{0x0F12, 0x03E8},	 //029A  //REG_0TC_PCFG_usMaxFrTimeMsecMult10
+{0x0F12, 0x014A},	 //REG_0TC_PCFG_usMinFrTimeMsecMult10
+{0x002A, 0x02D0},
 {0x0F12, 0x0002},	 //REG_0TC_PCFG_uPrevMirror
 {0x0F12, 0x0002},	 //REG_0TC_PCFG_uCaptureMirror
 
-//Capture Config[0] 2561920   7.5~15fps                           	
-{0x002A, 0x0396},                                     	
-{0x0F12, 0x0001},	 //REG_0TC_CCFG_uCaptureMode         
-{0x0F12, 0x0A00},	 //REG_0TC_CCFG_usWidth              
-{0x0F12, 0x0780},	 //REG_0TC_CCFG_usHeight             
-{0x0F12, 0x0005},	 //REG_0TC_CCFG_Format               
-{0x0F12, 0x278D},	 //4F1A	 //REG_0TC_CCFG_usMaxOut4KHzRate     
-{0x0F12, 0x278D},	 //4F1A	 //REG_0TC_CCFG_usMinOut4KHzRate     
-{0x0F12, 0x0100},	 //REG_0TC_CCFG_OutClkPerPix88       
-{0x0F12, 0x0300},	 //REG_0TC_CCFG_uBpp88               
-{0x0F12, 0x0002},	 //REG_0TC_CCFG_PVIMask              
-{0x0F12, 0x0070},	 //REG_0TC_CCFG_OIFMask              
-{0x0F12, 0x0810},	 //REG_0TC_CCFG_usJpegPacketSize     
-{0x0F12, 0x0900},	 //REG_0TC_CCFG_usJpegTotalPackets   
-{0x0F12, 0x0001},	 //REG_0TC_CCFG_uClockInd            
-{0x0F12, 0x0000},	 //REG_0TC_CCFG_usFrTimeType         
-{0x0F12, 0x0002},	 //REG_0TC_CCFG_FrRateQualityType    
+//Capture Config[0] 2561920   7.5~15fps
+{0x002A, 0x0396},
+{0x0F12, 0x0001},	 //REG_0TC_CCFG_uCaptureMode
+{0x0F12, 0x0A00},	 //REG_0TC_CCFG_usWidth
+{0x0F12, 0x0780},	 //REG_0TC_CCFG_usHeight
+{0x0F12, 0x0005},	 //REG_0TC_CCFG_Format
+{0x0F12, 0x278D},	 //4F1A	 //REG_0TC_CCFG_usMaxOut4KHzRate
+{0x0F12, 0x278D},	 //4F1A	 //REG_0TC_CCFG_usMinOut4KHzRate
+{0x0F12, 0x0100},	 //REG_0TC_CCFG_OutClkPerPix88
+{0x0F12, 0x0300},	 //REG_0TC_CCFG_uBpp88
+{0x0F12, 0x0002},	 //REG_0TC_CCFG_PVIMask
+{0x0F12, 0x0070},	 //REG_0TC_CCFG_OIFMask
+{0x0F12, 0x0810},	 //REG_0TC_CCFG_usJpegPacketSize
+{0x0F12, 0x0900},	 //REG_0TC_CCFG_usJpegTotalPackets
+{0x0F12, 0x0001},	 //REG_0TC_CCFG_uClockInd
+{0x0F12, 0x0000},	 //REG_0TC_CCFG_usFrTimeType
+{0x0F12, 0x0002},	 //REG_0TC_CCFG_FrRateQualityType
 {0x0F12, 0x07d0},	 //REG_0TC_CCFG_usMaxFrTimeMsecMult10
 {0x0F12, 0x07d0},	 //REG_0TC_CCFG_usMinFrTimeMsecMult10
 
@@ -3146,21 +3146,21 @@ static struct regval_list sensor_default_regs[] = {
 //==================================================================================
 // 19.Select Cofigration Display
 //==================================================================================
-//PREVIEW                                                                        		
+//PREVIEW
 
 {0x0028, 0x7000},//many insert
-{0x002A, 0x0266},   
-{0x0F12, 0x0000},	 //REG_TC_GP_ActivePrevConfig        		
-{0x002A, 0x026A},                                    
-{0x0F12, 0x0001},	 //REG_TC_GP_PrevOpenAfterChange     		
-{0x002A, 0x024E},                                    
-{0x0F12, 0x0001},	 //REG_TC_GP_NewConfigSync           		
-{0x002A, 0x0268},                                    
-{0x0F12, 0x0001},	 //REG_TC_GP_PrevConfigChanged       		
+{0x002A, 0x0266},
+{0x0F12, 0x0000},	 //REG_TC_GP_ActivePrevConfig
+{0x002A, 0x026A},
+{0x0F12, 0x0001},	 //REG_TC_GP_PrevOpenAfterChange
+{0x002A, 0x024E},
+{0x0F12, 0x0001},	 //REG_TC_GP_NewConfigSync
+{0x002A, 0x0268},
+{0x0F12, 0x0001},	 //REG_TC_GP_PrevConfigChanged
 {0x002A, 0x0270},
 {0x0F12, 0x0001},	 //REG_TC_GP_CapConfigChanged
-{0x002A, 0x023E},                                    
-{0x0F12, 0x0001},	 //REG_TC_GP_EnablePreview           	
+{0x002A, 0x023E},
+{0x0F12, 0x0001},	 //REG_TC_GP_EnablePreview
 {0x0F12, 0x0001},	 //REG_TC_GP_EnablePreviewChanged
 //===================================================================================
 // 22. ESD Check
@@ -3192,25 +3192,25 @@ static struct regval_list sensor_default_regs[] = {
 };
 ////////////////////////////////////////////////////////////////
 // Automatically written by Setfile Rule Check function.
-// Date: 2013-04-26 10:37:00 
+// Date: 2013-04-26 10:37:00
 //WRITE #REG_TC_GP_InvokeReadOTPData 0001
-////////////////////////////////////////////////////////////////                       	                         
+////////////////////////////////////////////////////////////////
 
 #if 0
-//for capture                                                                    	    
+//for capture
 static struct regval_list sensor_qsxga_regs[] = { //qsxga: 2560*1920  5fps
 /* capture setting */
 
 //==================================================================================
 // 20.Preview & Capture Configration Setting
 //==================================================================================
-{0x002A, 0x0396},                                     	
-{0x0F12, 0x0001},	//REG_0TC_CCFG_uCaptureMode         
-{0x0F12, 0x0A00},	//REG_0TC_CCFG_usWidth              
+{0x002A, 0x0396},
+{0x0F12, 0x0001},	//REG_0TC_CCFG_uCaptureMode
+{0x0F12, 0x0A00},	//REG_0TC_CCFG_usWidth
 {0x0F12, 0x0780},	//REG_0TC_CCFG_usHeight
-{0x002A, 0x03AE},                                     	
-{0x0F12, 0x0000},	//REG_0TC_CCFG_uClockInd 
-{0x002A, 0x03B4},                                     	
+{0x002A, 0x03AE},
+{0x0F12, 0x0000},	//REG_0TC_CCFG_uClockInd
+{0x002A, 0x03B4},
 {0x0F12, 0x07D0},	//REG_0TC_CCFG_usMaxFrTimeMsecMult10
 {0x0F12, 0x07D0},	//REG_0TC_CCFG_usMinFrTimeMsecMult10
 
@@ -3223,11 +3223,11 @@ static struct regval_list sensor_qsxga_regs[] = { //qsxga: 2560*1920  5fps
 {0x002A, 0x026E},
 {0x0F12, 0x0000}, //REG_TC_GP_ActiveCapConfig
 {0x0F12, 0x0001}, // /
-{0x002A, 0x0242}, // 
+{0x002A, 0x0242}, //
 {0x0F12, 0x0001}, // /#REG_TC_GP_EnableCapture
-{0x002A, 0x024E}, // 
+{0x002A, 0x024E}, //
 {0x0F12, 0x0001}, // /#REG_TC_GP_NewConfigSync
-{0x002A, 0x0244}, // 
+{0x002A, 0x0244}, //
 {0x0F12, 0x0001}, // /#REG_TC_GP_EnableCaptureChanged
 
 {0xffff, 0x00c8},  //delay 200ms
@@ -3235,20 +3235,20 @@ static struct regval_list sensor_qsxga_regs[] = { //qsxga: 2560*1920  5fps
 
 
 #else
-//for capture                                                                    	    
+//for capture
 static struct regval_list sensor_qsxga_regs[] = { //qsxga: 2560*1920  7fps
 /* capture setting */
 
 //==================================================================================
 // 20.Preview & Capture Configration Setting
 //==================================================================================
-{0x002A, 0x0396},                                     	
-{0x0F12, 0x0001},	//REG_0TC_CCFG_uCaptureMode         
-{0x0F12, 0x0A00},	//REG_0TC_CCFG_usWidth              
+{0x002A, 0x0396},
+{0x0F12, 0x0001},	//REG_0TC_CCFG_uCaptureMode
+{0x0F12, 0x0A00},	//REG_0TC_CCFG_usWidth
 {0x0F12, 0x0780},	//REG_0TC_CCFG_usHeight
-{0x002A, 0x03AE},                                     	
-{0x0F12, 0x0000},	//REG_0TC_CCFG_uClockInd            
-{0x002A, 0x03B4},      
+{0x002A, 0x03AE},
+{0x0F12, 0x0000},	//REG_0TC_CCFG_uClockInd
+{0x002A, 0x03B4},
 {0x0F12, 0x0535},	//REG_0TC_CCFG_usMaxFrTimeMsecMult10
 {0x0F12, 0x0535},	//REG_0TC_CCFG_usMinFrTimeMsecMult10
 
@@ -3261,11 +3261,11 @@ static struct regval_list sensor_qsxga_regs[] = { //qsxga: 2560*1920  7fps
 {0x002A, 0x026E},
 {0x0F12, 0x0000}, //REG_TC_GP_ActiveCapConfig
 {0x0F12, 0x0001}, // /
-{0x002A, 0x0242}, // 
+{0x002A, 0x0242}, //
 {0x0F12, 0x0001}, // /#REG_TC_GP_EnableCapture
-{0x002A, 0x024E}, // 
+{0x002A, 0x024E}, //
 {0x0F12, 0x0001}, // /#REG_TC_GP_NewConfigSync
-{0x002A, 0x0244}, // 
+{0x002A, 0x0244}, //
 {0x0F12, 0x0001}, // /#REG_TC_GP_EnableCaptureChanged
 
 {0xffff, 0x00c8},  //delay 200ms
@@ -3278,13 +3278,13 @@ static struct regval_list sensor_qxga_regs[] = { //qxga: 2048*1536
 //==================================================================================
 // 20.Preview & Capture Configration Setting
 //==================================================================================
-{0x002A, 0x0396},                                     	
-{0x0F12, 0x0001},	//REG_0TC_CCFG_uCaptureMode         
-{0x0F12, 0x0800},	//REG_0TC_CCFG_usWidth              
+{0x002A, 0x0396},
+{0x0F12, 0x0001},	//REG_0TC_CCFG_uCaptureMode
+{0x0F12, 0x0800},	//REG_0TC_CCFG_usWidth
 {0x0F12, 0x0600},	//REG_0TC_CCFG_usHeight
-{0x002A, 0x03AE},                                     	
-{0x0F12, 0x0000},	//REG_0TC_CCFG_uClockInd    
-{0x002A, 0x03B4},                                     	
+{0x002A, 0x03AE},
+{0x0F12, 0x0000},	//REG_0TC_CCFG_uClockInd
+{0x002A, 0x03B4},
 {0x0F12, 0x0535},	//REG_0TC_CCFG_usMaxFrTimeMsecMult10
 {0x0F12, 0x0535},	//REG_0TC_CCFG_usMinFrTimeMsecMult10
 
@@ -3297,19 +3297,19 @@ static struct regval_list sensor_qxga_regs[] = { //qxga: 2048*1536
 {0x002A, 0x026E},
 {0x0F12, 0x0000}, //REG_TC_GP_ActiveCapConfig
 {0x0F12, 0x0001}, // /
-{0x002A, 0x0242}, // 
+{0x002A, 0x0242}, //
 {0x0F12, 0x0001}, // /#REG_TC_GP_EnableCapture
-{0x002A, 0x024E}, // 
+{0x002A, 0x024E}, //
 {0x0F12, 0x0001}, // /#REG_TC_GP_NewConfigSync
-{0x002A, 0x0244}, // 
+{0x002A, 0x0244}, //
 {0x0F12, 0x0001}, // /#REG_TC_GP_EnableCaptureChanged
 
 {0xffff, 0x00c8},  //delay 200ms
-};                                      
+};
 
 
 //for video
-static struct regval_list sensor_1080p_regs[] = { //1080: 1920*1080 
+static struct regval_list sensor_1080p_regs[] = { //1080: 1920*1080
 /* preview setting */
 
 {0x002A, 0x18AC},
@@ -3361,7 +3361,7 @@ static struct regval_list sensor_1080p_regs[] = { //1080: 1920*1080
 {0x0F12, 0x029A},	//REG_0TC_PCFG_usMaxFrTimeMsecMult10
 {0x0F12, 0x029A},	//REG_0TC_PCFG_usMinFrTimeMsecMult10
 
-{0x002A, 0x022C},	
+{0x002A, 0x022C},
 {0x0F12, 0x0001},	//REG_TC_IPRM_InitParamsUpdated
 
 //==================================================================================
@@ -3376,13 +3376,13 @@ static struct regval_list sensor_1080p_regs[] = { //1080: 1920*1080
 {0x0F12, 0x0001},	//REG_TC_GP_PrevOpenAfterChange
 {0x002A, 0x0268},
 {0x0F12, 0x0001},	//REG_TC_GP_PrevConfigChanged
-{0x002A, 0x026E},                                          
-{0x0f12, 0x0000},       //REG_TC_GP_ActiveCapConfig          
-{0x002A, 0x026A},	                                         
-{0x0F12, 0x0001},	//REG_TC_GP_CapOpenAfterChange           
-{0x002A, 0x0270},	                                         
-{0x0F12, 0x0001},	//REG_TC_GP_CapConfigChanged   
-    		
+{0x002A, 0x026E},
+{0x0f12, 0x0000},       //REG_TC_GP_ActiveCapConfig
+{0x002A, 0x026A},
+{0x0F12, 0x0001},	//REG_TC_GP_CapOpenAfterChange
+{0x002A, 0x0270},
+{0x0F12, 0x0001},	//REG_TC_GP_CapConfigChanged
+
 {0x002A, 0x024E},
 {0x0F12, 0x0001},	//REG_TC_GP_NewConfigSync
 {0x002A, 0x023E},
@@ -3407,24 +3407,24 @@ static struct regval_list sensor_720p_regs[] = { //1280*720
 //==================================================================================
 //Input Size
 {0x002A, 0x0250},
-{0x0F12, 0x0A00},	//REG_TC_GP_PrevReqInputWidth 
+{0x0F12, 0x0A00},	//REG_TC_GP_PrevReqInputWidth
 {0x0F12, 0x05A0},	//REG_TC_GP_PrevReqInputHeight
-{0x0F12, 0x0010},	//REG_TC_GP_PrevInputWidthOfs 
+{0x0F12, 0x0010},	//REG_TC_GP_PrevInputWidthOfs
 {0x0F12, 0x00FC},	//REG_TC_GP_PrevInputHeightOfs
-{0x0F12, 0x0A00},	//REG_TC_GP_CapReqInputWidth  
-{0x0F12, 0x0780},	//REG_TC_GP_CapReqInputHeight 
-{0x0F12, 0x0010},	//REG_TC_GP_CapInputWidthOfs  
-{0x0F12, 0x000C},	//REG_TC_GP_CapInputHeightOfs 
+{0x0F12, 0x0A00},	//REG_TC_GP_CapReqInputWidth
+{0x0F12, 0x0780},	//REG_TC_GP_CapReqInputHeight
+{0x0F12, 0x0010},	//REG_TC_GP_CapInputWidthOfs
+{0x0F12, 0x000C},	//REG_TC_GP_CapInputHeightOfs
 
 {0x002A, 0x0494},
 {0x0F12, 0x0A00},	//REG_TC_PZOOM_ZoomInputWidth
 {0x0F12, 0x05A0},	//REG_TC_PZOOM_ZoomInputHeight
-{0x0F12, 0x0000},	//REG_TC_PZOOM_ZoomInputWidthOfs    
-{0x0F12, 0x0000},	//REG_TC_PZOOM_ZoomInputHeightOfs   
-{0x0F12, 0x0A00},	//REG_TC_CZOOM_ZoomInputWidth       
-{0x0F12, 0x0780},	//REG_TC_CZOOM_ZoomInputHeight      
-{0x0F12, 0x0000},	//REG_TC_CZOOM_ZoomInputWidthOfs    
-{0x0F12, 0x0000},	//REG_TC_CZOOM_ZoomInputHeightOfs  
+{0x0F12, 0x0000},	//REG_TC_PZOOM_ZoomInputWidthOfs
+{0x0F12, 0x0000},	//REG_TC_PZOOM_ZoomInputHeightOfs
+{0x0F12, 0x0A00},	//REG_TC_CZOOM_ZoomInputWidth
+{0x0F12, 0x0780},	//REG_TC_CZOOM_ZoomInputHeight
+{0x0F12, 0x0000},	//REG_TC_CZOOM_ZoomInputWidthOfs
+{0x0F12, 0x0000},	//REG_TC_CZOOM_ZoomInputHeightOfs
 
 {0x002A, 0x0262},
 {0x0F12, 0x0001},	//REG_TC_GP_bUseReqInputInPre
@@ -3445,7 +3445,7 @@ static struct regval_list sensor_720p_regs[] = { //1280*720
 {0x0F12, 0x014D},	//REG_0TC_PCFG_usMaxFrTimeMsecMult10
 {0x0F12, 0x014D},	//REG_0TC_PCFG_usMinFrTimeMsecMult10
 
-{0x002A, 0x022C},	
+{0x002A, 0x022C},
 {0x0F12, 0x0001},	//REG_TC_IPRM_InitParamsUpdated
 
 //==================================================================================
@@ -3458,15 +3458,15 @@ static struct regval_list sensor_720p_regs[] = { //1280*720
 {0x0f12, 0x0000},	//REG_TC_GP_ActivePrevConfig
 {0x002A, 0x026A},
 {0x0F12, 0x0001},	//REG_TC_GP_PrevOpenAfterChange
-{0x002A, 0x0268},	                                         
-{0x0F12, 0x0001},	//REG_TC_GP_PrevConfigChanged                             
-{0x002A, 0x026E},                                          
-{0x0f12, 0x0000},       //REG_TC_GP_ActiveCapConfig          
-{0x002A, 0x026A},	                                         
-{0x0F12, 0x0001},	//REG_TC_GP_CapOpenAfterChange           
-{0x002A, 0x0270},	                                         
-{0x0F12, 0x0001},	//REG_TC_GP_CapConfigChanged   
-    		
+{0x002A, 0x0268},
+{0x0F12, 0x0001},	//REG_TC_GP_PrevConfigChanged
+{0x002A, 0x026E},
+{0x0f12, 0x0000},       //REG_TC_GP_ActiveCapConfig
+{0x002A, 0x026A},
+{0x0F12, 0x0001},	//REG_TC_GP_CapOpenAfterChange
+{0x002A, 0x0270},
+{0x0F12, 0x0001},	//REG_TC_GP_CapConfigChanged
+
 {0x002A, 0x024E},
 {0x0F12, 0x0001},	//REG_TC_GP_NewConfigSync
 {0x002A, 0x023E},
@@ -3519,17 +3519,17 @@ static struct regval_list sensor_vga_regs[] = { //VGA:  640*480
 //==================================================================================
 {0xFCFC, 0xD000},
 {0x0028, 0x7000},
-{0x002A, 0x02A6},	
-{0x0F12, 0x0280},	//REG_0TC_PCFG_usWidth              	
-{0x0F12, 0x01E0},	//REG_0TC_PCFG_usHeight              	
-{0x002A, 0x02BC},	
-{0x0F12, 0x0000},	//REG_0TC_PCFG_uClockInd            	
-{0x0F12, 0x0000},	//REG_0TC_PCFG_usFrTimeType         	
-{0x0F12, 0x0001},	//REG_0TC_PCFG_FrRateQualityType    	
-{0x0F12, 0x0535},	//REG_0TC_PCFG_usMaxFrTimeMsecMult10	
-{0x0F12, 0x014D},	//REG_0TC_PCFG_usMinFrTimeMsecMult10	
+{0x002A, 0x02A6},
+{0x0F12, 0x0280},	//REG_0TC_PCFG_usWidth
+{0x0F12, 0x01E0},	//REG_0TC_PCFG_usHeight
+{0x002A, 0x02BC},
+{0x0F12, 0x0000},	//REG_0TC_PCFG_uClockInd
+{0x0F12, 0x0000},	//REG_0TC_PCFG_usFrTimeType
+{0x0F12, 0x0001},	//REG_0TC_PCFG_FrRateQualityType
+{0x0F12, 0x0535},	//REG_0TC_PCFG_usMaxFrTimeMsecMult10
+{0x0F12, 0x014D},	//REG_0TC_PCFG_usMinFrTimeMsecMult10
 
-{0x002A, 0x022C},	
+{0x002A, 0x022C},
 {0x0F12, 0x0001},	//REG_TC_IPRM_InitParamsUpdated
 
 //==================================================================================
@@ -3537,25 +3537,25 @@ static struct regval_list sensor_vga_regs[] = { //VGA:  640*480
 //==================================================================================
 //PREVIEW
 {0xFCFC, 0xD000},
-{0x0028, 0x7000},                                		                               		
-{0x002A, 0x0266},   
-{0x0f12, 0x0000},	//REG_TC_GP_ActivePrevConfig        		
-{0x002A, 0x026A},	                                   
-{0x0F12, 0x0001},	//REG_TC_GP_PrevOpenAfterChange     		
-{0x002A, 0x0268},	                                         
-{0x0F12, 0x0001},	//REG_TC_GP_PrevConfigChanged                             
-{0x002A, 0x026E},                                          
-{0x0f12, 0x0000},       //REG_TC_GP_ActiveCapConfig          
-{0x002A, 0x026A},	                                         
-{0x0F12, 0x0001},	//REG_TC_GP_CapOpenAfterChange           
-{0x002A, 0x0270},	                                         
-{0x0F12, 0x0001},	//REG_TC_GP_CapConfigChanged   
-    		
-{0x002A, 0x024E},	                                   
-{0x0F12, 0x0001},	//REG_TC_GP_NewConfigSync           		
-{0x002A, 0x023E},	                                   
-{0x0F12, 0x0001},	//REG_TC_GP_EnablePreview           	
-{0x0F12, 0x0001},	//REG_TC_GP_EnablePreviewChanged   
+{0x0028, 0x7000},
+{0x002A, 0x0266},
+{0x0f12, 0x0000},	//REG_TC_GP_ActivePrevConfig
+{0x002A, 0x026A},
+{0x0F12, 0x0001},	//REG_TC_GP_PrevOpenAfterChange
+{0x002A, 0x0268},
+{0x0F12, 0x0001},	//REG_TC_GP_PrevConfigChanged
+{0x002A, 0x026E},
+{0x0f12, 0x0000},       //REG_TC_GP_ActiveCapConfig
+{0x002A, 0x026A},
+{0x0F12, 0x0001},	//REG_TC_GP_CapOpenAfterChange
+{0x002A, 0x0270},
+{0x0F12, 0x0001},	//REG_TC_GP_CapConfigChanged
+
+{0x002A, 0x024E},
+{0x0F12, 0x0001},	//REG_TC_GP_NewConfigSync
+{0x002A, 0x023E},
+{0x0F12, 0x0001},	//REG_TC_GP_EnablePreview
+{0x0F12, 0x0001},	//REG_TC_GP_EnablePreviewChanged
 
 {0xffff, 0x00c8},  //delay 200ms
 #else			//vga fix 30fps
@@ -3600,10 +3600,10 @@ static struct regval_list sensor_vga_regs[] = { //VGA:  640*480
 //==================================================================================
 {0xFCFC, 0xD000},
 {0x0028, 0x7000},
-{0x002A, 0x02A6},	
+{0x002A, 0x02A6},
 {0x0F12, 0x0280},	//280 REG_0TC_PCFG_usWidth
 {0x0F12, 0x01E0},	//1E0 REG_0TC_PCFG_usHeight
-{0x002A, 0x02BC},	
+{0x002A, 0x02BC},
 {0x0F12, 0x0000},	//REG_0TC_PCFG_uClockInd
 {0x0F12, 0x0002},	//REG_0TC_PCFG_usFrTimeType
 {0x0F12, 0x0001},	//REG_0TC_PCFG_FrRateQualityType
@@ -3727,10 +3727,10 @@ static struct regval_list sensor_af_infinity_regs[] = {
 
 /*
  * The white balance settings
- * Here only tune the R G B channel gain. 
+ * Here only tune the R G B channel gain.
  * The white balance enalbe bit is modified in sensor_s_autowb and sensor_s_wb
  */
-static struct regval_list sensor_wb_manual[] = {  
+static struct regval_list sensor_wb_manual[] = {
   //{0x3406,0x1 },
   //{REG_TERM,VAL_TERM},
 };
@@ -3762,7 +3762,7 @@ static struct regval_list sensor_wb_fluorescent_regs[] = {
 	//ri guang deng
 {0xFCFC, 0xD000},
 {0x0028, 0x7000},
-{0x002A, 0x04E6}, 
+{0x002A, 0x04E6},
 {0x0F12, 0x0777},
 {0x002A, 0x04BA},
 {0x0F12, 0x06C0},
@@ -3790,7 +3790,7 @@ static struct regval_list sensor_wb_tungsten_regs[] = {
 {0x0F12, 0x0001},
 };
 
-static struct regval_list sensor_wb_horizon[] = { 
+static struct regval_list sensor_wb_horizon[] = {
 //null
 };
 
@@ -3810,11 +3810,11 @@ static struct regval_list sensor_wb_daylight_regs[] = {
 {0x0F12, 0x0001},
 };
 
-static struct regval_list sensor_wb_flash[] = { 
+static struct regval_list sensor_wb_flash[] = {
 //null
 };
 
-static struct regval_list sensor_wb_cloud_regs[] = {	
+static struct regval_list sensor_wb_cloud_regs[] = {
 {0xFCFC, 0xD000},
 {0x0028, 0x7000},
 {0x002A, 0x04E6},
@@ -3829,25 +3829,25 @@ static struct regval_list sensor_wb_cloud_regs[] = {
 {0x0F12, 0x0001},
 };
 
-static struct regval_list sensor_wb_shade[] = { 
+static struct regval_list sensor_wb_shade[] = {
 //null
 };
 
 static struct cfg_array sensor_wb[] = {
-	{ 
-		.regs = sensor_wb_manual,             //V4L2_WHITE_BALANCE_MANUAL       
+	{
+		.regs = sensor_wb_manual,             //V4L2_WHITE_BALANCE_MANUAL
 		.size = ARRAY_SIZE(sensor_wb_manual),
 	},
 	{
-		.regs = sensor_wb_auto_regs,          //V4L2_WHITE_BALANCE_AUTO      
+		.regs = sensor_wb_auto_regs,          //V4L2_WHITE_BALANCE_AUTO
 		.size = ARRAY_SIZE(sensor_wb_auto_regs),
 	},
 	{
-		.regs = sensor_wb_incandescence_regs, //V4L2_WHITE_BALANCE_INCANDESCENT 
+		.regs = sensor_wb_incandescence_regs, //V4L2_WHITE_BALANCE_INCANDESCENT
 		.size = ARRAY_SIZE(sensor_wb_incandescence_regs),
 	},
 	{
-		.regs = sensor_wb_fluorescent_regs,   //V4L2_WHITE_BALANCE_FLUORESCENT  
+		.regs = sensor_wb_fluorescent_regs,   //V4L2_WHITE_BALANCE_FLUORESCENT
 		.size = ARRAY_SIZE(sensor_wb_fluorescent_regs),
 	},
 	{
@@ -3855,28 +3855,28 @@ static struct cfg_array sensor_wb[] = {
 		.size = ARRAY_SIZE(sensor_wb_tungsten_regs),
 	},
 	{
-		.regs = sensor_wb_horizon,            //V4L2_WHITE_BALANCE_HORIZON    
+		.regs = sensor_wb_horizon,            //V4L2_WHITE_BALANCE_HORIZON
 		.size = ARRAY_SIZE(sensor_wb_horizon),
-	},  
+	},
 	{
-		.regs = sensor_wb_daylight_regs,      //V4L2_WHITE_BALANCE_DAYLIGHT     
+		.regs = sensor_wb_daylight_regs,      //V4L2_WHITE_BALANCE_DAYLIGHT
 		.size = ARRAY_SIZE(sensor_wb_daylight_regs),
 	},
 	{
-		.regs = sensor_wb_flash,              //V4L2_WHITE_BALANCE_FLASH        
+		.regs = sensor_wb_flash,              //V4L2_WHITE_BALANCE_FLASH
 		.size = ARRAY_SIZE(sensor_wb_flash),
 	},
 	{
-		.regs = sensor_wb_cloud_regs,         //V4L2_WHITE_BALANCE_CLOUDY       
+		.regs = sensor_wb_cloud_regs,         //V4L2_WHITE_BALANCE_CLOUDY
 		.size = ARRAY_SIZE(sensor_wb_cloud_regs),
 	},
 	{
-		.regs = sensor_wb_shade,              //V4L2_WHITE_BALANCE_SHADE  
+		.regs = sensor_wb_shade,              //V4L2_WHITE_BALANCE_SHADE
 		.size = ARRAY_SIZE(sensor_wb_shade),
 	},
 };
- 
- 
+
+
 /*
  * The color effect settings
  */
@@ -3967,55 +3967,55 @@ static struct regval_list sensor_colorfx_set_cbcr_regs[] = {
 
 static struct cfg_array sensor_colorfx[] = {
 	{
-		.regs = sensor_colorfx_none_regs,         //V4L2_COLORFX_NONE = 0,         
+		.regs = sensor_colorfx_none_regs,         //V4L2_COLORFX_NONE = 0,
 		.size = ARRAY_SIZE(sensor_colorfx_none_regs),
 	},
 	{
-		.regs = sensor_colorfx_bw_regs,           //V4L2_COLORFX_BW   = 1,  
+		.regs = sensor_colorfx_bw_regs,           //V4L2_COLORFX_BW   = 1,
 		.size = ARRAY_SIZE(sensor_colorfx_bw_regs),
 	},
 	{
-		.regs = sensor_colorfx_sepia_regs,        //V4L2_COLORFX_SEPIA  = 2,   
+		.regs = sensor_colorfx_sepia_regs,        //V4L2_COLORFX_SEPIA  = 2,
 		.size = ARRAY_SIZE(sensor_colorfx_sepia_regs),
 	},
 	{
-		.regs = sensor_colorfx_negative_regs,     //V4L2_COLORFX_NEGATIVE = 3,     
+		.regs = sensor_colorfx_negative_regs,     //V4L2_COLORFX_NEGATIVE = 3,
 		.size = ARRAY_SIZE(sensor_colorfx_negative_regs),
 	},
 	{
-		.regs = sensor_colorfx_emboss_regs,       //V4L2_COLORFX_EMBOSS = 4,       
+		.regs = sensor_colorfx_emboss_regs,       //V4L2_COLORFX_EMBOSS = 4,
 		.size = ARRAY_SIZE(sensor_colorfx_emboss_regs),
 	},
 	{
-		.regs = sensor_colorfx_sketch_regs,       //V4L2_COLORFX_SKETCH = 5,       
+		.regs = sensor_colorfx_sketch_regs,       //V4L2_COLORFX_SKETCH = 5,
 		.size = ARRAY_SIZE(sensor_colorfx_sketch_regs),
 	},
 	{
-		.regs = sensor_colorfx_sky_blue_regs,     //V4L2_COLORFX_SKY_BLUE = 6,     
+		.regs = sensor_colorfx_sky_blue_regs,     //V4L2_COLORFX_SKY_BLUE = 6,
 		.size = ARRAY_SIZE(sensor_colorfx_sky_blue_regs),
 	},
 	{
-		.regs = sensor_colorfx_grass_green_regs,  //V4L2_COLORFX_GRASS_GREEN = 7,  
+		.regs = sensor_colorfx_grass_green_regs,  //V4L2_COLORFX_GRASS_GREEN = 7,
 		.size = ARRAY_SIZE(sensor_colorfx_grass_green_regs),
 	},
 	{
-		.regs = sensor_colorfx_skin_whiten_regs,  //V4L2_COLORFX_SKIN_WHITEN = 8,  
+		.regs = sensor_colorfx_skin_whiten_regs,  //V4L2_COLORFX_SKIN_WHITEN = 8,
 		.size = ARRAY_SIZE(sensor_colorfx_skin_whiten_regs),
 	},
 	{
-		.regs = sensor_colorfx_vivid_regs,        //V4L2_COLORFX_VIVID = 9,        
+		.regs = sensor_colorfx_vivid_regs,        //V4L2_COLORFX_VIVID = 9,
 		.size = ARRAY_SIZE(sensor_colorfx_vivid_regs),
 	},
 	{
-		.regs = sensor_colorfx_aqua_regs,         //V4L2_COLORFX_AQUA = 10,        
+		.regs = sensor_colorfx_aqua_regs,         //V4L2_COLORFX_AQUA = 10,
 		.size = ARRAY_SIZE(sensor_colorfx_aqua_regs),
 	},
 	{
-		.regs = sensor_colorfx_art_freeze_regs,   //V4L2_COLORFX_ART_FREEZE = 11,  
+		.regs = sensor_colorfx_art_freeze_regs,   //V4L2_COLORFX_ART_FREEZE = 11,
 		.size = ARRAY_SIZE(sensor_colorfx_art_freeze_regs),
 	},
 	{
-		.regs = sensor_colorfx_silhouette_regs,   //V4L2_COLORFX_SILHOUETTE = 12,  
+		.regs = sensor_colorfx_silhouette_regs,   //V4L2_COLORFX_SILHOUETTE = 12,
 		.size = ARRAY_SIZE(sensor_colorfx_silhouette_regs),
 	},
 	{
@@ -4023,11 +4023,11 @@ static struct cfg_array sensor_colorfx[] = {
 		.size = ARRAY_SIZE(sensor_colorfx_solarization_regs),
 	},
 	{
-		.regs = sensor_colorfx_antique_regs,      //V4L2_COLORFX_ANTIQUE = 14,     
+		.regs = sensor_colorfx_antique_regs,      //V4L2_COLORFX_ANTIQUE = 14,
 		.size = ARRAY_SIZE(sensor_colorfx_antique_regs),
 	},
 	{
-		.regs = sensor_colorfx_set_cbcr_regs,     //V4L2_COLORFX_SET_CBCR = 15, 
+		.regs = sensor_colorfx_set_cbcr_regs,     //V4L2_COLORFX_SET_CBCR = 15,
 		.size = ARRAY_SIZE(sensor_colorfx_set_cbcr_regs),
 	},
 };
@@ -4037,17 +4037,17 @@ static struct cfg_array sensor_colorfx[] = {
  */
 static struct regval_list sensor_flicker_50hz_regs[] = {
 {0x002A, 0x04E6},
-{0x0F12, 0x075F},	//REG_TC_DBG 7F: 60Hz  5F:50Hz				
+{0x0F12, 0x075F},	//REG_TC_DBG 7F: 60Hz  5F:50Hz
 {0x002a, 0x04d6},
-{0x0F12, 0x0001},	//REG_SF_USER_FlickerQuant 01h : 50hz  02h : 60hz				
+{0x0F12, 0x0001},	//REG_SF_USER_FlickerQuant 01h : 50hz  02h : 60hz
 {0x0F12, 0x0001},	//REG_SF_USER_FlickerQuantChanged
 };
 
 static struct regval_list sensor_flicker_60hz_regs[] = {
-{0x002A, 0x04E6},														
-{0x0F12, 0x075F},	//REG_TC_DBG 7F: 60Hz  5F:50Hz				
+{0x002A, 0x04E6},
+{0x0F12, 0x075F},	//REG_TC_DBG 7F: 60Hz  5F:50Hz
 {0x002a, 0x04d6},
-{0x0f12, 0x0002},	//REG_SF_USER_FlickerQuant 01h : 50hz  02h : 60hz				
+{0x0f12, 0x0002},	//REG_SF_USER_FlickerQuant 01h : 50hz  02h : 60hz
 {0x0F12, 0x0001},	//REG_SF_USER_FlickerQuantChanged
 };
 
@@ -4368,7 +4368,7 @@ static struct regval_list sensor_ev_neg1_regs[] = {
 {0x0028, 0x7000},
 {0x002A, 0x023A},
 {0x0F12, 0x00E0},   //Control value
-};                     
+};
 
 static struct regval_list sensor_ev_zero_regs[] = {
 {0xFCFC, 0xD000},
@@ -4448,17 +4448,17 @@ static struct cfg_array sensor_ev[] = {
 /*
  * Here we'll try to encapsulate the changes for just the output
  * video format.
- * 
+ *
  */
 static struct regval_list sensor_fmt_mipi_yuv422[] = {
 
 
 {0xFCFC, 0xD000},
 {0x0028, 0x7000},
-{0x002A, 0x02B4},	
-{0x0F12, 0x0040},	//REG_0TC_PCFG_PVIMask    [5:4] YUYV 00 / UYVY 01 / YVYU 10 / VYUV 11        	
-{0x002A, 0x03A6},	
-{0x0F12, 0x0040},	//REG_0TC_CCFG_PVIMask    [5:4] YUYV 00 / UYVY 01 / YVYU 10 / VYUV 11  
+{0x002A, 0x02B4},
+{0x0F12, 0x0040},	//REG_0TC_PCFG_PVIMask    [5:4] YUYV 00 / UYVY 01 / YVYU 10 / VYUV 11
+{0x002A, 0x03A6},
+{0x0F12, 0x0040},	//REG_0TC_CCFG_PVIMask    [5:4] YUYV 00 / UYVY 01 / YVYU 10 / VYUV 11
 
 
 
@@ -4467,7 +4467,7 @@ static struct regval_list sensor_fmt_mipi_yuv422[] = {
 };
 
 #if 0
-static struct regval_list sensor_fmt_yuv422_yuyv[] = {	
+static struct regval_list sensor_fmt_yuv422_yuyv[] = {
 	//YUYV
 	//==================================================================================
 	// 20.Preview & Capture Configration Setting
@@ -4475,10 +4475,10 @@ static struct regval_list sensor_fmt_yuv422_yuyv[] = {
 	//{0xFFFF, 0x0000},
 	{0xFCFC, 0xD000},
 	{0x0028, 0x7000},
-	{0x002A, 0x02B4},	
-	{0x0F12, 0x0040},	//REG_0TC_PCFG_PVIMask    [5:4] YUYV 00 / UYVY 01 / YVYU 10 / VYUV 11        	
-	{0x002A, 0x03A6},	
-	{0x0F12, 0x0040},	//REG_0TC_CCFG_PVIMask    [5:4] YUYV 00 / UYVY 01 / YVYU 10 / VYUV 11  
+	{0x002A, 0x02B4},
+	{0x0F12, 0x0040},	//REG_0TC_PCFG_PVIMask    [5:4] YUYV 00 / UYVY 01 / YVYU 10 / VYUV 11
+	{0x002A, 0x03A6},
+	{0x0F12, 0x0040},	//REG_0TC_CCFG_PVIMask    [5:4] YUYV 00 / UYVY 01 / YVYU 10 / VYUV 11
 };
 
 static struct regval_list sensor_fmt_yuv422_yvyu[] = {
@@ -4488,10 +4488,10 @@ static struct regval_list sensor_fmt_yuv422_yvyu[] = {
 	//{0xFFFF, 0x0000},
 	{0xFCFC, 0xD000},
 	{0x0028, 0x7000},
-	{0x002A, 0x02B4},	
-	{0x0F12, 0x0060},	//REG_0TC_PCFG_PVIMask    [5:4] YUYV 00 / UYVY 01 / YVYU 10 / VYUV 11        	
-	{0x002A, 0x03A6},	
-	{0x0F12, 0x0060},	//REG_0TC_CCFG_PVIMask    [5:4] YUYV 00 / UYVY 01 / YVYU 10 / VYUV 11  
+	{0x002A, 0x02B4},
+	{0x0F12, 0x0060},	//REG_0TC_PCFG_PVIMask    [5:4] YUYV 00 / UYVY 01 / YVYU 10 / VYUV 11
+	{0x002A, 0x03A6},
+	{0x0F12, 0x0060},	//REG_0TC_CCFG_PVIMask    [5:4] YUYV 00 / UYVY 01 / YVYU 10 / VYUV 11
 };
 
 static struct regval_list sensor_fmt_yuv422_vyuy[] = {
@@ -4501,10 +4501,10 @@ static struct regval_list sensor_fmt_yuv422_vyuy[] = {
 	//{0xFFFF, 0x0000},
 	{0xFCFC, 0xD000},
 	{0x0028, 0x7000},
-	{0x002A, 0x02B4},	
-	{0x0F12, 0x0070},	//REG_0TC_PCFG_PVIMask    [5:4] YUYV 00 / UYVY 01 / YVYU 10 / VYUV 11        	
-	{0x002A, 0x03A6},	
-	{0x0F12, 0x0070},	//REG_0TC_CCFG_PVIMask    [5:4] YUYV 00 / UYVY 01 / YVYU 10 / VYUV 11  
+	{0x002A, 0x02B4},
+	{0x0F12, 0x0070},	//REG_0TC_PCFG_PVIMask    [5:4] YUYV 00 / UYVY 01 / YVYU 10 / VYUV 11
+	{0x002A, 0x03A6},
+	{0x0F12, 0x0070},	//REG_0TC_CCFG_PVIMask    [5:4] YUYV 00 / UYVY 01 / YVYU 10 / VYUV 11
 };
 
 static struct regval_list sensor_fmt_yuv422_uyvy[] = {
@@ -4514,9 +4514,9 @@ static struct regval_list sensor_fmt_yuv422_uyvy[] = {
 //{0xFFFF, 0x0000},
 {0xFCFC, 0xD000},
 {0x0028, 0x7000},
-{0x002A, 0x02B4},	
-{0x0F12, 0x0050},	//REG_0TC_PCFG_PVIMask    [5:4] YUYV 00 / UYVY 01 / YVYU 10 / VYUV 11        	
-{0x002A, 0x03A6},	
+{0x002A, 0x02B4},
+{0x0F12, 0x0050},	//REG_0TC_PCFG_PVIMask    [5:4] YUYV 00 / UYVY 01 / YVYU 10 / VYUV 11
+{0x002A, 0x03A6},
 {0x0F12, 0x0050},	//REG_0TC_CCFG_PVIMask    [5:4] YUYV 00 / UYVY 01 / YVYU 10 / VYUV 11
 };
 #endif
@@ -4540,10 +4540,10 @@ static int sensor_s_hflip(struct v4l2_subdev *sd, int value)
 		////==================================================================================
 		//{0xFCFC, 0xD000},
 		//{0x0028, 0x7000},
-		//{0x002A, 0x02D0},	
+		//{0x002A, 0x02D0},
 		//{0x0F12, 0x0000},	//REG_0TC_PCFG_uPrevMirror     Original 00 / H Mirror 05 / V Mirror 0A / HV Mirror 0F
 		//{0x0F12, 0x0000},	//REG_0TC_PCFG_uCaptureMirror  Original 00 / H Mirror 05 / V Mirror 0A / HV Mirror 0F
-		
+
 		//==================================================================================
 		// 21.Select Cofigration Display
 		//==================================================================================
@@ -4572,7 +4572,7 @@ static int sensor_s_hflip(struct v4l2_subdev *sd, int value)
 	sensor_read(sd, 0x0f12, &cap_val);
 	sensor_write(sd, 0x0028, 0x7000);
 	sensor_write(sd, 0x002a, 0x02d0);
-	
+
 	switch (value) {
 		case 0:
 		  pre_val &= 0xfa;
@@ -4585,10 +4585,10 @@ static int sensor_s_hflip(struct v4l2_subdev *sd, int value)
 		default:
 			return -EINVAL;
 	}
-	
+
 	sensor_write(sd, 0x0f12, pre_val);
 	sensor_write(sd, 0x0f12, cap_val);
-  
+
 	ret = sensor_write_array(sd, regs, ARRAY_SIZE(regs));
 	if (ret < 0) {
 		vfe_dev_err("sensor_write err at sensor_s_hflip!\n");
@@ -4596,7 +4596,7 @@ static int sensor_s_hflip(struct v4l2_subdev *sd, int value)
 	}
 
 	info->hflip = value;
-	
+
 	return 0;
 }
 
@@ -4619,10 +4619,10 @@ static int sensor_s_vflip(struct v4l2_subdev *sd, int value)
 		////==================================================================================
 		//{0xFCFC, 0xD000},
 		//{0x0028, 0x7000},
-		//{0x002A, 0x02D0},	
+		//{0x002A, 0x02D0},
 		//{0x0F12, 0x0000},	//REG_0TC_PCFG_uPrevMirror     Original 00 / H Mirror 05 / V Mirror 0A / HV Mirror 0F
 		//{0x0F12, 0x0000},	//REG_0TC_PCFG_uCaptureMirror  Original 00 / H Mirror 05 / V Mirror 0A / HV Mirror 0F
-		
+
 		//==================================================================================
 		// 21.Select Cofigration Display
 		//==================================================================================
@@ -4644,14 +4644,14 @@ static int sensor_s_vflip(struct v4l2_subdev *sd, int value)
 
 	if(info->vflip == value)
 		return 0;
-	
+
 	sensor_write(sd, 0x0028, 0x7000);
 	sensor_write(sd, 0x002a, 0x02d0);
 	sensor_write(sd, 0x002c , 0x7000);
 	sensor_write(sd, 0x002e , 0x02d0);
 	sensor_read(sd, 0x0f12, &pre_val);
 	sensor_read(sd, 0x0f12, &cap_val);
-	
+
 	switch (value) {
 		case 0:
 		  pre_val &= 0xf5;
@@ -4675,14 +4675,14 @@ static int sensor_s_vflip(struct v4l2_subdev *sd, int value)
 	}
 
 	info->vflip = value;
-	
+
 	return 0;
 }
 
 /* stuff about exposure when capturing image */
 
 static int sensor_set_exposure(struct v4l2_subdev *sd)
-{	
+{
 	return 0;
 }
 
@@ -4695,22 +4695,22 @@ static int sensor_download_af_fw(struct v4l2_subdev *sd)
 static int sensor_ae_awb_lockon(struct v4l2_subdev *sd)
 {
 	int ret;
-	
+
 	ret = sensor_write_array(sd, sensor_ae_awb_lockon_regs , ARRAY_SIZE(sensor_ae_awb_lockon_regs));
 	if(ret < 0)
-		vfe_dev_err("sensor_ae_awb_lockon error!\n"); 
-	
+		vfe_dev_err("sensor_ae_awb_lockon error!\n");
+
 	return ret;
 };
 
 static int sensor_ae_awb_lockoff(struct v4l2_subdev *sd)
 {
 	int ret;
-	
+
 	ret = sensor_write_array(sd, sensor_ae_awb_lockoff_regs , ARRAY_SIZE(sensor_ae_awb_lockoff_regs));
 	if(ret < 0)
-		vfe_dev_err("sensor_ae_awb_lockoff error!\n"); 
-	
+		vfe_dev_err("sensor_ae_awb_lockoff error!\n");
+
 	return ret;
 };
 
@@ -4720,16 +4720,16 @@ static int sensor_s_single_af(struct v4l2_subdev *sd)
 	struct sensor_info *info = to_state(sd);
 
 	vfe_dev_print("sensor_s_single_af\n");
-	
+
 	info->focus_status = 0;	//idle
 	coarse_af_pd = 0;
 	//ae lock on
 	sensor_ae_awb_lockon(sd);
-	
-	//single trigger	
+
+	//single trigger
 	ret = sensor_write_array(sd, sensor_af_single_trig_regs , ARRAY_SIZE(sensor_af_single_trig_regs));
 	if(ret < 0) {
-		vfe_dev_err("sensor_s_single_af error!\n"); 
+		vfe_dev_err("sensor_s_single_af error!\n");
 		sensor_ae_awb_lockoff(sd);
 	} else if(ret == 0) {
 		info->focus_status = 1;	//busy
@@ -4743,7 +4743,7 @@ static int sensor_g_single_af(struct v4l2_subdev *sd)
 	unsigned short rdval;
 	int ret;
 	struct sensor_info *info = to_state(sd);
-	
+
 	vfe_dev_dbg("sensor_g_single_af\n");
 	vfe_dev_dbg("coarse_af_pd = %d\n",coarse_af_pd);
 	if(coarse_af_pd != 1) {
@@ -4758,7 +4758,7 @@ static int sensor_g_single_af(struct v4l2_subdev *sd)
 			ret = -EAGAIN;
 			goto af_out;
 		}
-	
+
 		if(rdval == 0x0001 ) {
 			vfe_dev_dbg("Single AF 1st is busy,value = 0x%4x\n",rdval);
 			msleep(50);
@@ -4776,7 +4776,7 @@ static int sensor_g_single_af(struct v4l2_subdev *sd)
 			goto af_out;
 		}
 	}
-	
+
 	//wait for 2nd af complete
 	rdval = 0xffff;
 	sensor_write(sd, 0x002c , 0x7000);
@@ -4787,21 +4787,21 @@ static int sensor_g_single_af(struct v4l2_subdev *sd)
 		vfe_dev_err("sensor_g_single_af read error !\n");
 		goto af_out;
 	}
-	
+
 	if((rdval&0xff00)!=0x0000) {
 		vfe_dev_dbg("Single AF 2nd is busy,value = 0x%4x\n",rdval);
 		return EBUSY;
 	}
-	
+
 	vfe_dev_print("Single AF 2nd is complete,value = 0x%4x\n",rdval);
 	info->focus_status = 0;	//idle
-	
+
 	ret = 0;
-af_out:	
-	
+af_out:
+
 	//ae lock off
 	sensor_ae_awb_lockoff(sd);
-	
+
 	return ret;
 }
 
@@ -4814,12 +4814,12 @@ static int sensor_g_af_status(struct v4l2_subdev *sd)
 {
 	int ret=0;
 	struct sensor_info *info = to_state(sd);
-	
+
 	if(info->auto_focus==1)
 		ret = sensor_g_contin_af(sd);
 	else
 		ret = sensor_g_single_af(sd);
-	
+
 	return ret;
 }
 
@@ -4837,12 +4837,12 @@ static int sensor_s_init_af(struct v4l2_subdev *sd)
 static int sensor_s_infinity_af(struct v4l2_subdev *sd)
 {
 	int ret;
-  
+
 	vfe_dev_print("sensor_s_infinity_af\n");
 	ret = sensor_write_array(sd,sensor_af_infinity_regs,ARRAY_SIZE(sensor_af_infinity_regs));
 	if(ret < 0)
 		vfe_dev_err("sensor_s_infinity_af error\n");
-   
+
 	return ret;
 }
 
@@ -4862,7 +4862,7 @@ static int sensor_s_continueous_af(struct v4l2_subdev *sd, int value)
 	struct sensor_info *info = to_state(sd);
 
 	vfe_dev_print("sensor_s_continueous_af[0x%x]\n",value);
-	
+
 	if(value==1)
 	{
 		ret = sensor_write_array(sd,sensor_af_continueous_regs,ARRAY_SIZE(sensor_af_continueous_regs));
@@ -4875,7 +4875,7 @@ static int sensor_s_continueous_af(struct v4l2_subdev *sd, int value)
 		LOG_ERR_RET(sensor_s_infinity_af(sd));
 		info->auto_focus=0;
 	}
-  
+
 	return ret;
 }
 
@@ -4883,11 +4883,11 @@ static int sensor_s_af_zone(struct v4l2_subdev *sd,
 														struct v4l2_win_coordinate * win_c)
 {
 	struct sensor_info *info = to_state(sd);
-	
+
 	int x1,y1,x2,y2;
 	unsigned int xc,yc;
 	unsigned int prv_x,prv_y;
-  
+
 	int fst_win_start_x,fst_win_start_y;
 	int fst_disp_start_x,fst_disp_start_y;
 	int fst_win_size_x = 512,fst_win_size_y = 568;
@@ -4896,24 +4896,24 @@ static int sensor_s_af_zone(struct v4l2_subdev *sd,
 	int scnd_disp_start_x,scnd_disp_start_y;
 	int scnd_win_size_x = 116,scnd_win_size_y = 306;
 	int scnd_disp_size_x,scnd_disp_size_y;
-	
+
 	if(info->focus_status == 1)	//can not set af zone when focus is busy
 		return 0;
-	
+
 	if(info->width == 0 || info->height == 0) {
 		vfe_dev_err("current width or height is zero!\n");
 		return -EINVAL;
 	}
 	vfe_dev_print("sensor_s_af_zone\n");
-  
+
 	prv_x=(int)info->width;
 	prv_y=(int)info->height;
-  
+
 	x1=win_c->x1;
 	y1=win_c->y1;
 	x2=win_c->x2;
 	y2=win_c->y2;
-  
+
 #ifdef AF_WIN_NEW_COORD
 	xc=prv_x*((unsigned int)(2000+x1+x2)/2)/2000;
 	yc=(prv_y*((unsigned int)(2000+y1+y2)/2)/2000);
@@ -4921,12 +4921,12 @@ static int sensor_s_af_zone(struct v4l2_subdev *sd,
 	xc=(x1+x2)/2;
 	yc=(y1+y2)/2;
 #endif
-	vfe_dev_dbg("af zone input xc=%d,yc=%d\n",xc,yc);	
-  
+	vfe_dev_dbg("af zone input xc=%d,yc=%d\n",xc,yc);
+
 	//first window
-	
+
 	fst_disp_size_x = fst_win_size_x * info->width /1024;
-	
+
 	if(xc + fst_disp_size_x/2 > info->width) {
 		fst_disp_start_x = info->width - fst_disp_size_x;
 	} else if(xc - (fst_disp_size_x/2) < 0) {
@@ -4934,7 +4934,7 @@ static int sensor_s_af_zone(struct v4l2_subdev *sd,
 	} else {
 		fst_disp_start_x = xc - (fst_disp_size_x/2);
 	}
-	
+
 	fst_disp_size_y = fst_win_size_y * info->height /1024;
 	if(yc + fst_disp_size_y/2 > info->height) {
 		fst_disp_start_y = info->height - fst_disp_size_y;
@@ -4943,12 +4943,12 @@ static int sensor_s_af_zone(struct v4l2_subdev *sd,
 	} else {
 		fst_disp_start_y = yc - fst_disp_size_y/2;
 	}
-	
+
 	fst_win_start_x = fst_disp_start_x * 1024 / info->width;
 	fst_win_start_y = fst_disp_start_y * 1024 / info->height;
-	
+
 	//second window
-	
+
 	scnd_disp_size_x = scnd_win_size_x * info->width /1024;
 	if(xc + scnd_disp_size_x/2 > info->width) {
 		scnd_disp_start_x = info->width - scnd_disp_size_x;
@@ -4957,7 +4957,7 @@ static int sensor_s_af_zone(struct v4l2_subdev *sd,
 	} else {
 		scnd_disp_start_x = xc - scnd_disp_size_x/2;
 	}
-	
+
 	scnd_disp_size_y = scnd_win_size_y * info->height /1024;
 	if(yc + scnd_disp_size_y/2 > info->height) {
 		scnd_disp_start_y = info->height - scnd_disp_size_y;
@@ -4966,25 +4966,25 @@ static int sensor_s_af_zone(struct v4l2_subdev *sd,
 	} else {
 		scnd_disp_start_y = yc - scnd_disp_size_y/2;
 	}
-	
+
 	scnd_win_start_x = scnd_disp_start_x * 1024 / info->width;
 	scnd_win_start_y = scnd_disp_start_y * 1024 / info->height;
-	
+
 	sensor_write(sd, 0x0028, 0x7000);
 	sensor_write(sd, 0x002a, 0x0294);
-	sensor_write(sd, 0x0f12, fst_win_start_x);	//REG_TC_AF_FstWinStartX 
-	sensor_write(sd, 0x0f12, fst_win_start_y);	//REG_TC_AF_FstWinStartY 
-	sensor_write(sd, 0x0f12, fst_win_size_x); 	//REG_TC_AF_FstWinSizeX  
-	sensor_write(sd, 0x0f12, fst_win_size_y); 	//REG_TC_AF_FstWinSizeY  
+	sensor_write(sd, 0x0f12, fst_win_start_x);	//REG_TC_AF_FstWinStartX
+	sensor_write(sd, 0x0f12, fst_win_start_y);	//REG_TC_AF_FstWinStartY
+	sensor_write(sd, 0x0f12, fst_win_size_x); 	//REG_TC_AF_FstWinSizeX
+	sensor_write(sd, 0x0f12, fst_win_size_y); 	//REG_TC_AF_FstWinSizeY
 	sensor_write(sd, 0x0f12, scnd_win_start_x); //REG_TC_AF_ScndWinStartX
 	sensor_write(sd, 0x0f12, scnd_win_start_y);	//REG_TC_AF_ScndWinStartY
-	sensor_write(sd, 0x0f12, scnd_win_size_x);	//REG_TC_AF_ScndWinSizeX 
-	sensor_write(sd, 0x0f12, scnd_win_size_y);	//REG_TC_AF_ScndWinSizeY 
+	sensor_write(sd, 0x0f12, scnd_win_size_x);	//REG_TC_AF_ScndWinSizeX
+	sensor_write(sd, 0x0f12, scnd_win_size_y);	//REG_TC_AF_ScndWinSizeY
 	sensor_write(sd, 0x0f12, 0x0001);						//REG_TC_AF_WinSizesUpdated;
-	
+
 	vfe_dev_dbg("af zone 1st window stx=%d,sty=%d,width=%d,height=%d\n",fst_win_start_x,fst_win_start_y,fst_win_size_x,fst_win_size_y);
 	vfe_dev_dbg("af zone 2nd window stx=%d,sty=%d,width=%d,height=%d\n",scnd_win_start_x,scnd_win_start_y,scnd_win_size_x,scnd_win_size_y);
-	
+
 	usleep_range(30000,31000);
 	return 0;
 }
@@ -5013,7 +5013,7 @@ static int sensor_s_autoexp(struct v4l2_subdev *sd,
 static int sensor_g_autowb(struct v4l2_subdev *sd, int *value)
 {
 	struct sensor_info *info = to_state(sd);
-	
+
 	*value = info->autowb;
 	return 0;
 }
@@ -5022,16 +5022,16 @@ static int sensor_s_autowb(struct v4l2_subdev *sd, int value)
 {
 	int ret;
 	struct sensor_info *info = to_state(sd);
-	
+
 	ret = sensor_write_array(sd, sensor_wb_auto_regs, ARRAY_SIZE(sensor_wb_auto_regs));
 	if (ret < 0) {
 		vfe_dev_err("sensor_write_array err at sensor_s_autowb!\n");
 		return ret;
 	}
-	
+
 	usleep_range(10000,12000);
 	info->autowb = value;
-	
+
 	return 0;
 }
 
@@ -5055,25 +5055,25 @@ static int sensor_s_gain(struct v4l2_subdev *sd, int value)
 	return -EINVAL;
 }
 
-static int sensor_g_band_filter(struct v4l2_subdev *sd, 
+static int sensor_g_band_filter(struct v4l2_subdev *sd,
 		__s32 *value)
 {
 	struct sensor_info *info = to_state(sd);
-	
+
 	*value = info->band_filter;
 	return 0;
 }
 
-static int sensor_s_band_filter(struct v4l2_subdev *sd, 
+static int sensor_s_band_filter(struct v4l2_subdev *sd,
 		enum v4l2_power_line_frequency value)
 {
 	struct sensor_info *info = to_state(sd);
 
 	int ret = 0;
-	
+
 	switch(value) {
 		case V4L2_CID_POWER_LINE_FREQUENCY_DISABLED:
-			break;			
+			break;
 		case V4L2_CID_POWER_LINE_FREQUENCY_50HZ:
 			ret = sensor_write_array(sd, sensor_flicker_50hz_regs, ARRAY_SIZE(sensor_flicker_50hz_regs));
 			if (ret < 0)
@@ -5095,7 +5095,7 @@ static int sensor_s_band_filter(struct v4l2_subdev *sd,
 static int sensor_g_brightness(struct v4l2_subdev *sd, __s32 *value)
 {
 	struct sensor_info *info = to_state(sd);
-  
+
 	*value = info->brightness;
 	return 0;
 }
@@ -5103,13 +5103,13 @@ static int sensor_g_brightness(struct v4l2_subdev *sd, __s32 *value)
 static int sensor_s_brightness(struct v4l2_subdev *sd, int value)
 {
 	struct sensor_info *info = to_state(sd);
-  
+
 	if(info->brightness == value)
 		return 0;
-  
+
 	if(value < -4 || value > 4)
 		return -ERANGE;
-  
+
 	LOG_ERR_RET(sensor_write_array(sd, sensor_brightness[value+4].regs, sensor_brightness[value+4].size))
 
 	info->brightness = value;
@@ -5119,7 +5119,7 @@ static int sensor_s_brightness(struct v4l2_subdev *sd, int value)
 static int sensor_g_contrast(struct v4l2_subdev *sd, __s32 *value)
 {
 	struct sensor_info *info = to_state(sd);
-  
+
 	*value = info->contrast;
 	return 0;
 }
@@ -5127,15 +5127,15 @@ static int sensor_g_contrast(struct v4l2_subdev *sd, __s32 *value)
 static int sensor_s_contrast(struct v4l2_subdev *sd, int value)
 {
 	struct sensor_info *info = to_state(sd);
-  
+
 	if(info->contrast == value)
 		return 0;
-  
+
 	if(value < -4 || value > 4)
 		return -ERANGE;
-    
+
 	LOG_ERR_RET(sensor_write_array(sd, sensor_contrast[value+4].regs, sensor_contrast[value+4].size))
-  
+
 	info->contrast = value;
 	return 0;
 }
@@ -5143,7 +5143,7 @@ static int sensor_s_contrast(struct v4l2_subdev *sd, int value)
 static int sensor_g_saturation(struct v4l2_subdev *sd, __s32 *value)
 {
 	struct sensor_info *info = to_state(sd);
-  
+
 	*value = info->saturation;
 	return 0;
 }
@@ -5151,13 +5151,13 @@ static int sensor_g_saturation(struct v4l2_subdev *sd, __s32 *value)
 static int sensor_s_saturation(struct v4l2_subdev *sd, int value)
 {
 	struct sensor_info *info = to_state(sd);
-  
+
 	if(info->saturation == value)
 		return 0;
 
 	if(value < -4 || value > 4)
 		return -ERANGE;
-      
+
 	LOG_ERR_RET(sensor_write_array(sd, sensor_saturation[value+4].regs, sensor_saturation[value+4].size))
 
 	info->saturation = value;
@@ -5167,7 +5167,7 @@ static int sensor_s_saturation(struct v4l2_subdev *sd, int value)
 static int sensor_g_exp_bias(struct v4l2_subdev *sd, __s32 *value)
 {
 	struct sensor_info *info = to_state(sd);
-  
+
 	*value = info->exp_bias;
 	return 0;
 }
@@ -5181,7 +5181,7 @@ static int sensor_s_exp_bias(struct v4l2_subdev *sd, int value)
 
 	if(value < -4 || value > 4)
 		return -ERANGE;
-      
+
 	LOG_ERR_RET(sensor_write_array(sd, sensor_ev[value+4].regs, sensor_ev[value+4].size))
 
 	info->exp_bias = value;
@@ -5192,9 +5192,9 @@ static int sensor_g_wb(struct v4l2_subdev *sd, int *value)
 {
 	struct sensor_info *info = to_state(sd);
 	enum v4l2_auto_n_preset_white_balance *wb_type = (enum v4l2_auto_n_preset_white_balance*)value;
-  
+
 	*wb_type = info->wb;
-  
+
 	return 0;
 }
 
@@ -5202,20 +5202,20 @@ static int sensor_s_wb(struct v4l2_subdev *sd,
     enum v4l2_auto_n_preset_white_balance value)
 {
 	struct sensor_info *info = to_state(sd);
-  
+
 	if(info->capture_mode == V4L2_MODE_IMAGE)
 		return 0;
-  
+
 	if(info->wb == value)
 		return 0;
-  
+
 	LOG_ERR_RET(sensor_write_array(sd, sensor_wb[value].regs ,sensor_wb[value].size) )
-  
-	if (value == V4L2_WHITE_BALANCE_AUTO) 
+
+	if (value == V4L2_WHITE_BALANCE_AUTO)
 		info->autowb = 1;
 	else
 		info->autowb = 0;
-  
+
 	info->wb = value;
 	return 0;
 }
@@ -5225,7 +5225,7 @@ static int sensor_g_colorfx(struct v4l2_subdev *sd,
 {
 	struct sensor_info *info = to_state(sd);
 	enum v4l2_colorfx *clrfx_type = (enum v4l2_colorfx*)value;
-  
+
 	*clrfx_type = info->clrfx;
 	return 0;
 }
@@ -5237,7 +5237,7 @@ static int sensor_s_colorfx(struct v4l2_subdev *sd,
 
 	if(info->clrfx == value)
 		return 0;
-  
+
 	LOG_ERR_RET(sensor_write_array(sd, sensor_colorfx[value].regs, sensor_colorfx[value].size))
 
 	info->clrfx = value;
@@ -5249,7 +5249,7 @@ static int sensor_g_flash_mode(struct v4l2_subdev *sd,
 {
 	struct sensor_info *info = to_state(sd);
 	enum v4l2_flash_led_mode *flash_mode = (enum v4l2_flash_led_mode*)value;
-  
+
 	*flash_mode = info->flash_mode;
 	return 0;
 }
@@ -5267,7 +5267,7 @@ static int sensor_s_flash_mode(struct v4l2_subdev *sd,
 /*
  * Stuff that knows about the sensor.
  */
- 
+
 static int sensor_power(struct v4l2_subdev *sd, int on)
 {
 	switch(on)
@@ -5280,7 +5280,7 @@ static int sensor_power(struct v4l2_subdev *sd, int on)
 			vfe_gpio_write(sd,PWDN,CSI_GPIO_LOW);
 			usleep_range(1000,1200);
 			vfe_set_mclk(sd,OFF);
-			cci_unlock(sd);	
+			cci_unlock(sd);
 			break;
 		case CSI_SUBDEV_STBY_OFF:
 			vfe_dev_dbg("CSI_SUBDEV_STBY_OFF\n");
@@ -5313,7 +5313,7 @@ static int sensor_power(struct v4l2_subdev *sd, int on)
 			usleep_range(10000,12000);
 			vfe_gpio_write(sd,RESET,CSI_GPIO_HIGH);
 			usleep_range(10000,12000);
-			cci_unlock(sd);	
+			cci_unlock(sd);
 			break;
 		case CSI_SUBDEV_PWR_OFF:
 			vfe_dev_dbg("CSI_SUBDEV_PWR_OFF\n");
@@ -5322,7 +5322,7 @@ static int sensor_power(struct v4l2_subdev *sd, int on)
 			udelay(100);
 			vfe_set_mclk(sd,OFF);
 			udelay(10);
-			vfe_gpio_write(sd,PWDN,CSI_GPIO_LOW);	
+			vfe_gpio_write(sd,PWDN,CSI_GPIO_LOW);
 			vfe_gpio_write(sd,POWER_EN,CSI_GPIO_LOW);
 			vfe_set_pmu_channel(sd,IOVDD,OFF);
 			vfe_set_pmu_channel(sd,AVDD,OFF);
@@ -5330,15 +5330,15 @@ static int sensor_power(struct v4l2_subdev *sd, int on)
 			vfe_set_pmu_channel(sd,AFVDD,OFF);
 			vfe_gpio_set_status(sd,PWDN,0);//set the gpio to input
 			vfe_gpio_set_status(sd,RESET,0);//set the gpio to input
-			cci_unlock(sd);	
+			cci_unlock(sd);
 			break;
 		default:
 			return -EINVAL;
-	}		
+	}
 
 	return 0;
 }
- 
+
 static int sensor_reset(struct v4l2_subdev *sd, u32 val)
 {
 	switch(val)
@@ -5362,7 +5362,7 @@ static int sensor_detect(struct v4l2_subdev *sd)
 {
 	int ret;
 	data_type rdval=0xffff;
-	
+
 	ret = sensor_write(sd, 0x002c, 0x7000);
 	ret = sensor_write(sd, 0x002e, 0x01a4);
 	if (ret < 0)
@@ -5378,7 +5378,7 @@ static int sensor_detect(struct v4l2_subdev *sd)
 		vfe_dev_err("id read from sensor is 0x%4x,not 0x4ec0\n",rdval);
 		return -ENODEV;
 	}
-	
+
 	return 0;
 }
 
@@ -5386,24 +5386,24 @@ static int sensor_init(struct v4l2_subdev *sd, u32 val)
 {
 	int ret;
 	struct sensor_info *info = to_state(sd);
-	
+
 	vfe_dev_dbg("sensor_init\n");
-	
+
 	/*Make sure it is a target sensor*/
 	ret = sensor_detect(sd);
 	if (ret) {
 		vfe_dev_err("chip found is not an target chip.\n");
 		return ret;
 	}
-	
+
 	vfe_get_standby_mode(sd,&info->stby_mode);
-  
+
 	if((info->stby_mode == HW_STBY || info->stby_mode == SW_STBY) \
 	  && info->init_first_flag == 0) {
 		vfe_dev_print("stby_mode and init_first_flag = 0\n");
 		return 0;
-	} 
-  
+	}
+
 	info->focus_status = 0;
 	info->width = 0;
 	info->height = 0;
@@ -5421,22 +5421,22 @@ static int sensor_init(struct v4l2_subdev *sd, u32 val)
 	info->wb = V4L2_WHITE_BALANCE_AUTO;
 	info->clrfx = V4L2_COLORFX_NONE;
 	info->band_filter = V4L2_CID_POWER_LINE_FREQUENCY_50HZ;
-	info->tpf.numerator = 1;            
+	info->tpf.numerator = 1;
 	info->tpf.denominator = 30;    /* 30fps */
 	info->width = 0;
 	info->height = 0;
-	
-	ret = sensor_write_array(sd, sensor_default_regs , ARRAY_SIZE(sensor_default_regs));	
+
+	ret = sensor_write_array(sd, sensor_default_regs , ARRAY_SIZE(sensor_default_regs));
 	if(ret < 0) {
 		vfe_dev_err("write sensor_default_regs error\n");
 		return ret;
 	}
-			
+
 	sensor_s_band_filter(sd, V4L2_CID_POWER_LINE_FREQUENCY_50HZ);
-	
+
 	if(info->stby_mode == 0)
 		info->init_first_flag = 0;
-  
+
   	info->preview_first_flag = 1;
 	return 0;
 }
@@ -5468,7 +5468,7 @@ static long sensor_ioctl(struct v4l2_subdev *sd, unsigned int cmd, void *arg)
 
 
 /*
- * Store information about the video data format. 
+ * Store information about the video data format.
  */
 static struct sensor_format_struct {
 	__u8 *desc;
@@ -5524,7 +5524,7 @@ static struct sensor_format_struct {
 };
 #define N_FMTS ARRAY_SIZE(sensor_formats)
 
-	
+
 
 /*
  * Then there is the issue of window sizes.  Try to capture the info here.
@@ -5605,11 +5605,11 @@ static int sensor_enum_size(struct v4l2_subdev *sd,
 {
 	if(fsize->index > N_WIN_SIZES-1)
 		return -EINVAL;
-  
+
 	fsize->type = V4L2_FRMSIZE_TYPE_DISCRETE;
 	fsize->discrete.width = sensor_win_sizes[fsize->index].width;
 	fsize->discrete.height = sensor_win_sizes[fsize->index].height;
-  
+
 	return 0;
 }
 
@@ -5626,12 +5626,12 @@ static int sensor_try_fmt_internal(struct v4l2_subdev *sd,
 		if (sensor_formats[index].mbus_code == fmt->code)
 			break;
 
-	if (index >= N_FMTS) 
+	if (index >= N_FMTS)
 		return -EINVAL;
 
 	if (ret_fmt != NULL)
 		*ret_fmt = sensor_formats + index;
-    
+
 	/*
 	* Fields: the sensor devices claim to be progressive.
 	*/
@@ -5661,7 +5661,7 @@ static int sensor_try_fmt_internal(struct v4l2_subdev *sd,
 	return 0;
 }
 
-static int sensor_try_fmt(struct v4l2_subdev *sd, 
+static int sensor_try_fmt(struct v4l2_subdev *sd,
              struct v4l2_mbus_framefmt *fmt)
 {
 	return sensor_try_fmt_internal(sd, fmt, NULL, NULL);
@@ -5672,33 +5672,33 @@ static int sensor_g_mbus_config(struct v4l2_subdev *sd,
 {
 	cfg->type = V4L2_MBUS_PARALLEL;
 	cfg->flags = V4L2_MBUS_MASTER | VREF_POL | HREF_POL | CLK_POL ;
-  
+
 	return 0;
 }
 
 /*
  * Set a format.
  */
-static int sensor_s_fmt(struct v4l2_subdev *sd, 
+static int sensor_s_fmt(struct v4l2_subdev *sd,
              struct v4l2_mbus_framefmt *fmt)//linux-3.0
 {
 	int ret;
 	struct sensor_format_struct *sensor_fmt;
 	struct sensor_win_size *wsize;
 	struct sensor_info *info = to_state(sd);
-	
+
 	vfe_dev_dbg("sensor_s_fmt\n");
-	
+
 	ret = sensor_try_fmt_internal(sd, fmt, &sensor_fmt, &wsize);
 	if (ret)
 		return ret;
-	
+
 	if(info->fmt == sensor_fmt && info->width == wsize->width && info->height == wsize->height)
 	{
 		vfe_dev_print("format and size remain the same\n");
 		goto update;
 	}
-		
+
 	if(info->capture_mode == V4L2_MODE_VIDEO ||
 	   info->capture_mode == V4L2_MODE_PREVIEW)
 	{
@@ -5712,20 +5712,20 @@ static int sensor_s_fmt(struct v4l2_subdev *sd,
 		{
 			vfe_dev_err("sensor_set_exposure err !\n");
 			return ret;
-		}	
+		}
 	}
-	
+
 	ret = sensor_write_array(sd, sensor_fmt->regs , sensor_fmt->regs_size);
-	if (ret < 0)		
+	if (ret < 0)
 		return ret;
-	
+
 	ret = 0;
 	if (wsize->regs)
 		LOG_ERR_RET(sensor_write_array(sd, wsize->regs , wsize->regs_size));
-	
+
 	if (wsize->set_size)
 		LOG_ERR_RET(wsize->set_size(sd));
-	
+
 	if(info->capture_mode == V4L2_MODE_VIDEO || info->capture_mode == V4L2_MODE_PREVIEW)
 	{
 
@@ -5735,9 +5735,9 @@ update:
 	info->fmt = sensor_fmt;
 	info->width = wsize->width;
 	info->height = wsize->height;
-	
+
 	vfe_dev_print("s_fmt set width = %d, height = %d\n",wsize->width,wsize->height);
-		
+
 	return 0;
 }
 
@@ -5753,14 +5753,14 @@ static int sensor_g_parm(struct v4l2_subdev *sd, struct v4l2_streamparm *parms)
 
 	if (parms->type != V4L2_BUF_TYPE_VIDEO_CAPTURE)
 		return -EINVAL;
-	
+
 	memset(cp, 0, sizeof(struct v4l2_captureparm));
 	cp->capability = V4L2_CAP_TIMEPERFRAME;
 	cp->capturemode = info->capture_mode;
-	
+
 	cp->timeperframe.numerator = info->tpf.numerator;
 	cp->timeperframe.denominator = info->tpf.denominator;
-	 
+
 	return 0;
 }
 
@@ -5807,12 +5807,12 @@ static int sensor_s_parm(struct v4l2_subdev *sd, struct v4l2_streamparm *parms)
 
 	vfe_dev_dbg("set frame rate %d\n",tpf->denominator/tpf->numerator);
 
-	info->tpf.denominator = SENSOR_FRAME_RATE; 
+	info->tpf.denominator = SENSOR_FRAME_RATE;
 	info->tpf.numerator = div;
-  
+
 	if(info->tpf.denominator/info->tpf.numerator < 30)
 		info->low_speed = 1;
-    
+
 	return 0;
 }
 
@@ -5851,7 +5851,7 @@ static int sensor_queryctrl(struct v4l2_subdev *sd,
 	case V4L2_CID_COLORFX:
 		return v4l2_ctrl_query_fill(qc, 0, 15, 1, 0);
 	case V4L2_CID_FLASH_LED_MODE:
-		return v4l2_ctrl_query_fill(qc, 0, 4, 1, 0);  
+		return v4l2_ctrl_query_fill(qc, 0, 4, 1, 0);
 //  case V4L2_CID_3A_LOCK:
 //    return v4l2_ctrl_query_fill(qc, 0, V4L2_LOCK_FOCUS, 1, 0);
 //  case V4L2_CID_AUTO_FOCUS_RANGE:
@@ -5878,7 +5878,7 @@ static int sensor_g_ctrl(struct v4l2_subdev *sd, struct v4l2_control *ctrl)
 	case V4L2_CID_SATURATION:
 		return sensor_g_saturation(sd, &ctrl->value);
 	case V4L2_CID_HUE:
-		return sensor_g_hue(sd, &ctrl->value);  
+		return sensor_g_hue(sd, &ctrl->value);
 	case V4L2_CID_VFLIP:
 		return sensor_g_vflip(sd, &ctrl->value);
 	case V4L2_CID_HFLIP:
@@ -5920,23 +5920,6 @@ static int sensor_g_ctrl(struct v4l2_subdev *sd, struct v4l2_control *ctrl)
 
 static int sensor_s_ctrl(struct v4l2_subdev *sd, struct v4l2_control *ctrl)
 {
-	struct v4l2_queryctrl qc;
-	int ret;
-	qc.id = ctrl->id;
-	ret = sensor_queryctrl(sd, &qc);
-	if (ret < 0) {
-		return ret;
-	}
-
-	if (qc.type == V4L2_CTRL_TYPE_MENU ||
-		qc.type == V4L2_CTRL_TYPE_INTEGER ||
-		qc.type == V4L2_CTRL_TYPE_BOOLEAN)
-	{
-		if (ctrl->value < qc.minimum || ctrl->value > qc.maximum) {
-			return -ERANGE;
-		}
-	}
-	
 	switch (ctrl->id) {
 	case V4L2_CID_BRIGHTNESS:
 		return sensor_s_brightness(sd, ctrl->value);
@@ -5945,7 +5928,7 @@ static int sensor_s_ctrl(struct v4l2_subdev *sd, struct v4l2_control *ctrl)
 	case V4L2_CID_SATURATION:
 		return sensor_s_saturation(sd, ctrl->value);
 	case V4L2_CID_HUE:
-		return sensor_s_hue(sd, ctrl->value);   
+		return sensor_s_hue(sd, ctrl->value);
 	case V4L2_CID_VFLIP:
 		return sensor_s_vflip(sd, ctrl->value);
 	case V4L2_CID_HFLIP:
@@ -5960,7 +5943,7 @@ static int sensor_s_ctrl(struct v4l2_subdev *sd, struct v4l2_control *ctrl)
 	case V4L2_CID_EXPOSURE_AUTO:
 		return sensor_s_autoexp(sd,(enum v4l2_exposure_auto_type) ctrl->value);
 	case V4L2_CID_AUTO_N_PRESET_WHITE_BALANCE:
-		return sensor_s_wb(sd,(enum v4l2_auto_n_preset_white_balance) ctrl->value); 
+		return sensor_s_wb(sd,(enum v4l2_auto_n_preset_white_balance) ctrl->value);
 	case V4L2_CID_AUTO_WHITE_BALANCE:
 		return sensor_s_autowb(sd, ctrl->value);
 	case V4L2_CID_COLORFX:
@@ -6049,7 +6032,7 @@ static int sensor_probe(struct i2c_client *client,
 	info->af_first_flag = 1;
 	info->init_first_flag = 1;
 	info->auto_focus = 0;
-	
+
 	return 0;
 }
 

@@ -541,6 +541,156 @@ choice
 	  a less common variant of a device class protocol.
 
 # this first set of drivers all depend on bulk-capable hardware.
+config USB_CONFIGFS
+	tristate "USB functions configurable through configfs"
+	select USB_LIBCOMPOSITE
+	help
+	  A Linux USB "gadget" can be set up through configfs.
+	  If this is the case, the USB functions (which from the host's
+	  perspective are seen as interfaces) and configurations are
+	  specified simply by creating appropriate directories in configfs.
+	  Associating functions with configurations is done by creating
+	  appropriate symbolic links.
+	  For more information see Documentation/usb/gadget_configfs.txt.
+
+config USB_CONFIGFS_SERIAL
+	boolean "Generic serial bulk in/out"
+	depends on USB_CONFIGFS
+	depends on TTY
+	select USB_U_SERIAL
+	select USB_F_SERIAL
+	help
+	  The function talks to the Linux-USB generic serial driver.
+
+config USB_CONFIGFS_ACM
+	boolean "Abstract Control Model (CDC ACM)"
+	depends on USB_CONFIGFS
+	depends on TTY
+	select USB_U_SERIAL
+	select USB_F_ACM
+	help
+	  ACM serial link.  This function can be used to interoperate with
+	  MS-Windows hosts or with the Linux-USB "cdc-acm" driver.
+
+config USB_CONFIGFS_OBEX
+	boolean "Object Exchange Model (CDC OBEX)"
+	depends on USB_CONFIGFS
+	depends on TTY
+	select USB_U_SERIAL
+	select USB_F_OBEX
+	help
+	  You will need a user space OBEX server talking to /dev/ttyGS*,
+	  since the kernel itself doesn't implement the OBEX protocol.
+
+config USB_CONFIGFS_NCM
+	boolean "Network Control Model (CDC NCM)"
+	depends on USB_CONFIGFS
+	depends on NET
+	select USB_U_ETHER
+	select USB_F_NCM
+	help
+	  NCM is an advanced protocol for Ethernet encapsulation, allows
+	  grouping of several ethernet frames into one USB transfer and
+	  different alignment possibilities.
+
+config USB_CONFIGFS_ECM
+	boolean "Ethernet Control Model (CDC ECM)"
+	depends on USB_CONFIGFS
+	depends on NET
+	select USB_U_ETHER
+	select USB_F_ECM
+	help
+	  The "Communication Device Class" (CDC) Ethernet Control Model.
+	  That protocol is often avoided with pure Ethernet adapters, in
+	  favor of simpler vendor-specific hardware, but is widely
+	  supported by firmware for smart network devices.
+
+config USB_CONFIGFS_ECM_SUBSET
+	boolean "Ethernet Control Model (CDC ECM) subset"
+	depends on USB_CONFIGFS
+	depends on NET
+	select USB_U_ETHER
+	select USB_F_SUBSET
+	help
+	  On hardware that can't implement the full protocol,
+	  a simple CDC subset is used, placing fewer demands on USB.
+
+config USB_CONFIGFS_RNDIS
+	bool "RNDIS"
+	depends on USB_CONFIGFS
+	depends on NET
+	select USB_U_ETHER
+	select USB_F_RNDIS
+	help
+	   Microsoft Windows XP bundles the "Remote NDIS" (RNDIS) protocol,
+	   and Microsoft provides redistributable binary RNDIS drivers for
+	   older versions of Windows.
+
+	   To make MS-Windows work with this, use Documentation/usb/linux.inf
+	   as the "driver info file".  For versions of MS-Windows older than
+	   XP, you'll need to download drivers from Microsoft's website; a URL
+	   is given in comments found in that info file.
+
+config USB_CONFIGFS_EEM
+	bool "Ethernet Emulation Model (EEM)"
+	depends on USB_CONFIGFS
+	depends on NET
+	select USB_U_ETHER
+	select USB_F_EEM
+	help
+	  CDC EEM is a newer USB standard that is somewhat simpler than CDC ECM
+	  and therefore can be supported by more hardware.  Technically ECM and
+	  EEM are designed for different applications.  The ECM model extends
+	  the network interface to the target (e.g. a USB cable modem), and the
+	  EEM model is for mobile devices to communicate with hosts using
+	  ethernet over USB.  For Linux gadgets, however, the interface with
+	  the host is the same (a usbX device), so the differences are minimal.
+
+config USB_CONFIGFS_PHONET
+	boolean "Phonet protocol"
+	depends on USB_CONFIGFS
+	depends on NET
+	depends on PHONET
+	select USB_U_ETHER
+	select USB_F_PHONET
+	help
+	  The Phonet protocol implementation for USB device.
+
+config USB_CONFIGFS_MASS_STORAGE
+	boolean "Mass storage"
+	depends on USB_CONFIGFS
+	depends on BLOCK
+	select USB_F_MASS_STORAGE
+	help
+	  The Mass Storage Gadget acts as a USB Mass Storage disk drive.
+	  As its storage repository it can use a regular file or a block
+	  device (in much the same way as the "loop" device driver),
+	  specified as a module parameter or sysfs option.
+
+config USB_CONFIGFS_F_LB_SS
+	boolean "Loopback and sourcesink function (for testing)"
+	depends on USB_CONFIGFS
+	select USB_F_SS_LB
+	help
+	  Loopback function loops back a configurable number of transfers.
+	  Sourcesink function either sinks and sources bulk data.
+	  It also implements control requests, for "chapter 9" conformance.
+	  Make this be the first driver you try using on top of any new
+	  USB peripheral controller driver.  Then you can use host-side
+	  test software, like the "usbtest" driver, to put your hardware
+	  and its driver through a basic set of functional tests.
+
+config USB_CONFIGFS_F_FS
+	boolean "Function filesystem (FunctionFS)"
+	depends on USB_CONFIGFS
+	select USB_F_FS
+	help
+	  The Function Filesystem (FunctionFS) lets one create USB
+	  composite functions in user space in the same way GadgetFS
+	  lets one create USB gadgets in user space.  This allows creation
+	  of composite gadgets such that some of the functions are
+	  implemented in kernel space (for instance Ethernet, serial or
+	  mass storage) and other are implemented in user space.
 
 config USB_ZERO
 	tristate "Gadget Zero (DEVELOPMENT)"

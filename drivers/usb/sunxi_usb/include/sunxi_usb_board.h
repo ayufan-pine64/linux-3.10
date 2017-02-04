@@ -29,6 +29,7 @@
 
 #define  KEY_USB_ENABLE			"usbc0_used"
 #define  KEY_USB_PORT_TYPE			"usb_port_type"
+#define  KEY_USB_DET_MODE			"usb_detect_mode"
 #define  KEY_USB_ID_GPIO			"usb_id_gpio"
 #define  KEY_USB_DETVBUS_GPIO			"usb_det_vbus_gpio"
 
@@ -60,6 +61,12 @@ enum usb_detect_type{
 	USB_DETECT_TYPE_VBUS_ID,
 };
 
+/* 0: thread scan mode; 1: gpio interrupt mode */
+enum usb_detect_mode {
+	USB_DETECT_MODE_THREAD = 0,
+	USB_DETECT_MODE_INTR,
+};
+
 enum usb_det_vbus_type{
 	USB_DET_VBUS_TYPE_NULL = 0,
 	USB_DET_VBUS_TYPE_GIPO,
@@ -78,6 +85,7 @@ typedef struct usb_port_info{
 	__u32 port_no;				/* usb port number		*/
 	enum usb_port_type port_type;    	/* usb port type		*/
 	enum usb_detect_type detect_type; 	/* usb detect type		*/
+	enum usb_detect_mode detect_mode;	/* usb detect mode		*/
 	enum usb_det_vbus_type det_vbus_type;
 	const char *det_vbus_name;
 	usb_gpio_t id;				/* usb id pin info 		*/
@@ -88,6 +96,7 @@ typedef struct usb_port_info{
 	__u32 voltage;				/* usb port number(?)		*/
 	__u32 capacity;				/* usb port number(?)		*/
 	__u32 host_init_state;			/* usb controller initial state. 0 - not work, 1 - work */
+	int id_irq_num;				/* id gpio irq num */
 }usb_port_info_t;
 
 typedef struct usb_cfg{

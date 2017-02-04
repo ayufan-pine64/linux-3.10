@@ -749,20 +749,24 @@ static ssize_t mbus_store_value(struct device *dev, \
 
 /* CPU bandwidth of DDR channel 0 */
 static SENSOR_DEVICE_ATTR(pmu_cpuddr, S_IRUGO, mbus_show_value, NULL, MBUS_PMU_CPU);
+#if !(defined CONFIG_ARCH_SUN8IW10)
 /* GPU bandwidth of DDR channel 0 */
 static SENSOR_DEVICE_ATTR(pmu_gpuddr, S_IRUGO, mbus_show_value, NULL, MBUS_PMU_GPU);
 /* DE bandwidth of DDR channel 0 */
 static SENSOR_DEVICE_ATTR(pmu_ve_ddr, S_IRUGO, mbus_show_value, NULL, MBUS_PMU_VE);
+#endif
 /* VE & CSI & FD bandwidth of DDR channel 0 */
 static SENSOR_DEVICE_ATTR(pmu_de_ddr, S_IRUGO, mbus_show_value, NULL, MBUS_PMU_DISP);
 /* other master bandwidth of DDR channel 0 */
 static SENSOR_DEVICE_ATTR(pmu_othddr, S_IRUGO, mbus_show_value, NULL, MBUS_PMU_OTH);
 /* total bandwidth of DDR channel 0 */
 static SENSOR_DEVICE_ATTR(pmu_totddr, S_IRUGO, mbus_show_value, NULL, MBUS_PMU_TOTAL);
+#if !(defined CONFIG_ARCH_SUN8IW10)
 /* csi bandwidth of CSI channel 0 */
 static SENSOR_DEVICE_ATTR(pmu_csiddr, S_IRUGO, mbus_show_value, NULL, MBUS_PMU_CSI);
 /* get all masters' priority or set a master's priority */
 static SENSOR_DEVICE_ATTR(port_prio, S_IRUGO | S_IWUSR, mbus_show_value, mbus_store_value, MBUS_PORT_PRI);
+#endif
 /* get all masterss' qos or set a master's qos */
 static SENSOR_DEVICE_ATTR(port_qos, S_IRUGO | S_IWUSR, mbus_show_value, mbus_store_value, MBUS_PORT_QOS);
 /* get all masterss' threshold or set a master's threshold */
@@ -781,13 +785,17 @@ static SENSOR_DEVICE_ATTR(port_bwlen, S_IRUGO | S_IWUSR, mbus_show_value, mbus_s
 /* pointers to created device attributes */
 static struct attribute *mbus_attributes[] = {
 	&sensor_dev_attr_pmu_cpuddr.dev_attr.attr,
+#if !(defined CONFIG_ARCH_SUN8IW10)
 	&sensor_dev_attr_pmu_gpuddr.dev_attr.attr,
 	&sensor_dev_attr_pmu_ve_ddr.dev_attr.attr,
+#endif
 	&sensor_dev_attr_pmu_de_ddr.dev_attr.attr,
 	&sensor_dev_attr_pmu_othddr.dev_attr.attr,
 	&sensor_dev_attr_pmu_totddr.dev_attr.attr,
+#if !(defined CONFIG_ARCH_SUN8IW10)
 	&sensor_dev_attr_pmu_csiddr.dev_attr.attr,
 	&sensor_dev_attr_port_prio.dev_attr.attr,
+#endif
 	&sensor_dev_attr_port_qos.dev_attr.attr,
 	&sensor_dev_attr_port_watt.dev_attr.attr,
 	&sensor_dev_attr_port_acs.dev_attr.attr,

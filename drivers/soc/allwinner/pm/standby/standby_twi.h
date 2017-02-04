@@ -18,15 +18,15 @@
 
 #ifndef __STANDBY_TWI_H__
 #define __STANDBY_TWI_H__
-
-enum twi_op_type_e{
-    TWI_OP_RD,
-    TWI_OP_WR,
+#include "../mem_twi.h"
+enum twi_op_type_e {
+	TWI_OP_RD,
+	TWI_OP_WR,
 };
 
 extern __s32 standby_twi_init(int group);
 extern __s32 standby_twi_exit(void);
-extern __s32 twi_byte_rw(enum twi_op_type_e op, __u8 saddr, __u8 baddr, __u8 *data);
+extern __s32 twi_byte_rw(enum twi_op_type_e op, __u8 saddr, __u8 baddr,
+			 __u8 *data);
 
-#endif  /* __STANDBY_TWI_H__ */
-
+#endif				/* __STANDBY_TWI_H__ */

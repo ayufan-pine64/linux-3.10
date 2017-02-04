@@ -16,15 +16,15 @@ typedef enum sunxi_flash_ctrl {
   SW_CTRL_FLASH_OFF = 0x100,
   SW_CTRL_FLASH_ON  = 0x101,
   SW_CTRL_TORCH_ON  = 0x102,
-  
+
   CAM_CTRL_FLASH_OFF = 0x200,
   CAM_CTRL_FLASH_ON  = 0x201,
   CAM_CTRL_TORCH_ON  = 0x202,
-  
+
   EXT_SYNC_FLASH_OFF = 0x300,
   EXT_SYNC_FLASH_ON  = 0x301,
   EXT_SYNC_TORCH_ON  = 0x302,
-  
+
 }__flash_ctrl_t;
 
 //typedef enum sunxi_flash_mode {
@@ -53,17 +53,17 @@ struct flash_dev_info {
 	unsigned int dev_if;              //0-io type 1-i2c type
 	unsigned int en_pol;              //polarity
 	unsigned int fl_mode_pol;         //polarity
-  
+
 	unsigned int light_src;           //0x01-LEDX1 0x02-LEDX2 0x10-XENON
 	unsigned int light_temperature;   //in K
-  
+
 	unsigned int flash_intensity;     //flash intensity
 	unsigned int flash_level;         //in lux
 	unsigned int torch_intensity;     //torch intensity
 	unsigned int torch_level;         //in lux
-  
+
 	unsigned int timeout_counter;     //in us
-  
+
 	unsigned int status;              //0-led_off/1-flash_on/2-torch_on/
 	enum sunxi_flash_driver_ic_type flash_driver_ic;
 	//enum sunxi_flash_mode flash_mode;
@@ -75,6 +75,7 @@ struct flash_dev
 {
 	struct v4l2_subdev subdev;
 	struct flash_dev_info fl_info;
+	int	flash_used;
 };
 
 int sunxi_flash_get_subdev(struct v4l2_subdev **sd, int sel);

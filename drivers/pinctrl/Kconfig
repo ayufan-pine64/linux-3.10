@@ -229,8 +229,9 @@ config PINCTRL_XWAY
 
 config PINCTRL_AXP
        bool "AXP pinctrl driver"
-       depends on AW_AXP
-       default y
+	depends on ARCH_SUN50IW1
+	depends on AW_AXP
+	default y
 
 config PINCTRL_AXP_TEST
 	tristate "AXP pinctrl test driver"

@@ -6,7 +6,7 @@
 #define __BSP__CSI__H__
 
 #if defined CONFIG_ARCH_SUN8IW11P1
-#include "csi_reg_a20.h"
+#include "csi_reg_v1.h"
 #else
 #include "csi_reg.h"
 #endif

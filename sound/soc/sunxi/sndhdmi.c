@@ -21,8 +21,9 @@
 #include <sound/soc-dapm.h>
 #include <sound/initval.h>
 #include <linux/io.h>
-#include "sunxi_tdm_utils.h"
 #include <video/drv_hdmi.h>
+
+#include "sunxi_dma.h"
 #ifdef CONFIG_HAS_EARLYSUSPEND
 #include <linux/earlysuspend.h>
 #endif
@@ -63,21 +64,14 @@ int sndhdmi_hw_params(struct snd_pcm_substream *substream,
 	struct snd_pcm_hw_params *params,
 	struct snd_soc_dai *dai)
 {
-	struct snd_soc_dai *cpu_dai 	= NULL;
-	struct snd_soc_pcm_runtime *rtd = NULL;
-	struct sunxi_tdm_info  *sunxi_tdmhdmi = NULL;
-	if ((!substream)||(!params)) {
-		pr_err("error:%s,line:%d\n", __func__, __LINE__);
-		return -EAGAIN;
-	}
-	rtd = substream->private_data;
-	cpu_dai = rtd->cpu_dai;
-	sunxi_tdmhdmi = snd_soc_dai_get_drvdata(cpu_dai);
+	struct snd_soc_pcm_runtime *rtd = substream->private_data;
+	struct snd_soc_card *card = rtd->card;
+	struct sunxi_hdmi_priv *sunxi_hdmi = snd_soc_card_get_drvdata(card);
 
 	#ifdef hdmi_hw
 	hdmi_para.sample_rate = params_rate(params);
 	hdmi_para.channel_num = params_channels(params);
-	hdmi_para.data_raw 		= sunxi_tdmhdmi->others;
+	hdmi_para.data_raw = sunxi_hdmi->hdmi_format;
 
 	switch (params_format(params))
 	{
@@ -132,7 +126,7 @@ static int sndhdmi_set_dai_fmt(struct snd_soc_dai *codec_dai,
 {
 	return 0;
 }
-int sndhdmi_perpare(struct snd_pcm_substream *substream,
+int sndhdmi_prepare(struct snd_pcm_substream *substream,
 	struct snd_soc_dai *dai)
 {
 //	u32 reg_val;
@@ -183,6 +177,7 @@ int sndhdmi_perpare(struct snd_pcm_substream *substream,
 		g_hdmi_func.hdmi_set_audio_para(&hdmi_para);
 	}
 	g_hdmi_func.hdmi_audio_enable(1, 1);
+
 #ifdef CONFIG_ARCH_SUN9I
 	is_play = g_hdmi_func.hdmi_is_playback();
 	i = 0;
@@ -201,7 +196,7 @@ int sndhdmi_perpare(struct snd_pcm_substream *substream,
 #endif //hdmi_hw
 	return 0;
 }
-EXPORT_SYMBOL(sndhdmi_perpare);
+EXPORT_SYMBOL(sndhdmi_prepare);
 static int sndhdmi_trigger(struct snd_pcm_substream *substream,
                               int cmd, struct snd_soc_dai *dai)
 {
@@ -270,7 +265,7 @@ static struct snd_soc_dai_ops sndhdmi_dai_ops = {
 	.hw_params 	= sndhdmi_hw_params,
 	.set_fmt 	= sndhdmi_set_dai_fmt,
 	.trigger 	= sndhdmi_trigger,
-	.prepare  =	sndhdmi_perpare,
+	.prepare  =	sndhdmi_prepare,
 	.shutdown 	= sndhdmi_shutdown,
 };
 
@@ -332,7 +327,7 @@ static struct snd_soc_codec_driver soc_codec_dev_sndhdmi = {
 	.resume 	= sunxi_sndhdmi_resume,
 };
 
-static int __init sndhdmi_codec_probe(struct platform_device *pdev)
+static int sndhdmi_codec_probe(struct platform_device *pdev)
 {
 	if (!pdev) {
 		pr_err("error:%s,line:%d\n", __func__, __LINE__);

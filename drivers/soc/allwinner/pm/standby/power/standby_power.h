@@ -8,8 +8,9 @@
  * under the terms of the GNU General Public License version 2 as published by
  * the Free Software Foundation.
  */
-extern void power_enter_super(struct aw_pm_info * config, extended_standby_t * extended_config);
-extern void dm_suspend(struct aw_pm_info * config, extended_standby_t * extended_config);
-extern void dm_resume(extended_standby_t * extended_config);
+extern void power_enter_super(struct aw_pm_info *config,
+			      extended_standby_t *extended_config);
+extern void dm_suspend(struct aw_pm_info *config,
+		       extended_standby_t *extended_config);
+extern void dm_resume(extended_standby_t *extended_config);
 #endif /*_PM_H*/
-

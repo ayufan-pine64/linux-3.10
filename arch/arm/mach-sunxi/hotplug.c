@@ -42,6 +42,9 @@ int sunxi_cpu_kill(unsigned int cpu)
 				sunxi_disable_cpu(cpu);
 #endif
 				pr_debug("%s: cpu%d is killed!\n", __func__, cpu);
+#ifdef CONFIG_CPU_IDLE_SUNXI
+				sunxi_idle_cpux_flag_valid(cpu, 1);
+#endif
 				return 1;
 			}
 		}
@@ -64,6 +67,10 @@ void sunxi_cpu_die(unsigned int cpu)
 	unsigned long actlr;
 
 	cpumask_set_cpu(cpu, &dead_cpus);
+
+#ifdef CONFIG_CPU_IDLE_SUNXI
+	sunxi_idle_cpux_flag_set(cpu, 1);
+#endif
 
 	/* step1: disable the data cache */
 	asm("mrc p15, 0, %0, c1, c0, 0" : "=r" (actlr) );

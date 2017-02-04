@@ -1,108 +1,81 @@
+#
+# Copyright (C) 2015-2016 Allwinner Technology Limited. All rights reserved.
+#
+# This program is free software and is provided to you under the terms of the GNU General Public License version 2
+# as published by the Free Software Foundation, and any use by you of this program is subject to the terms of such GNU licence.
+#
+# Author: Albert Yu <yuxyun@allwinnertech.com>
+#
+
 ifneq ($(LICHEE_KDIR),)
-KERNEL_DIR = $(LICHEE_KDIR)
-GPU_BUILD_TYPE = release
+export KERNEL_DIR = $(LICHEE_KDIR)
+else
+$(error LICHEE_KDIR is empty)
 endif
+
+export KDIR = $(KERNEL_DIR)
+export KERNELDIR = $(KERNEL_DIR)
+
+GPU_BUILD_TYPE = release
 
 include $(KERNEL_DIR)/.config
 
-##############################################################
-##################     Set SYSTEM_TYPE      ##################
-##############################################################
-ifneq ($(LICHEE_PLATFORM),)
-SYSTEM_TYPE = $(LICHEE_PLATFORM)
+ifdef CONFIG_OF
+export USING_DT = 1
 endif
 
 ##############################################################
-##################   Set ARCH and CROSS_COMPILE  #############
+##############     Set WINDOW_SYSTEM_TYPE      ###############
 ##############################################################
-ifdef CONFIG_ARM
-export ARCH ?= arm
-export CROSS_COMPILE ?= arm-linux-gnueabi-
-endif
-	
-ifdef CONFIG_ARM64
-export ARCH ?= arm64
-export CROSS_COMPILE ?= aarch64-linux-gnu-
+ifeq ($(LICHEE_PLATFORM), android)
+WINDOW_SYSTEM_TYPE = android
+else ifeq ($(LICHEE_PLATFORM), secureandroid)
+WINDOW_SYSTEM_TYPE = android
+else ifeq ($(LICHEE_PLATFORM), camdroid)
+WINDOW_SYSTEM_TYPE = android
+else ifeq ($(LICHEE_PLATFORM), linux)
+WINDOW_SYSTEM_TYPE = linux
+else ifeq ($(LICHEE_PLATFORM), dragonboard)
+WINDOW_SYSTEM_TYPE = linux
+else
+$(error LICHEE_PLATFORM is invalid)
 endif
 
 ##############################################################
 ##################     Set GPU_TYPE         ##################
 ##############################################################
-ifneq ($(LICHEE_PLATFORM),)
-#####################################
-#For mali400 Platform
-#####################################
-ifdef CONFIG_ARCH_SUN8IW3P1
-GPU_TYPE = mali400
-endif
-
-ifdef CONFIG_ARCH_SUN8IW5P1
-GPU_TYPE = mali400
-endif
-
-ifdef CONFIG_ARCH_SUN8IW7P1
-GPU_TYPE = mali400
-endif
-
-ifdef CONFIG_ARCH_SUN50IW1P1
-GPU_TYPE = mali400
-endif
-
-#####################################
-#For sgx544 Platform
-#####################################
-ifdef CONFIG_ARCH_SUN8IW6P1
-GPU_TYPE = sgx544
-endif
-
-endif
+GPU_TYPE = $(CONFIG_SUNXI_GPU_TYPE)
 
 ##############################################################
-#############  Set GPU_BUILD_DIR and GPU_KO_NAME ##############
+#############  Set GPU_BUILD_DIR and GPU_KO_NAME #############
 ##############################################################
-#####################################
-#For mali400 Platform
-#####################################
-ifeq ($(GPU_TYPE),mali400)
+ifeq ($(GPU_TYPE), "mali400")
 GPU_BUILD_DIR = mali400/kernel_mode/driver/src/devicedrv/mali
 GPU_KO_NAME   = $(GPU_BUILD_DIR)/mali.ko
-ifdef CONFIG_OF
-export USING_DT = 1
-endif
-export USING_UMP=0
-export KDIR=$(KERNEL_DIR)
-endif
-
-#####################################
-#For sgx544 Platform
-#####################################
-ifeq ($(GPU_TYPE),sgx544)
-GPU_BUILD_DIR = sgx544/$(SYSTEM_TYPE)/kernel_mode/eurasia_km/eurasiacon/build/linux2/sunxi_android
-GPU_KO_NAME   = sgx544/$(SYSTEM_TYPE)/kernel_mode/eurasia_km/eurasiacon/binary2_sunxi_$(SYSTEM_TYPE)_$(GPU_BUILD_TYPE)/target/pvrsrvkm.ko
-GPU_CLEAN_DIR = sgx544/$(SYSTEM_TYPE)/kernel_mode/eurasia_km/eurasiacon/binary2_sunxi_$(SYSTEM_TYPE)_$(GPU_BUILD_TYPE)
-ifdef CONFIG_OF
-export USING_DT = 1
-endif
-export KERNELDIR=$(KERNEL_DIR)
+else ifeq ($(GPU_TYPE), "mali450")
+GPU_BUILD_DIR = mali450/kernel_mode/driver/src/devicedrv/mali
+GPU_KO_NAME   = $(GPU_BUILD_DIR)/mali.ko
+else ifeq ($(GPU_TYPE), "sgx544")
+GPU_BUILD_DIR = sgx544/$(WINDOW_SYSTEM_TYPE)/kernel_mode/eurasia_km/eurasiacon/build/linux2/sunxi_android
+GPU_KO_NAME   = sgx544/$(WINDOW_SYSTEM_TYPE)/kernel_mode/eurasia_km/eurasiacon/binary2_sunxi_$(WINDOW_SYSTEM_TYPE)_$(GPU_BUILD_TYPE)/target/pvrsrvkm.ko
+else ifeq ($(GPU_TYPE), "rgx6230")
+GPU_BUILD_DIR = rgx6230/$(WINDOW_SYSTEM_TYPE)/kernel_mode/rogue_km/build/linux/sunxi_$(WINDOW_SYSTEM_TYPE)
+GPU_KO_NAME   = rgx6230/$(WINDOW_SYSTEM_TYPE)/kernel_mode/rogue_km/binary_sunxi_$(WINDOW_SYSTEM_TYPE)_$(GPU_BUILD_TYPE)/target_armv7-a/pvrsrvkm.ko
+else
+$(error The GPU type $(GPU_TYPE) is invalid)
 endif
 
 ##############################################################
+
+.PHONY: all build install clean
 
 all: build install
 
 build:
-	$(MAKE) -j -C $(GPU_BUILD_DIR) BUILD=$(GPU_BUILD_TYPE) KERNELDIR=$(KERNEL_DIR)
+	$(MAKE) -j -C $(GPU_BUILD_DIR) BUILD=$(GPU_BUILD_TYPE)
 
 install:
-	if [ $(LICHEE_MOD_DIR) ]; then \
-		cp -u $(GPU_KO_NAME) $(LICHEE_MOD_DIR); \
-	fi
-	if [ -z $(LICHEE_MOD_DIR) ]; then \
-		cp -u $(GPU_KO_NAME) $(GPU_TARGET_OUT_DIR)/module; \
-	fi
+	@cp -uv $(GPU_KO_NAME) $(LICHEE_MOD_DIR);
 
 clean:
 	$(MAKE) -C $(GPU_BUILD_DIR) clean
-	if [ $(GPU_CLEAN_DIR) ]; then \
-		rm -rf $(GPU_CLEAN_DIR); \
-	fi

@@ -196,6 +196,24 @@ static ssize_t mem_used_total_show(struct device *dev,
 	return sprintf(buf, "%llu\n", val);
 }
 
+static ssize_t time_reads_show(struct device *dev,
+		struct device_attribute *attr, char *buf)
+{
+	struct zram *zram = dev_to_zram(dev);
+
+	return sprintf(buf, "%llu\n",
+		zram_stat64_read(zram, &zram->stats.time_reads));
+}
+
+static ssize_t time_writes_show(struct device *dev,
+		struct device_attribute *attr, char *buf)
+{
+	struct zram *zram = dev_to_zram(dev);
+
+	return sprintf(buf, "%llu\n",
+		zram_stat64_read(zram, &zram->stats.time_writes));
+}
+
 static DEVICE_ATTR(disksize, S_IRUGO | S_IWUSR,
 		disksize_show, disksize_store);
 static DEVICE_ATTR(initstate, S_IRUGO, initstate_show, NULL);
@@ -208,6 +226,10 @@ static DEVICE_ATTR(zero_pages, S_IRUGO, zero_pages_show, NULL);
 static DEVICE_ATTR(orig_data_size, S_IRUGO, orig_data_size_show, NULL);
 static DEVICE_ATTR(compr_data_size, S_IRUGO, compr_data_size_show, NULL);
 static DEVICE_ATTR(mem_used_total, S_IRUGO, mem_used_total_show, NULL);
+static DEVICE_ATTR(time_reads, S_IRUGO, time_reads_show, NULL);
+static DEVICE_ATTR(time_writes, S_IRUGO, time_writes_show, NULL);
+
+
 
 static struct attribute *zram_disk_attrs[] = {
 	&dev_attr_disksize.attr,
@@ -221,6 +243,8 @@ static struct attribute *zram_disk_attrs[] = {
 	&dev_attr_orig_data_size.attr,
 	&dev_attr_compr_data_size.attr,
 	&dev_attr_mem_used_total.attr,
+	&dev_attr_time_reads.attr,
+	&dev_attr_time_writes.attr,
 	NULL,
 };
 

@@ -324,7 +324,11 @@ ssize_t sys_pwr_dm_mask_store(struct kobject *kobj, struct kobj_attribute *attr,
 static int __init userscene_lock_init(void)
 {
 
-#if defined(CONFIG_ARCH_SUN8IW6P1) || defined(CONFIG_ARCH_SUN8IW8P1) || defined(CONFIG_ARCH_SUN50IW1P1)
+#if defined(CONFIG_ARCH_SUN8IW6P1) || \
+	defined(CONFIG_ARCH_SUN8IW8P1) || \
+	defined(CONFIG_ARCH_SUN50IW1P1) || \
+	defined(CONFIG_ARCH_SUN8IW10P1) || \
+	defined(CONFIG_ARCH_SUN8IW11P1)
 	printk(KERN_INFO "lock super standby defaultly!\n");
 	scene_lock_store(NULL, NULL, "super_standby", 0);
 #endif

@@ -110,7 +110,7 @@ u32 tcon_get_cur_field(u32 sel, u32 tcon_index)
 s32 tcon_get_timing(u32 sel,u32 index, struct disp_video_timings* tt)
 {
     u32 x,y,ht,hbp,vt,vbp,hspw,vspw;
-    u32 lcd_if, lcd_hv_if = 0;
+    u32 lcd_if = 0, lcd_hv_if = 0;
     u32 b_interlace = 0;
 
     if (index==0)
@@ -150,7 +150,7 @@ s32 tcon_get_timing(u32 sel,u32 index, struct disp_video_timings* tt)
     tt->ver_sync_time	= (vspw+1);             //vsync_len
     tt->ver_total_time = (vt/2);
 
-    if ((index==0) && (lcd_hv_if == LCD_HV_IF_CCIR656_2CYC)) {
+    if ((index==0) && (lcd_if == LCD_IF_HV) && (lcd_hv_if == LCD_HV_IF_CCIR656_2CYC)) {
 		tt->ver_total_time = vt;
 		tt->hor_total_time = (ht + 1) / 2;
 		tt->hor_back_porch	= (hbp+1) / 2;
@@ -166,7 +166,7 @@ s32 tcon_get_timing(u32 sel,u32 index, struct disp_video_timings* tt)
 
 s32 tcon_set_reg_base(u32 sel, uintptr_t base)
 {
-	lcd_dev[sel]=(__de_lcd_dev_t *)(uintptr_t)(base + sel*0x1000);
+	lcd_dev[sel]=(__de_lcd_dev_t *)(uintptr_t)(base);
 	return 0;
 }
 
@@ -466,6 +466,7 @@ s32 tcon0_cfg(u32 sel, disp_panel_para * panel)
 		lcd_dev[sel]->tcon0_hv_ctl.bits.srgb_seq = panel->lcd_hv_srgb_seq;
 		lcd_dev[sel]->tcon0_hv_ctl.bits.syuv_seq = panel->lcd_hv_syuv_seq;
 		lcd_dev[sel]->tcon0_hv_ctl.bits.syuv_fdly = panel->lcd_hv_syuv_fdly;
+		lcd_dev[sel]->tcon0_hv_ctl.bits.res0 = 0x80000;
 		panel->lcd_fresh_mode = 0;
         tcon0_cfg_mode_auto(sel,panel);
 	}
@@ -568,6 +569,15 @@ s32 tcon0_tri_busy(u32 sel)
 	return lcd_dev[sel]->tcon0_cpu_ctl.bits.trigger_start;
 }
 
+
+s32 tcon0_cpu_set_auto_mode(u32 sel)
+{
+	/* trigger mode 0 */
+	lcd_dev[sel]->tcon0_cpu_ctl.bits.auto_ = 1;
+	/* trigger mode 1 */
+	lcd_dev[sel]->tcon0_cpu_ctl.bits.flush = 0;
+	return 0;
+}
 
 s32 tcon0_tri_start(u32 sel)
 {
@@ -672,6 +682,43 @@ s32 tcon0_cpu_wr_24b(u32 sel, u32 index, u32 data)
 s32 tcon0_cpu_rd_24b(u32 sel, u32 index, u32 *data)
 {
 	return -1;
+}
+
+s32 tcon0_cpu_rd_24b_data(u32 sel, u32 index, u32 *data, u32 size)
+{
+	u32 count = 0;
+	u32 tmp;
+	int i = 0;
+
+	tcon0_cpu_wr_24b_index(sel, tcon0_cpu_16b_to_24b(index));
+
+	count = 0;
+	while ((tcon0_cpu_busy(sel)) && (count < 50)) {
+		count++;
+		disp_delay_us(100);
+	}
+
+	lcd_dev[sel]->tcon0_cpu_ctl.bits.da = 0;
+	lcd_dev[sel]->tcon0_cpu_ctl.bits.ca = 1;
+	tmp = lcd_dev[sel]->tcon0_cpu_rd.bits.data_rd0;
+	lcd_dev[sel]->tcon0_cpu_ctl.bits.da = 1;
+
+	for (i = 0; i < size; i++) {
+		count = 0;
+		while ((tcon0_cpu_busy(sel)) && (count < 50)) {
+			count++;
+			disp_delay_us(100);
+		}
+
+		lcd_dev[sel]->tcon0_cpu_ctl.bits.da = 0;
+		lcd_dev[sel]->tcon0_cpu_ctl.bits.ca = 1;
+		tmp = lcd_dev[sel]->tcon0_cpu_rd.bits.data_rd0;
+		lcd_dev[sel]->tcon0_cpu_ctl.bits.da = 1;
+
+		*data++ = tcon0_cpu_24b_to_16b(tmp);
+	}
+
+	return 0;
 }
 
 s32 tcon0_cpu_wr_16b(u32 sel, u32 index, u32 data)

@@ -22,34 +22,39 @@
 #include <sound/soc-dapm.h>
 #include <linux/io.h>
 #include <linux/of.h>
-#include "sunxi_tdm_utils.h"
-#include "codec-utils.h"
 
 static int sunxi_snddaudio1_hw_params(struct snd_pcm_substream *substream,
 					struct snd_pcm_hw_params *params)
 {
-	int ret  = 0;
-	u32 freq = 22579200;
-
 	struct snd_soc_pcm_runtime *rtd = substream->private_data;
 	struct snd_soc_dai *codec_dai = rtd->codec_dai;
 	struct snd_soc_dai *cpu_dai = rtd->cpu_dai;
-	unsigned long sample_rate = params_rate(params);
-	struct sunxi_tdm_info  *sunxi_daudio = snd_soc_dai_get_drvdata(cpu_dai);
+	unsigned int freq, clk_div;
+	int ret;
 
-	switch (sample_rate) {
-		case 8000:
-		case 16000:
-		case 32000:
-		case 64000:
-		case 128000:
-		case 12000:
-		case 24000:
-		case 48000:
-		case 96000:
-		case 192000:
-			freq = 24576000;
-			break;
+	switch (params_rate(params)) {
+	case	8000:
+	case	16000:
+	case	32000:
+	case	64000:
+	case	128000:
+	case	12000:
+	case	24000:
+	case	48000:
+	case	96000:
+	case	192000:
+		freq = 24576000;
+		break;
+	case	11025:
+	case	22050:
+	case	44100:
+	case	88200:
+	case	176400:
+		freq = 22579200;
+		break;
+	default:
+		pr_err("unsupport params rate\n");
+		return -EINVAL;
 	}
 
 	/*set system clock source freq and set the mode as daudio or pcm*/
@@ -69,25 +74,21 @@ static int sunxi_snddaudio1_hw_params(struct snd_pcm_substream *substream,
 	if (ret < 0) {
 		pr_warn("[daudio1],the codec_dai set set_fmt failed.\n");
 	}
-	/*
-	* codec clk & FRM master. AP as slave
-	*/
-	ret = snd_soc_dai_set_fmt(cpu_dai, (sunxi_daudio->audio_format| (sunxi_daudio->signal_inversion <<8) | (sunxi_daudio->daudio_master <<12)));
-	if (ret < 0) {
-		return ret;
-	}
 
-	ret = snd_soc_dai_set_clkdiv(cpu_dai, 0, sample_rate);
+	clk_div = freq / params_rate(params);
+
+	ret = snd_soc_dai_set_clkdiv(cpu_dai, 0, clk_div);
 	if (ret < 0) {
 		return ret;
 	}
-	ret = snd_soc_dai_set_clkdiv(codec_dai, 0, sample_rate);
+	ret = snd_soc_dai_set_clkdiv(codec_dai, 0, clk_div);
 	if (ret < 0) {
 		pr_warn("[daudio1],the codec_dai set set_clkdiv failed.\n");
 	}
 
 	return 0;
 }
+
 /*
  * Card initialization
  */
@@ -104,8 +105,15 @@ static struct snd_soc_dai_link sunxi_snddaudio_dai_link = {
 	.name 			= "sysvoice",
 	.stream_name 	= "SUNXI-TDM1",
 	.cpu_dai_name 	= "sunxi-daudio",
-	.init 			= sunxi_daudio_init,
-	.platform_name 	= "sunxi-daudio",
+	.platform_name	= "sunxi-daudio",
+#ifdef CONFIG_SND_SOC_STA32X
+	.codec_dai_name = "STA32X",
+	.codec_name     = "sta32x.1-001c",
+#else
+	.codec_dai_name = "snd-soc-dummy-dai",
+	.codec_name	= "snd-soc-dummy",
+#endif
+	.init		= sunxi_daudio_init,
 	.ops 			= &sunxi_snddaudio_ops,
 };
 
@@ -133,12 +141,6 @@ static int  sunxi_snddaudio1_dev_probe(struct platform_device *pdev)
 	sunxi_snddaudio_dai_link.platform_name = NULL;
 	sunxi_snddaudio_dai_link.platform_of_node = sunxi_snddaudio_dai_link.cpu_of_node;
 
-	if (sunxi_snddaudio_dai_link.codec_dai_name == NULL
-			&& sunxi_snddaudio_dai_link.codec_name == NULL){
-			codec_utils_probe(pdev);
-			sunxi_snddaudio_dai_link.codec_dai_name = pdev->name;
-			sunxi_snddaudio_dai_link.codec_name 	= pdev->name;
-	}
 	ret = snd_soc_register_card(card);
 	if (ret) {
 		dev_err(&pdev->dev, "snd_soc_register_card() failed: %d\n", ret);
@@ -147,7 +149,7 @@ static int  sunxi_snddaudio1_dev_probe(struct platform_device *pdev)
 	return ret;
 }
 
-static int  sunxi_snddaudio1_dev_remove(struct platform_device *pdev)
+static int  __exit sunxi_snddaudio1_dev_remove(struct platform_device *pdev)
 {
 	struct snd_soc_card *card = platform_get_drvdata(pdev);
 	snd_soc_unregister_card(card);
@@ -168,25 +170,11 @@ static struct platform_driver sunxi_daudio_driver = {
 		.of_match_table = sunxi_daudio1_of_match,
 	},
 	.probe = sunxi_snddaudio1_dev_probe,
-	.remove= sunxi_snddaudio1_dev_remove,
+	.remove = __exit_p(sunxi_snddaudio1_dev_remove),
 };
 
-static int __init sunxi_snddaudio1_init(void)
-{
-	int err = 0;
-	if ((err = platform_driver_register(&sunxi_daudio_driver)) < 0)
-		return err;
-	return 0;
-}
-module_init(sunxi_snddaudio1_init);
+module_platform_driver(sunxi_daudio_driver);
 
-static void __exit sunxi_snddaudio1_exit(void)
-{
-	platform_driver_unregister(&sunxi_daudio_driver);
-}
-module_exit(sunxi_snddaudio1_exit);
 MODULE_AUTHOR("huangxin");
 MODULE_DESCRIPTION("SUNXI_snddaudio ALSA SoC audio driver");
 MODULE_LICENSE("GPL");
-
-

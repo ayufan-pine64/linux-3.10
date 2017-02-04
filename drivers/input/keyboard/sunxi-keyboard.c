@@ -174,11 +174,16 @@ static u32 sunxi_keyboard_read_data(void)
 #ifdef CONFIG_PM
 static int sunxi_keyboard_suspend(struct device *dev)
 {
-	dprintk(DEBUG_SUSPEND, "[%s] enter standby. \n", __FUNCTION__);
+	dprintk(DEBUG_SUSPEND, "[%s] enter standby\n", __func__);
 
 	disable_irq_nosync(key_data->irq_num);
 
 	sunxi_keyboard_ctrl_set(0, 0);
+
+	if (IS_ERR_OR_NULL(key_data->mclk))
+		pr_warn("%s apb1_keyadc mclk handle is invalid!\n", __func__);
+	else
+		clk_disable_unprepare(key_data->mclk);
 
 	return 0;
 }
@@ -187,7 +192,12 @@ static int sunxi_keyboard_resume(struct device *dev)
 {
 	unsigned long mode, para;
 
-	dprintk(DEBUG_SUSPEND, "[%s] return from standby. \n", __FUNCTION__);
+	dprintk(DEBUG_SUSPEND, "[%s] return from standby\n", __func__);
+
+	if (IS_ERR_OR_NULL(key_data->mclk))
+		pr_warn("%s apb1_keyadc mclk handle is invalid!\n", __func__);
+	else
+		clk_prepare_enable(key_data->mclk);
 
 	mode = ADC0_DOWN_INT_SET | ADC0_UP_INT_SET | ADC0_DATA_INT_SET;
 	para = LRADC_ADC0_DOWN_EN | LRADC_ADC0_UP_EN | LRADC_ADC0_DATA_EN;
@@ -334,11 +344,18 @@ static int sunxi_keyboard_startup(struct platform_device *pdev)
 		ret = -EBUSY;
 	}else
 		dprintk(DEBUG_INIT, "ir irq num: %d !\n",key_data->irq_num);
-	key_data->pclk = of_clk_get(np, 0);
-	key_data->mclk = of_clk_get(np, 1);
-	if (NULL==key_data->pclk||IS_ERR(key_data->pclk)
-		||NULL==key_data->mclk||IS_ERR(key_data->mclk)) {
-		dprintk(DEBUG_INIT, "%s:keyboard has no clk.\n", __func__);
+	/* some IC will use clock gating while others HW use 24MHz, so just
+	 * try get the clock, if it doesn't exit, give warning instead* of error.
+	 *
+	 */
+	key_data->mclk = of_clk_get(np, 0);
+	if (IS_ERR_OR_NULL(key_data->mclk)) {
+		pr_warn("%s: keyboard has no clk.\n", __func__);
+	} else{
+		if (clk_prepare_enable(key_data->mclk)) {
+			pr_err("%s enable apb1_keyadc clock failed!\n", __func__);
+			return -EINVAL;
+		}
 	}
 
 	return ret;

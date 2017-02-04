@@ -362,7 +362,7 @@ static void handle_critical_trips(struct thermal_zone_device *tz,
 	if (trip_type == THERMAL_TRIP_CRITICAL) {
 		dev_emerg(&tz->device,
 			  "critical temperature reached(%d C),shutting down\n",
-			  tz->temperature / 1000);
+			  tz->temperature);
 		orderly_poweroff(true);
 	}
 }
@@ -1841,5 +1841,5 @@ static void __exit thermal_exit(void)
 	mutex_destroy(&thermal_governor_lock);
 }
 
-fs_initcall(thermal_init);
+subsys_initcall_sync(thermal_init);
 module_exit(thermal_exit);

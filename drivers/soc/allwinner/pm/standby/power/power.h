@@ -19,4 +19,3 @@ extern s32 axp152_set_state(u32 id, u32 state);
 extern s32 axp152_get_state(u32 id);
 extern s32 axp152_suspend(u32 id);
 #endif /*_PM_H*/
-

@@ -30,6 +30,7 @@
 #include <linux/highmem.h>
 #include <linux/slab.h>
 #include <linux/lzo.h>
+#include <linux/lz4.h>
 #include <linux/string.h>
 #include <linux/vmalloc.h>
 
@@ -164,6 +165,8 @@ static int zram_decompress_page(struct zram *zram, char *mem, u32 index)
 	else
 		ret = lzo1x_decompress_safe(cmem, meta->table[index].size,
 						mem, &clen);
+/*		ret = lz4_decompress_unknownoutputsize
+			(cmem, meta->table[index].size,	mem, &clen);*/
 	zs_unmap_object(meta->mem_pool, handle);
 
 	/* Should NEVER happen. Return bio error if it does. */
@@ -288,6 +291,8 @@ static int zram_bvec_write(struct zram *zram, struct bio_vec *bvec, u32 index,
 
 	ret = lzo1x_1_compress(uncmem, PAGE_SIZE, src, &clen,
 			       meta->compress_workmem);
+/*	ret = lz4_compress(uncmem, PAGE_SIZE, src, &clen,
+			       meta->compress_workmem);*/
 
 	if (!is_partial_io(bvec)) {
 		kunmap_atomic(user_mem);
@@ -362,6 +367,13 @@ static int zram_bvec_rw(struct zram *zram, struct bio_vec *bvec, u32 index,
 {
 	int ret;
 
+#ifdef CONFIG_ZRAM_DEBUG
+	struct timeval tpstart, tpend;
+	u64 timeuse = 0;
+
+	do_gettimeofday(&tpstart);
+#endif
+
 	if (rw == READ) {
 		down_read(&zram->lock);
 		handle_pending_slot_free(zram);
@@ -374,6 +386,20 @@ static int zram_bvec_rw(struct zram *zram, struct bio_vec *bvec, u32 index,
 		up_write(&zram->lock);
 	}
 
+#ifdef CONFIG_ZRAM_DEBUG
+	do_gettimeofday(&tpend);
+	timeuse = 1000*(tpend.tv_sec-tpstart.tv_sec)*1000
+		+(tpend.tv_usec-tpstart.tv_usec);
+
+	switch (rw) {
+	case READ:
+		zram->stats.time_reads = zram->stats.time_reads + timeuse;
+		break;
+	case WRITE:
+		zram->stats.time_writes = zram->stats.time_writes + timeuse;
+		break;
+	}
+#endif
 	return ret;
 }
 
@@ -639,7 +665,7 @@ static void zram_slot_free_notify(struct block_device *bdev,
 
 	free_rq->index = index;
 	add_slot_free(zram, free_rq);
-	schedule_work(&zram->free_work);	
+	schedule_work(&zram->free_work);
 }
 
 static const struct block_device_operations zram_devops = {
@@ -654,7 +680,7 @@ static int create_device(struct zram *zram, int device_id)
 	init_rwsem(&zram->lock);
 	init_rwsem(&zram->init_lock);
 	spin_lock_init(&zram->stat64_lock);
-	
+
 	INIT_WORK(&zram->free_work, zram_slot_free);
 	spin_lock_init(&zram->slot_free_lock);
 	zram->slot_free_rq = NULL;

@@ -28,6 +28,11 @@
 #include <linux/of_platform.h>
 #include <linux/platform_device.h>
 #include <linux/phy.h>
+#include <linux/of_gpio.h>
+#include <linux/io.h>
+#include <linux/sys_config.h>
+#include <linux/regulator/consumer.h>
+#include <linux/soc/sunxi/sunxi_sram.h>
 
 #include "sun4i-emac.h"
 
@@ -83,7 +88,90 @@ struct emac_board_info {
 	unsigned int		duplex;
 
 	phy_interface_t		phy_interface;
+
+	struct regulator **power;
+	int phyrst;
+	u8  rst_active_low;
 };
+
+struct emac_power {
+	unsigned int vol;
+	const char *name;
+};
+
+static struct emac_power ptb[5] = {};
+
+static int emac_power_on(struct emac_board_info *priv)
+{
+	struct regulator **regu;
+	int ret = 0, i = 0;
+
+	regu = kmalloc(ARRAY_SIZE(ptb) *
+			sizeof(struct regulator *), GFP_KERNEL);
+	if (!regu)
+		return -1;
+
+	if (gpio_is_valid(priv->phyrst))
+		gpio_direction_output(priv->phyrst, priv->rst_active_low);
+
+	/* Set the voltage */
+	for (i = 0; i < ARRAY_SIZE(ptb) && ptb[i].name; i++) {
+		regu[i] = regulator_get(NULL, ptb[i].name);
+		if (IS_ERR(regu[i])) {
+			ret = -1;
+			goto err;
+		}
+
+		if (ptb[i].vol != 0) {
+			ret = regulator_set_voltage(regu[i], ptb[i].vol,
+					ptb[i].vol);
+			if (ret)
+				goto err;
+		}
+
+		ret = regulator_enable(regu[i]);
+		if (ret)
+			goto err;
+
+		mdelay(3);
+	}
+
+	msleep(300);
+	priv->power = regu;
+
+	/* If configure gpio to reset the phy device, we should reset it. */
+	if (gpio_is_valid(priv->phyrst)) {
+		msleep(20);
+		gpio_direction_output(priv->phyrst, !priv->rst_active_low);
+		msleep(20);
+	}
+
+	return 0;
+
+err:
+	for (; i > 0; i--) {
+		regulator_disable(regu[i - 1]);
+		regulator_put(regu[i - 1]);
+	}
+	kfree(regu);
+	priv->power = NULL;
+	return ret;
+}
+
+static void emac_power_off(struct emac_board_info *priv)
+{
+	struct regulator **regu = priv->power;
+	int i = 0;
+
+	if (regu == NULL)
+		return;
+
+	for (i = 0; i < ARRAY_SIZE(ptb) && ptb[i].name; i++) {
+		regulator_disable(regu[i]);
+		regulator_put(regu[i]);
+	}
+	kfree(regu);
+}
 
 static void emac_update_speed(struct net_device *dev)
 {
@@ -487,7 +575,7 @@ static int emac_start_xmit(struct sk_buff *skb, struct net_device *dev)
 	spin_unlock_irqrestore(&db->lock, flags);
 
 	/* free this SKB */
-	dev_consume_skb_any(skb);
+	dev_kfree_skb_any(skb);
 
 	return NETDEV_TX_OK;
 }
@@ -732,6 +820,16 @@ static int emac_open(struct net_device *dev)
 	if (request_irq(dev->irq, &emac_interrupt, 0, dev->name, dev))
 		return -EAGAIN;
 
+	ret = emac_power_on(db);
+	if (ret)
+		goto out;
+
+	ret = clk_prepare_enable(db->clk);
+	if (ret) {
+		dev_err(db->dev, "Error couldn't enable clock (%d)\n", ret);
+		goto power_out;
+	}
+
 	/* Initialize EMAC board */
 	emac_reset(db);
 	emac_init_device(dev);
@@ -740,13 +838,22 @@ static int emac_open(struct net_device *dev)
 	if (ret < 0) {
 		free_irq(dev->irq, dev);
 		netdev_err(dev, "cannot probe MDIO bus\n");
-		return ret;
+		goto clk_out;
 	}
 
 	phy_start(db->phy_dev);
 	netif_start_queue(dev);
 
 	return 0;
+
+clk_out:
+	clk_disable_unprepare(db->clk);
+power_out:
+	emac_power_off(db);
+out:
+	free_irq(dev->irq, dev);
+
+	return ret;
 }
 
 static void emac_shutdown(struct net_device *dev)
@@ -788,6 +895,10 @@ static int emac_stop(struct net_device *ndev)
 
 	free_irq(ndev->irq, ndev);
 
+	clk_disable_unprepare(db->clk);
+
+	emac_power_off(db);
+
 	return 0;
 }
 
@@ -815,6 +926,8 @@ static int emac_probe(struct platform_device *pdev)
 	struct net_device *ndev;
 	int ret = 0;
 	const char *mac_addr;
+	struct gpio_config cfg;
+	int cnt = 0;
 
 	ndev = alloc_etherdev(sizeof(struct emac_board_info));
 	if (!ndev) {
@@ -849,17 +962,54 @@ static int emac_probe(struct platform_device *pdev)
 		goto out;
 	}
 
+	ret = sunxi_sram_claim(&pdev->dev);
+	if (ret) {
+		dev_err(&pdev->dev, "Error couldn't map SRAM to device\n");
+		goto out_iounmap;
+	}
+
+
 	db->clk = devm_clk_get(&pdev->dev, NULL);
 	if (IS_ERR(db->clk))
-		goto out;
-
-	clk_prepare_enable(db->clk);
+		goto out_release_sram;
 
 	db->phy_node = of_parse_phandle(np, "phy", 0);
 	if (!db->phy_node) {
 		dev_err(&pdev->dev, "no associated PHY\n");
 		ret = -ENODEV;
-		goto out;
+		goto out_clkput;
+	}
+
+	db->phyrst = of_get_named_gpio_flags(np, "phy-rst", 0,
+						(enum of_gpio_flags *)&cfg);
+	if (gpio_is_valid(db->phyrst)) {
+		ret = gpio_request(db->phyrst, "phy-rst");
+		if (ret < 0)
+			goto out_clkput;
+	}
+	db->rst_active_low = cfg.data;
+
+	memset(ptb, 0, sizeof(ptb));
+	for (cnt = 0; cnt < ARRAY_SIZE(ptb); cnt++) {
+		char *vol;
+		const char *ptr;
+		size_t len;
+		char power[20];
+		snprintf(power, 15, "emac_power%u", (cnt+1));
+		ret = of_property_read_string(np, power, &ptr);
+		if (ret)
+			continue;
+
+		/* Power format: \w\+:[0-9]\+ */
+		len = strlen((char *)ptr);
+		vol = strnchr((const char *)ptr, len, ':');
+		if (vol) {
+			len = (size_t)(vol - ptr);
+			if (kstrtoul(++vol, 10, (long unsigned int *)&ptb[cnt].vol))
+					continue;
+		}
+
+		ptb[cnt].name = kstrndup((char *)ptr, len, GFP_KERNEL);
 	}
 
 	/* Read MAC-address from DT */
@@ -891,7 +1041,11 @@ static int emac_probe(struct platform_device *pdev)
 	if (ret) {
 		dev_err(&pdev->dev, "Registering netdev failed!\n");
 		ret = -ENODEV;
-		goto out;
+
+		if (gpio_is_valid(db->phyrst))
+			gpio_free(db->phyrst);
+
+		goto out_clkput;
 	}
 
 	dev_info(&pdev->dev, "%s: at %p, IRQ %d MAC: %pM\n",
@@ -899,6 +1053,12 @@ static int emac_probe(struct platform_device *pdev)
 
 	return 0;
 
+out_clkput:
+	clk_put(db->clk);
+out_release_sram:
+	sunxi_sram_release(&pdev->dev);
+out_iounmap:
+	iounmap(db->membase);
 out:
 	dev_err(db->dev, "not found (%d).\n", ret);
 
@@ -910,8 +1070,14 @@ out:
 static int emac_remove(struct platform_device *pdev)
 {
 	struct net_device *ndev = platform_get_drvdata(pdev);
+	struct emac_board_info *db = netdev_priv(ndev);
 
 	unregister_netdev(ndev);
+	sunxi_sram_release(&pdev->dev);
+	iounmap(db->membase);
+	if (gpio_is_valid(db->phyrst))
+		gpio_free(db->phyrst);
+	clk_put(db->clk);
 	free_netdev(ndev);
 
 	dev_dbg(&pdev->dev, "released and freed device\n");

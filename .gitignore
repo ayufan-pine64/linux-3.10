@@ -67,6 +67,7 @@ resume1.code
 #
 !.gitignore
 !.mailmap
+!.config
 
 #
 # Generated include files

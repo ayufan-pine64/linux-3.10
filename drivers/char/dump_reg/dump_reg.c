@@ -24,24 +24,28 @@
 #include <linux/io.h>
 #include <linux/slab.h>
 #include <linux/miscdevice.h>
+#include <linux/seq_file.h>
+#include <asm/memory.h>
 #include "dump_reg.h"
 
 
-#define SUNXI_IO_PHYS_BASE      0x01000000UL
-#define SUNXI_IO_SIZE           SZ_16M          /* 16MB(Max) */
 
 #ifdef CONFIG_ARM64
-#define PLAT_PHYS_OFFSET        0x40000000UL
-#define SUNXI_IOMEM_VASE        0xffffff8000000000UL
-#define SUNXI_IOMEM_SIZE        SZ_2G
-#define SUNXI_MEM_PHYS_VASE     0xffffffc000000000UL
-#define PRINT_ADDR_FMT          "0x%016lx"
+#define SUNXI_IO_PHYS_BASE	0x01000000
+#define SUNXI_IO_SIZE		SZ_16M          /* 16MB(Max) */
+#define PLAT_PHYS_OFFSET	0x40000000UL
+#define SUNXI_IOMEM_VASE	0xffffff8000000000UL
+#define SUNXI_IOMEM_SIZE	SZ_2G
+#define SUNXI_MEM_PHYS_VASE	0xffffffc000000000UL
+#define PRINT_ADDR_FMT		"0x%016lx"
 #else
-#define SUNXI_IOMEM_VASE        0xf1000000UL
-#define SUNXI_IOMEM_SIZE        SZ_256M
-#define SUNXI_MEM_PHYS_VASE     0xc0000000UL
-#define PRINT_ADDR_FMT          "0x%08lx"
+#define SUNXI_IO_PHYS_BASE	SUNXI_IO_PBASE
+#define SUNXI_IOMEM_VASE	IO_ADDRESS(SUNXI_IO_PBASE)
+#define SUNXI_IOMEM_SIZE	SUNXI_IO_SIZE
+#define SUNXI_MEM_PHYS_VASE	PAGE_OFFSET
+#define PRINT_ADDR_FMT		"0x%08lx"
 #endif
+
 
 typedef struct dump_reg {
 	unsigned long pst_addr;  /* start reg addr */
@@ -50,9 +54,7 @@ typedef struct dump_reg {
 } dump_reg_t;
 
 typedef struct dump_struct {
-	unsigned long pst_addr;  /* start reg addr */
-	unsigned long ped_addr;  /* end reg addr   */
-	void __iomem *vaddr;
+	struct dump_reg dump;
 	/* some registers' operate method maybe different */
 	void __iomem *(*remap)(phys_addr_t phys_addr, size_t size);
 	void (*unmap)(void __iomem *addr);
@@ -122,10 +124,54 @@ static void __iomem *GET_VADDR(struct dump_reg *dump, unsigned long addr)
 }
 
 static const struct dump_struct dump_table[] = {
-	{SUNXI_IO_PHYS_BASE,    SUNXI_IO_PHYS_BASE + SUNXI_IO_SIZE,     NULL,   REMAPIO,    UNMAPIO,    GET_VADDR,  READ,   WRITE},
-	{PLAT_PHYS_OFFSET,      PLAT_PHYS_OFFSET + SZ_1G,               NULL,   REMAPMEM,   NULL,       GET_VADDR,  READ,   WRITE},
-	{SUNXI_IOMEM_VASE,      SUNXI_IOMEM_VASE + SUNXI_IOMEM_SIZE,    NULL,   NULL,       NULL,       GET_VADDR,  READ,   WRITE},
-	{SUNXI_MEM_PHYS_VASE,   SUNXI_MEM_PHYS_VASE + SZ_2G,            NULL,   NULL,       NULL,       GET_VADDR,  READ,   WRITE},
+	{
+		.dump = {
+			.pst_addr = SUNXI_IO_PHYS_BASE,
+			.ped_addr = SUNXI_IO_PHYS_BASE + SUNXI_IO_SIZE,
+			.vaddr = NULL,
+		},
+		.remap = REMAPIO,
+		.unmap = UNMAPIO,
+		.phys2virt = GET_VADDR,
+		.read = READ,
+		.write = WRITE,
+	},
+	{
+		.dump = {
+			.pst_addr = PLAT_PHYS_OFFSET,
+			.ped_addr = PLAT_PHYS_OFFSET + SZ_1G,
+			.vaddr = NULL,
+		},
+		.remap = REMAPMEM,
+		.unmap = NULL,
+		.phys2virt = GET_VADDR,
+		.read = READ,
+		.write = WRITE,
+	},
+	{
+		.dump = {
+			.pst_addr = (unsigned long)SUNXI_IOMEM_VASE,
+			.ped_addr = (unsigned long)SUNXI_IOMEM_VASE + SUNXI_IOMEM_SIZE,
+			.vaddr = NULL,
+		},
+		.remap = NULL,
+		.unmap = NULL,
+		.phys2virt = GET_VADDR,
+		.read = READ,
+		.write = WRITE,
+	},
+	{
+		.dump = {
+			.pst_addr = SUNXI_MEM_PHYS_VASE,
+			.ped_addr = SUNXI_MEM_PHYS_VASE + SZ_2G,
+			.vaddr = NULL,
+		},
+		.remap = NULL,
+		.unmap = NULL,
+		.phys2virt = GET_VADDR,
+		.read = READ,
+		.write = WRITE,
+	},
 };
 
 /**
@@ -139,8 +185,8 @@ static int __addr_valid(unsigned long addr)
 	int i;
 
 	for (i = 0; i < ARRAY_SIZE(dump_table); i++)
-		if (addr >= dump_table[i].pst_addr && \
-		    addr < dump_table[i].ped_addr)
+		if (addr >= dump_table[i].dump.pst_addr && \
+		    addr < dump_table[i].dump.ped_addr)
 			return i;
 
 	return -ENXIO;
@@ -153,7 +199,7 @@ static int __addr_valid(unsigned long addr)
  *
  * return bytes written to buf, <=0 indicate err
  */
-static ssize_t __dump_regs_ex(struct dump_reg *reg, char *buf)
+static ssize_t __dump_regs_ex(struct dump_reg *reg, char *buf, ssize_t len)
 {
 	int index;
 	ssize_t cnt = 0;
@@ -187,23 +233,24 @@ static ssize_t __dump_regs_ex(struct dump_reg *reg, char *buf)
 		goto out;
 	}
 
-	cnt += sprintf(buf, PRINT_ADDR_FMT": ", reg->pst_addr);
-	for (paddr = reg->pst_addr; paddr < reg->ped_addr; paddr += 4) {
-		if (paddr < reg->pst_addr || paddr > reg->ped_addr)
-			/* "0x12345678 ", 11 space */
-			cnt += sprintf(buf + cnt, "           ");
-		else
-			cnt += sprintf(buf + cnt, "0x%08x ", \
-			               dump->read(dump->phys2virt(reg, paddr)));
+	for (paddr = (reg->pst_addr & ~0x0F); paddr <= reg->ped_addr; paddr += 4) {
+		if (!(paddr & 0x0F))
+			cnt += snprintf(buf + cnt, len - cnt, "\n"PRINT_ADDR_FMT":", paddr);
 
-		if ((paddr & 0xc) == 0xc) {
-			if (paddr + 4 < reg->ped_addr) {
-				cnt += sprintf(buf + cnt, "\n"PRINT_ADDR_FMT": ", \
-				               paddr + 4);
-			}
+		if (cnt >= len) {
+			pr_warn("Range too large, strings buffer overflow\n");
+			cnt = len;
+			goto out;
 		}
+
+		if (paddr < reg->pst_addr)
+			/* "0x12345678 ", 11 space */
+			cnt += snprintf(buf + cnt, len - cnt,"           ");
+		else
+			cnt += snprintf(buf + cnt, len - cnt, " 0x%08x", \
+			               dump->read(dump->phys2virt(reg, paddr)));
 	}
-	cnt += sprintf(buf + cnt, "\n");
+	cnt += snprintf(buf + cnt, len - cnt, "\n");
 	pr_debug("%s,%d, start:0x%lx, end:0x%lx, return:%zd\n", __func__, \
 	         __LINE__, reg->pst_addr, reg->ped_addr, cnt);
 
@@ -212,33 +259,6 @@ out:
 		dump->unmap(reg->vaddr);
 
 	return cnt;
-}
-
-/**
- * first_str_to_int - convert substring of pstr to int, the substring is from
- *                    hed_addrd of pstr to the first occurance of ch in pstr.
- * @pstr: the string to convert.
- * @ch: a char in pstr.
- * @pout: store the convert result.
- *
- * return the first occurance of ch in pstr on success, NULL if failed.
- */
-static char * __first_str_to_u64(const char *pstr, char ch, unsigned long *pout)
-{
-	char *pret = NULL;
-	char str_tmp[260] = {0};
-
-	pret = strchr(pstr, ch);
-	if (pret) {
-		memcpy(str_tmp, pstr, pret - pstr);
-		if (strict_strtoul(str_tmp, 16, pout)) {
-			pr_err("%s,%d err!\n", __func__, __LINE__);
-			return NULL;
-		}
-	} else
-		*pout = 0;
-
-	return pret;
 }
 
 /**
@@ -253,24 +273,42 @@ static char * __first_str_to_u64(const char *pstr, char ch, unsigned long *pout)
 static int __parse_dump_str(const char *buf, size_t size, \
                             unsigned long *start, unsigned long *end)
 {
-	const char *ptr = buf;
+	char *ptr = NULL;
+	char *ptr2 = (char *)buf;
+	int ret = 0, times = 0;
 
-	if (!strchr(ptr, ',')) { /* only one reg to dump */
-		if (strict_strtoul(ptr, 16, start))
-			return -EINVAL;
-		*end = *start;
-		return 0;
+	/* Support single address mode, some time it haven't ',' */
+next:
+	/*
+	 * Default dump only one register(*start =*end).
+	 * If ptr is not NULL, we will cover the default value of end.
+	 */
+	if (times == 1)
+		*start = *end;
+
+	if (!ptr2 || (ptr2 - buf) >= size)
+		goto out;
+
+	ptr = ptr2;
+	ptr2 = strnchr(ptr, size - (ptr - buf), ',');
+	if (ptr2) {
+		*ptr2 = '\0';
+		ptr2++;
 	}
 
-	ptr = __first_str_to_u64(ptr, ',', start);
-	if (NULL == ptr)
-		return -EINVAL;
+	ptr = strim(ptr);
+	if (!strlen(ptr))
+		goto next;
 
-	ptr += 1;
-	if (strict_strtoul(ptr, 16, end))
-		return -EINVAL;
+	ret = strict_strtoul(ptr, 16, end);
+	if (!ret){
+		times++;
+		goto next;
+	} else
+		pr_warn("String syntax errors: \"%s\"\n", ptr);
 
-	return 0;
+out:
+	return ret;
 }
 
 /**
@@ -280,7 +318,7 @@ static int __parse_dump_str(const char *buf, size_t size, \
  *
  * return bytes written to buf, <=0 indicate err.
  */
-static ssize_t __write_show(struct write_group *pgroup, char *buf)
+static ssize_t __write_show(struct write_group *pgroup, char *buf, ssize_t len)
 {
 #ifdef CONFIG_ARM64
 #define WR_PRINT_FMT "reg                 to_write    after_write \n"
@@ -301,14 +339,25 @@ static ssize_t __write_show(struct write_group *pgroup, char *buf)
 		goto end;
 	}
 
-	cnt += sprintf(buf, WR_PRINT_FMT);
+	cnt += snprintf(buf, len - cnt, WR_PRINT_FMT);
+	if (cnt > len) {
+		cnt = -EINVAL;
+		goto end;
+	}
+
 	for (i = 0; i < pgroup->num; i++) {
 		reg = pgroup->pitem[i].reg_addr;
 		val = pgroup->pitem[i].val;
 		dump_reg.pst_addr = reg;
 		dump_reg.ped_addr = reg;
-		__dump_regs_ex(&dump_reg, rval_buf);
-		cnt += sprintf(buf + cnt, WR_DATA_FMT, reg, val, rval_buf);
+		if (__dump_regs_ex(&dump_reg, rval_buf, sizeof(rval_buf)) < 0)
+			return -EINVAL;
+
+		cnt += snprintf(buf + cnt, len - cnt, WR_DATA_FMT, reg, val, rval_buf);
+		if (cnt > len) {
+			cnt = len;
+			goto end;
+		}
 	}
 
 end:
@@ -326,16 +375,31 @@ end:
 static int __parse_write_str(char *str, unsigned long *reg_addr, u32 *val)
 {
 	char *ptr = str;
+	char *tstr = NULL;
+	int ret = 0;
 
-	ptr = __first_str_to_u64(ptr, ' ', reg_addr);
+	/*
+	 * Skip the leading whitespace, find the true split symbol.
+	 * And it must be 'address value'.
+	 */
+	tstr = strim(str);
+	ptr = strchr(tstr, ' ');
 	if (!ptr)
 		return -EINVAL;
 
-	ptr += 1;
-	if (kstrtou32(ptr, 16, val))
-		return -EINVAL;
+	/*
+	 * Replaced split symbol with a %NUL-terminator temporary.
+	 * Will be fixed at end.
+	 */
+	*ptr = '\0';
+	ret = strict_strtoul(tstr, 16, reg_addr);
+	if (ret)
+		goto out;
 
-	return 0;
+	ret = kstrtou32(skip_spaces(ptr + 1), 16, val);
+
+out:
+	return ret;
 }
 
 /**
@@ -351,8 +415,6 @@ static int __parse_write_str(char *str, unsigned long *reg_addr, u32 *val)
 static int __write_item_init(struct write_group **ppgroup, const char *buf, \
                              size_t size)
 {
-	int i;
-	char str_temp[256] = {0};
 	char *ptr, *ptr2;
 	unsigned long addr = 0;
 	u32 val;
@@ -371,60 +433,35 @@ static int __write_item_init(struct write_group **ppgroup, const char *buf, \
 	}
 
 	pgroup->num = 0;
-
-	/* get item from buf */
 	ptr = (char *)buf;
-	while ((ptr2 = strchr(ptr, ',')) != NULL) {
-		i = ptr2 - ptr;
-		memcpy(str_temp, ptr, i);
-		str_temp[i] = 0;
+	do {
+		ptr2 = strchr(ptr, ',');
+		if (ptr2)
+			*ptr2 = '\0';
 
-		if (__parse_write_str(str_temp, &addr, &val))
-			pr_err("%s,%d err, str_temp:%s\n", __func__, __LINE__, \
-			       str_temp);
-		else if (pgroup->num < MAX_WRITE_ITEM) {
-			if (__addr_valid(addr) < 0) {
-				pr_err("%s,%d err, addr:0x%lx invalid!\n", \
-				       __func__, __LINE__, addr);
-				pgroup->num = 0;
-				goto end;
-			}
+		if (!__parse_write_str(ptr, &addr, &val)) {
 			pgroup->pitem[pgroup->num].reg_addr = addr;
 			pgroup->pitem[pgroup->num].val = val;
 			pgroup->num++;
-			}
-		else {
-			pr_err("%s,%d err, num:%d exceed:%d\n", __func__, \
-			       __LINE__, pgroup->num, MAX_WRITE_ITEM);
+		} else
+			pr_err("%s: Failed to parse string: %s\n", __func__, ptr);
+
+		if (!ptr2)
 			break;
-		}
+
 		ptr = ptr2 + 1;
-	}
+		*ptr2 = ',';
 
-	/* the last item */
-	if (__parse_write_str(ptr, &addr, &val))
-		pr_err("%s,%d err, ptr:%s\n", __func__, __LINE__, ptr);
-	else if (pgroup->num < MAX_WRITE_ITEM) {
-		if (__addr_valid(addr) < 0) {
-			pr_err("%s,%d err, addr:0x%lx invalid!\n", __func__, \
-			       __LINE__, addr);
-			pgroup->num = 0;
-			goto end;
-		}
-		pgroup->pitem[pgroup->num].reg_addr = addr;
-		pgroup->pitem[pgroup->num].val = val;
-		pgroup->num++;
-	}
+	} while(pgroup->num <= MAX_WRITE_ITEM);
 
-end:
 	/* free buffer if no valid item */
 	if (0 == pgroup->num) {
 		kfree(pgroup->pitem);
 		kfree(pgroup);
 		return -EINVAL;
 	}
-	*ppgroup = pgroup;
 
+	*ppgroup = pgroup;
 	return 0;
 }
 
@@ -449,7 +486,7 @@ static void __write_item_deinit(struct write_group *pgroup)
  *
  * return bytes written to buf, <= 0 indicate err.
  */
-static ssize_t __compare_regs_ex(struct compare_group *pgroup, char *buf)
+static ssize_t __compare_regs_ex(struct compare_group *pgroup, char *buf, ssize_t len)
 {
 #ifdef CONFIG_ARM64
 #define CMP_PRINT_FMT "reg                 expect      actual      mask        result\n"
@@ -471,22 +508,34 @@ static ssize_t __compare_regs_ex(struct compare_group *pgroup, char *buf)
 		goto end;
 	}
 
-	cnt += sprintf(buf, CMP_PRINT_FMT);
+	cnt += snprintf(buf, len - cnt, CMP_PRINT_FMT);
+	if (cnt > len) {
+		cnt = -EINVAL;
+		goto end;
+	}
+
 	for (i = 0; i < pgroup->num; i++) {
 		reg = pgroup->pitem[i].reg_addr;
 		expect = pgroup->pitem[i].val_expect;
 		dump_reg.pst_addr = reg;
 		dump_reg.ped_addr = reg;
-		__dump_regs_ex(&dump_reg, actualb);
+		if (__dump_regs_ex(&dump_reg, actualb, sizeof(actualb)) < 0)
+			return -EINVAL;
+
 		if (kstrtou32(actualb, 16, &actual))
 			return -EINVAL;
+
 		mask = pgroup->pitem[i].val_mask;
 		if ((actual & mask) == (expect & mask))
-			cnt += sprintf(buf + cnt, CMP_DATAO_FMT, reg, \
+			cnt += snprintf(buf + cnt, len - cnt, CMP_DATAO_FMT, reg, \
 				       expect, actual, mask);
 		else
-			cnt += sprintf(buf + cnt, CMP_DATAE_FMT, reg, \
+			cnt += snprintf(buf + cnt, len - cnt, CMP_DATAE_FMT, reg, \
 			               expect, actual, mask);
+		if (cnt > len) {
+			cnt = -EINVAL;
+			goto end;
+		}
 	}
 
 end:
@@ -519,22 +568,34 @@ static void __compare_item_deinit(struct compare_group *pgroup)
 static int __parse_compare_str(char *str, unsigned long *reg_addr, \
                                u32 *val_expect, u32 *val_mask)
 {
+	unsigned long result_addr[3] = {0};
 	char *ptr = str;
+	char *ptr2 = NULL;
+	int i, ret = 0;
 
-	ptr = __first_str_to_u64(ptr, ' ', reg_addr);
-	if (NULL == ptr)
-		return -EINVAL;
+	for (i = 0; i < ARRAY_SIZE(result_addr); i++) {
+		ptr = skip_spaces(ptr);
+		ptr2 = strchr(ptr, ' ');
+		if (ptr2)
+			*ptr2 = '\0';
 
-	ptr += 1;
-	ptr = __first_str_to_u64(ptr, ' ', (unsigned long *)val_expect);
-	if (NULL == ptr)
-		return -EINVAL;
+		ret = strict_strtoul(ptr, 16, &result_addr[i]);
+		if (!ptr2)
+			break;
 
-	ptr += 1;
-	if (kstrtou32(ptr, 16, val_mask))
-		return -EINVAL;
+		*ptr2 = ' ';
 
-	return 0;
+		if (ret)
+			break;
+
+		ptr = ptr2 + 1;
+	}
+
+	*reg_addr = result_addr[0];
+	*val_expect = (u32)result_addr[1];
+	*val_mask = (u32)result_addr[2];
+
+	return ret;
 }
 
 /**
@@ -551,8 +612,6 @@ static int __parse_compare_str(char *str, unsigned long *reg_addr, \
 static int __compare_item_init(struct compare_group **ppgroup, \
                                const char *buf, size_t size)
 {
-	int i;
-	char str_temp[256] = {0};
 	char *ptr, *ptr2;
 	unsigned long addr = 0;
 	u32 val_expect = 0, val_mask = 0;
@@ -574,53 +633,27 @@ static int __compare_item_init(struct compare_group **ppgroup, \
 
 	/* get item from buf */
 	ptr = (char *)buf;
-	while ((ptr2 = strchr(ptr, ',')) != NULL) {
-		i = ptr2 - ptr;
-		memcpy(str_temp, ptr, i);
-		str_temp[i] = 0;
-		if (__parse_compare_str(str_temp, &addr, &val_expect, &val_mask))
-			pr_err("%s,%d err, str_temp:%s\n", __func__, __LINE__, \
-			       str_temp);
-		else if (pgroup->num < MAX_COMPARE_ITEM) {
-			pr_debug("%s,%d, addr:0x%lx, expect:0x%x, mask:0x%x\n",
-			         __func__, __LINE__, addr, val_expect, val_mask);
-			if (__addr_valid(addr) < 0) {
-				pr_err("%s,%d err, addr:0x%lx invalid!\n", \
-				       __func__, __LINE__, addr);
-				pgroup->num = 0;
-				goto end;
-			}
+	do {
+		ptr2 = strchr(ptr, ',');
+		if (ptr2)
+			*ptr2 = '\0';
+
+		if (!__parse_compare_str(ptr, &addr, &val_expect, &val_mask)) {
 			pgroup->pitem[pgroup->num].reg_addr = addr;
 			pgroup->pitem[pgroup->num].val_expect = val_expect;
 			pgroup->pitem[pgroup->num].val_mask = val_mask;
 			pgroup->num++;
-		} else {
-			pr_err("%s,%d err, num:%d exceed:%d\n", __func__, \
-			       __LINE__, pgroup->num, MAX_COMPARE_ITEM);
+		} else
+			pr_err("%s: Failed to parse string: %s\n", __func__, ptr);
+
+		if (!ptr2)
 			break;
-		}
+
+		*ptr2 = ',';
 		ptr = ptr2 + 1;
-	}
 
-	/* the last item */
-	if (__parse_compare_str(ptr, &addr, &val_expect, &val_mask))
-		pr_err("%s,%d err, ptr:%s\n", __func__, __LINE__, ptr);
-	else if (pgroup->num < MAX_COMPARE_ITEM) {
-		pr_debug("%s,%d, addr:0x%lx, expect:0x%x, mask:0x%x\n", \
-		         __func__, __LINE__, addr, val_expect, val_mask);
-		if (__addr_valid(addr) < 0) {
-			pr_err("%s,%d err, addr:0x%lx invalid!\n", __func__, \
-			       __LINE__, addr);
-			pgroup->num = 0;
-			goto end;
-		}
-		pgroup->pitem[pgroup->num].reg_addr = addr;
-		pgroup->pitem[pgroup->num].val_expect = val_expect;
-		pgroup->pitem[pgroup->num].val_mask = val_mask;
-		pgroup->num++;
-	}
+	} while(pgroup->num <= MAX_COMPARE_ITEM);
 
-end:
 	/* free buffer if no valid item */
 	if (0 == pgroup->num) {
 		kfree(pgroup->pitem);
@@ -644,7 +677,7 @@ end:
 static ssize_t
 dump_show(struct class *class, struct class_attribute *attr, char *buf)
 {
-	return __dump_regs_ex(&dump_para, buf);
+	return __dump_regs_ex(&dump_para, buf, PAGE_SIZE);
 }
 
 static ssize_t
@@ -684,7 +717,7 @@ static ssize_t
 write_show(struct class *class, struct class_attribute *attr, char *buf)
 {
 	/* display write result */
-	return __write_show(wt_group, buf);
+	return __write_show(wt_group, buf, PAGE_SIZE);
 }
 
 static ssize_t
@@ -736,7 +769,7 @@ static ssize_t
 compare_show(struct class *class, struct class_attribute *attr, char *buf)
 {
 	/* dump the items */
-	return __compare_regs_ex(cmp_group, buf);
+	return __compare_regs_ex(cmp_group, buf, PAGE_SIZE);
 }
 
 
@@ -818,7 +851,7 @@ static struct compare_group *misc_cmp_group;
 static ssize_t
 misc_dump_show(struct device *dev, struct device_attribute *attr, char *buf)
 {
-	return __dump_regs_ex(&misc_dump_para, buf);
+	return __dump_regs_ex(&misc_dump_para, buf, PAGE_SIZE);
 }
 
 static ssize_t
@@ -858,7 +891,7 @@ static ssize_t
 misc_write_show(struct device *dev, struct device_attribute *attr, char *buf)
 {
 	/* display write result */
-	return __write_show(misc_wt_group, buf);
+	return __write_show(misc_wt_group, buf, PAGE_SIZE);
 }
 
 static ssize_t
@@ -910,7 +943,7 @@ static ssize_t
 misc_compare_show(struct device *dev, struct device_attribute *attr, char *buf)
 {
 	/* dump the items */
-	return __compare_regs_ex(misc_cmp_group, buf);
+	return __compare_regs_ex(misc_cmp_group, buf, PAGE_SIZE);
 }
 
 

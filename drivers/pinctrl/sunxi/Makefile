@@ -15,3 +15,5 @@ obj-$(CONFIG_PINCTRL_SUN8IW10P1)	+= pinctrl-sun8iw10p1.o
 obj-$(CONFIG_PINCTRL_SUN8IW11P1)        += pinctrl-sun8iw11p1.o
 obj-$(CONFIG_PINCTRL_SUN50IW1P1)        += pinctrl-sun50iw1p1.o
 obj-$(CONFIG_PINCTRL_SUN50IW1P1_R)      += pinctrl-sun50iw1p1-r.o
+obj-$(CONFIG_PINCTRL_SUN50IW2P1)        += pinctrl-sun50iw2p1.o
+obj-$(CONFIG_PINCTRL_SUN50IW2P1_R)      += pinctrl-sun50iw2p1-r.o

@@ -32,6 +32,7 @@
 #include <linux/reboot.h>
 #include <linux/suspend.h>
 #include <linux/sunxi_dramfreq.h>
+#include <linux/workqueue.h>
 
 enum {
 	DEBUG_NONE = 0,
@@ -53,6 +54,25 @@ static unsigned int sunxi_dramfreq_table[LV_END] = {
 	240000, //LV_3
 	168000, //LV_4
 };
+
+#if defined(CONFIG_ARCH_SUN8IW10)
+static int key_masters_int_idx[][2] = {
+#ifdef CONFIG_EINK_PANEL_USED
+	{ MASTER_EINK0, 5 },
+	{ MASTER_EDMA,  6 },
+	{ MASTER_EINK1, 7 },
+#else
+	{ MASTER_DE,    9 },
+#endif
+	{ MASTER_CSI,   3 },
+};
+#elif defined(CONFIG_ARCH_SUN8IW11)
+static int key_masters_int_idx[][2] = {
+	{ MASTER_GPU,   1 },
+	{ MASTER_CSI,   5 },
+	{ MASTER_DE,   13 },
+};
+#endif
 
 struct sunxi_dramfreq *dramfreq = NULL;
 struct task_struct *sunxi_dramfreq_task = NULL;
@@ -222,12 +242,6 @@ static int mdfs_cfs(unsigned int freq_jump, struct sunxi_dramfreq *dramfreq,
 	reg_val |= ((trfc<<0)|(trefi<<16));
 	writel(reg_val, dramfreq->dramctl_base + RFSHTMG);
 
-	/* make sure clk always on */
-	// reg_val = readl(dramfreq->dramctl_base + PGCR0);
-	// reg_val &= ~(0xf<<12);
-	// reg_val |= (0x5<<12);
-	// writel(reg_val, dramfreq->dramctl_base + PGCR0);
-
 	/* change ODT status for power save  */
 	if (!((para->dram_tpr13>>12) & 0x1)) {
 		if (freq > 400) {
@@ -276,6 +290,10 @@ static int mdfs_cfs(unsigned int freq_jump, struct sunxi_dramfreq *dramfreq,
 	reg_val |= (0x1<<4);  //bypass
 	writel(reg_val, dramfreq->dramcom_base + MC_MDFSCR);
 
+	reg_val = readl(dramfreq->dramcom_base + MC_MDFSCR);
+	reg_val |= (0x1U<<0);
+	writel(reg_val, dramfreq->dramcom_base + MC_MDFSCR);
+
 	return 0;
 }
 
@@ -287,7 +305,6 @@ static int mdfs_dfs(unsigned int freq_jump, struct sunxi_dramfreq *dramfreq,
 	unsigned int i, n = 4;
 	unsigned int div, source;
 	unsigned int vtf_status;
-	// unsigned int hdr_clk_status;
 	unsigned int timeout = 1000000;
 	struct dram_para_t *para = &dramfreq->dram_para;
 
@@ -295,24 +312,29 @@ static int mdfs_dfs(unsigned int freq_jump, struct sunxi_dramfreq *dramfreq,
 	if (para->dram_tpr9 != 0) {
 		if (((para->dram_clk % freq) == 0 ) && ((para->dram_tpr9 % freq) == 0)) {
 			if ((para->dram_clk / freq) > (para->dram_tpr9 / freq)) {
-				source = 0;
+				source = !((para->dram_tpr13 >> 6) & 0x1);
 				div = para->dram_tpr9 / freq ;
 			} else {
-				source = 1;
+				source = (para->dram_tpr13 >> 6) & 0x1;
 				div = para->dram_clk / freq ;
 			}
-		} else if((para->dram_clk % freq) == 0) {
-			source = 1;
+		} else if ((para->dram_clk % freq) == 0) {
+			source = (para->dram_tpr13 >> 6) & 0x1;
 			div = para->dram_clk / freq ;
-		} else if((para->dram_tpr9 % freq) == 0) {
-			source = 0;
+		} else if ((para->dram_tpr9 % freq) == 0) {
+			source = !((para->dram_tpr13 >> 6) & 0x1);
 			div = para->dram_tpr9 / freq ;
 		} else {
 			DRAMFREQ_ERR("unsupported freq!\n");
 			return 1;
 		}
 	} else {
+#if defined(CONFIG_ARCH_SUN50IW1)
 		source = 1;
+#elif defined(CONFIG_ARCH_SUN8IW10) || defined(CONFIG_ARCH_SUN8IW11) || \
+	defined(CONFIG_ARCH_SUN50IW2)
+		source = (para->dram_tpr13 >> 6) & 0x1;
+#endif
 		div = para->dram_clk / freq ;
 	}
 
@@ -325,20 +347,22 @@ static int mdfs_dfs(unsigned int freq_jump, struct sunxi_dramfreq *dramfreq,
 		trfc = (210*ctrl_freq)/1000 + ((((210*ctrl_freq)%1000) != 0) ? 1 :0);
 	}
 
-	/* make sure clk always on */
-	// hdr_clk_status = (readl(dramfreq->dramctl_base + PGCR0)>>12) & 0xf;
-	// reg_val = readl(dramfreq->dramctl_base + PGCR0);
-	// reg_val &= ~(0xf<<12);
-	// reg_val |= (0x5<<12);
-	// writel(reg_val, dramfreq->dramctl_base + PGCR0);
-
-	/* save vtf status,global vtf off when DFS */
+	/* turn off vtf */
 	reg_val = readl(dramfreq->dramctl_base + VTFCR);
+#if defined(CONFIG_ARCH_SUN50IW1)
 	vtf_status = (reg_val & (0x1<<8));
 	if (vtf_status) {
 		reg_val &= ~(0x1<<8);
 		writel(reg_val, dramfreq->dramctl_base + VTFCR);
 	}
+#elif defined(CONFIG_ARCH_SUN8IW10) || defined(CONFIG_ARCH_SUN8IW11) || \
+	defined(CONFIG_ARCH_SUN50IW2)
+	vtf_status = (reg_val & (0x3<<8));
+	if (vtf_status) {
+		reg_val &= ~(0x3<<8);
+		writel(reg_val, dramfreq->dramctl_base + VTFCR);
+	}
+#endif
 
 	/* set dual buffer for timing change and power save */
 	reg_val = readl(dramfreq->dramcom_base + MC_MDFSCR);
@@ -416,23 +440,24 @@ static int mdfs_dfs(unsigned int freq_jump, struct sunxi_dramfreq *dramfreq,
 	if (timeout == 0)
 		return -EBUSY;
 
-	/* recovery vtf status */
-	if (vtf_status) {
-		reg_val = readl(dramfreq->dramctl_base + VTFCR);
-		vtf_status |= (0x1<<8);
-		writel(reg_val, dramfreq->dramctl_base + VTFCR);
-	}
-
 	/* turn off dual buffer */
 	reg_val = readl(dramfreq->dramcom_base + MC_MDFSCR);
 	reg_val &= ~(0x1U<<15);
 	writel(reg_val, dramfreq->dramcom_base + MC_MDFSCR);
 
-	/* revovery hdr clk status */
-	// reg_val = readl(dramfreq->dramctl_base + PGCR0);
-	// reg_val &= ~(0xf<<12);
-	// reg_val |= (hdr_clk_status<<12);
-	// writel(reg_val, dramfreq->dramctl_base + PGCR0);
+	/* turn on vtf */
+	if (vtf_status) {
+#if defined(CONFIG_ARCH_SUN50IW1)
+		reg_val = readl(dramfreq->dramctl_base + VTFCR);
+		vtf_status |= (0x1<<8);
+		writel(reg_val, dramfreq->dramctl_base + VTFCR);
+#elif defined(CONFIG_ARCH_SUN8IW10) || defined(CONFIG_ARCH_SUN8IW11) || \
+	defined(CONFIG_ARCH_SUN50IW2)
+		reg_val = readl(dramfreq->dramctl_base + VTFCR);
+		vtf_status |= (0x3<<8);
+		writel(reg_val, dramfreq->dramctl_base + VTFCR);
+#endif
+	}
 
 	return 0;
 }
@@ -460,6 +485,24 @@ static int sunxi_dramfreq_get_cur_freq(struct device *dev, unsigned long *freq)
 	return 0;
 }
 
+unsigned long dramfreq_get(void)
+{
+	unsigned long cur_freq;
+
+	if (dramfreq == NULL)
+		return 0;
+
+	if (dramfreq->ccu_base == NULL
+		|| dramfreq->clk_pll_ddr0 == NULL
+		|| dramfreq->clk_pll_ddr1 == NULL)
+		return 0;
+
+	sunxi_dramfreq_get_cur_freq(NULL, &cur_freq);
+
+	return cur_freq;
+}
+EXPORT_SYMBOL_GPL(dramfreq_get);
+
 static int sunxi_dramfreq_get_max_freq(void)
 {
 	return sunxi_dramfreq_table[0];
@@ -483,9 +526,14 @@ static int sunxi_dramfreq_get_min_freq(void)
 static int sunxi_dramfreq_get_valid_freq(unsigned long freq)
 {
 	unsigned int *valid_freq = &sunxi_dramfreq_table[0];
+	int i = 0;
 
-	while (*(valid_freq+1) >= freq)
+	while (*(valid_freq+1) >= freq) {
+		i++;
+		if (i >= LV_END)
+			break;
 		valid_freq++;
+	}
 
 	return *valid_freq;
 }
@@ -561,7 +609,11 @@ static int sunxi_dramfreq_set_rate(unsigned int jump, unsigned int freq_target,
 	mdfs_time_us = ktime_to_us(ktime_sub(ktime_get(), calltime));
 	local_irq_enable();
 
+#ifdef CONFIG_SMP
 	DRAMFREQ_DBG(DEBUG_FREQ, "[cpu%d] elapsed:%lldus\n", cur_cpu, mdfs_time_us);
+#else
+	DRAMFREQ_DBG(DEBUG_FREQ, "[cpu0] elapsed:%lldus\n", mdfs_time_us);
+#endif
 
 #ifdef CONFIG_DEBUG_FS
 	dramfreq->dramfreq_set_us = mdfs_time_us;
@@ -712,10 +764,36 @@ unlock:
 	return ret;
 }
 
+#ifdef CONFIG_DEVFREQ_GOV_TEMPTRIGGER
+extern int sunxi_get_sensor_temp(u32 sensor_num, long *temperature);
+bool temptrigger_initialized = false;
+
+static int sunxi_get_dev_status(struct device *dev,
+				      struct devfreq_dev_status *stat)
+{
+	int i, ret;
+	long temp = 0, max_temp = 0, std_temp = 0;
+
+	for (i = 0; i < 3; i++) {
+		ret = sunxi_get_sensor_temp(i, &temp);
+		if (ret == 0)
+			max_temp = max(max_temp, temp);
+		else
+			break;
+	}
+
+	stat->private_data = temptrigger_initialized ? &max_temp : &std_temp;
+	return 0;
+}
+#endif
+
 static struct devfreq_dev_profile sunxi_dramfreq_profile = {
 	.get_cur_freq = sunxi_dramfreq_get_cur_freq,
 	.target       = sunxi_dramfreq_target,
 	.freq_table   = sunxi_dramfreq_table,
+#ifdef CONFIG_DEVFREQ_GOV_TEMPTRIGGER
+	.get_dev_status	= sunxi_get_dev_status,
+#endif
 	.max_state    = LV_END,
 };
 
@@ -747,37 +825,192 @@ static void sunxi_dramfreq_masters_state_init(struct sunxi_dramfreq *dramfreq)
 		dramfreq->key_masters[i] = (i == MASTER_CSI) ? 0 : 1;
 }
 
-static int sunxi_dramfreq_governor_state_update(enum GOVERNOR_STATE type)
+#ifndef CONFIG_DEVFREQ_DRAM_FREQ_WITH_SOFT_NOTIFY
+static void sunxi_dramfreq_irq_clear_flag(struct sunxi_dramfreq *dramfreq)
 {
-	switch (type) {
-	case STATE_INIT:
-		dramfreq->pause = 1;
-		sunxi_dramfreq_task = kthread_create(sunxi_dramfreq_task_func,
-											dramfreq->devfreq, "dramfreq_task");
-		if (IS_ERR(sunxi_dramfreq_task))
-			return PTR_ERR(sunxi_dramfreq_task);
+	writel(0xFFFFFFFF, dramfreq->dramcom_base + MDFS_IRQ_STATUS0);
+	writel(0xFFFFFFFF, dramfreq->dramcom_base + MDFS_IRQ_STATUS1);
+}
 
-		get_task_struct(sunxi_dramfreq_task);
-		wake_up_process(sunxi_dramfreq_task);
-		break;
-	case STATE_RUNNING:
-		dramfreq->pause = 0;
-		wake_up_process(sunxi_dramfreq_task);
-		break;
-	case STATE_PAUSE:
-		dramfreq->pause = 1;
-		wake_up_process(sunxi_dramfreq_task);
-		break;
-	case STATE_EXIT:
-		dramfreq->pause = 1;
-		mutex_lock(&dramfreq->devfreq->lock);
-		update_devfreq(dramfreq->devfreq);
-		mutex_unlock(&dramfreq->devfreq->lock);
+static void sunxi_dramfreq_irq_mask_control(struct sunxi_dramfreq *dramfreq,
+					bool valid)
+{
+	unsigned int i;
+	unsigned int access_value, idle_value;
 
-		kthread_stop(sunxi_dramfreq_task);
-		put_task_struct(sunxi_dramfreq_task);
-		break;
+	access_value = readl(dramfreq->dramcom_base + MDFS_IRQ_MASK_STATUS0);
+	idle_value   = readl(dramfreq->dramcom_base + MDFS_IRQ_MASK_STATUS1);
+
+	for (i = 0; i < MASTER_MAX; i++) {
+		if (valid) {
+			access_value |= (0x1 << key_masters_int_idx[i][1]);
+			idle_value   |= (0x1 << key_masters_int_idx[i][1]);
+		} else {
+			access_value &= (~(0x1 << key_masters_int_idx[i][1]));
+			idle_value   &= (~(0x1 << key_masters_int_idx[i][1]));
+		}
 	}
+	writel(access_value, dramfreq->dramcom_base + MDFS_IRQ_MASK_STATUS0);
+	writel(idle_value,   dramfreq->dramcom_base + MDFS_IRQ_MASK_STATUS1);
+}
+
+static void sunxi_dramfreq_irq_enable_control(struct sunxi_dramfreq *dramfreq,
+					bool enable)
+{
+	unsigned int i;
+	unsigned int value;
+
+	value = readl(dramfreq->dramcom_base + MDFS_MASTER_ENABLE);
+
+	for (i = 0; i < MASTER_MAX; i++) {
+		if (enable)
+			value |= (0x1 << key_masters_int_idx[i][1]);
+		else
+			value &= (~(0x1 << key_masters_int_idx[i][1]));
+	}
+
+	writel(value, dramfreq->dramcom_base + MDFS_MASTER_ENABLE);
+}
+
+static irqreturn_t sunxi_dramfreq_irq_handler(int irq, void *data)
+{
+	struct sunxi_dramfreq *dramfreq = (struct sunxi_dramfreq *)data;
+	unsigned int i, idx;
+	unsigned int irq_access, irq_idle;
+	bool handled = false;
+
+	irq_access = readl(dramfreq->dramcom_base + MDFS_IRQ_STATUS0);
+	irq_idle   = readl(dramfreq->dramcom_base + MDFS_IRQ_STATUS1);
+
+	for (i = 0; i < MASTER_MAX; i++) {
+		idx = key_masters_int_idx[i][1];
+		if ((irq_access >> idx) & 0x1) {
+			dramfreq->key_masters[i] = 1;
+			irq_access |= (0x1 << idx);
+			writel(irq_access,
+				dramfreq->dramcom_base + MDFS_IRQ_STATUS0);
+			handled = true;
+		} else if ((irq_idle >> idx) & 0x1) {
+			dramfreq->key_masters[i] = 0;
+			irq_idle |= (0x1 << idx);
+			writel(irq_idle,
+				dramfreq->dramcom_base + MDFS_IRQ_STATUS1);
+			handled = true;
+		}
+	}
+
+	if (!handled) {
+		DRAMFREQ_ERR("(IRQ) access=0x%x, idle=0x%x\n",
+				irq_access, irq_idle);
+		return IRQ_NONE;
+	}
+
+	if (!dramfreq->pause)
+		wake_up_process(sunxi_dramfreq_task);
+
+	return IRQ_HANDLED;
+}
+#endif /* CONFIG_DEVFREQ_DRAM_FREQ_WITH_SOFT_NOTIFY */
+
+#ifdef CONFIG_DEVFREQ_GOV_TEMPTRIGGER
+struct delayed_work sunxi_temp_work;
+struct workqueue_struct *dramfreq_temp_workqueue;
+
+static void sunxi_dramfreq_temp_work_func(struct work_struct *work)
+{
+	if ((dramfreq == NULL) || (dramfreq->devfreq == NULL)) {
+		DRAMFREQ_ERR("%s: para error\n", __func__);
+		return;
+	}
+
+	mutex_lock(&dramfreq->devfreq->lock);
+	update_devfreq(dramfreq->devfreq);
+	mutex_unlock(&dramfreq->devfreq->lock);
+
+	queue_delayed_work_on(0, dramfreq_temp_workqueue, &sunxi_temp_work, msecs_to_jiffies(100));
+}
+#endif
+
+static int sunxi_dramfreq_governor_state_update(char *name, enum GOVERNOR_STATE type)
+{
+	if (!strcmp(name, "adaptive")) {
+		switch (type) {
+		case STATE_INIT:
+			dramfreq->pause = 1;
+			sunxi_dramfreq_task = kthread_create(sunxi_dramfreq_task_func,
+												dramfreq->devfreq, "dramfreq_task");
+			if (IS_ERR(sunxi_dramfreq_task))
+				return PTR_ERR(sunxi_dramfreq_task);
+
+			get_task_struct(sunxi_dramfreq_task);
+			wake_up_process(sunxi_dramfreq_task);
+			break;
+		case STATE_RUNNING:
+			dramfreq->pause = 0;
+			wake_up_process(sunxi_dramfreq_task);
+			/* set master access init state */
+			sunxi_dramfreq_masters_state_init(dramfreq);
+#ifndef CONFIG_DEVFREQ_DRAM_FREQ_WITH_SOFT_NOTIFY
+			/* set irq mask invalid */
+			sunxi_dramfreq_irq_mask_control(dramfreq, false);
+			/* clear irq flag */
+			sunxi_dramfreq_irq_clear_flag(dramfreq);
+			/* set irq enable */
+			sunxi_dramfreq_irq_enable_control(dramfreq, true);
+#endif
+			break;
+		case STATE_PAUSE:
+#ifndef CONFIG_DEVFREQ_DRAM_FREQ_WITH_SOFT_NOTIFY
+			/* set irq disable */
+			sunxi_dramfreq_irq_enable_control(dramfreq, false);
+			/* set irq mask valid */
+			sunxi_dramfreq_irq_mask_control(dramfreq, true);
+#endif
+			dramfreq->pause = 1;
+			wake_up_process(sunxi_dramfreq_task);
+			break;
+		case STATE_EXIT:
+#ifndef CONFIG_DEVFREQ_DRAM_FREQ_WITH_SOFT_NOTIFY
+			/* set irq disable */
+			sunxi_dramfreq_irq_enable_control(dramfreq, false);
+			/* set irq mask valid */
+			sunxi_dramfreq_irq_mask_control(dramfreq, true);
+#endif
+			dramfreq->pause = 1;
+			mutex_lock(&dramfreq->devfreq->lock);
+			update_devfreq(dramfreq->devfreq);
+			mutex_unlock(&dramfreq->devfreq->lock);
+
+			kthread_stop(sunxi_dramfreq_task);
+			put_task_struct(sunxi_dramfreq_task);
+			break;
+		}
+	}
+#ifdef CONFIG_DEVFREQ_GOV_TEMPTRIGGER
+	else if (!strcmp(name, "temptrigger")) {
+		switch (type) {
+		case STATE_INIT:
+			temptrigger_initialized = true;
+			dramfreq_temp_workqueue = create_singlethread_workqueue("dramfreq_temp");
+			INIT_DELAYED_WORK(&sunxi_temp_work, sunxi_dramfreq_temp_work_func);
+			queue_delayed_work_on(0, dramfreq_temp_workqueue, &sunxi_temp_work, msecs_to_jiffies(100));
+			break;
+		case STATE_RUNNING:
+		case STATE_PAUSE:
+			break;
+		case STATE_EXIT:
+			temptrigger_initialized = false;
+
+			mutex_lock(&dramfreq->devfreq->lock);
+			update_devfreq(dramfreq->devfreq);
+			mutex_unlock(&dramfreq->devfreq->lock);
+
+			cancel_delayed_work_sync(&sunxi_temp_work);
+			destroy_workqueue(dramfreq_temp_workqueue);
+			break;
+		}
+	}
+#endif
 
 	return 0;
 }
@@ -865,6 +1098,15 @@ static int sunxi_dramfreq_resource_init(struct platform_device *pdev,
 		ret = -EBUSY;
 		goto out;
 	}
+
+#ifndef CONFIG_DEVFREQ_DRAM_FREQ_WITH_SOFT_NOTIFY
+	dramfreq->irq = irq_of_parse_and_map(pdev->dev.of_node, 0);
+	if (!dramfreq->irq) {
+		DRAMFREQ_ERR("Map IRQ failed!\n");
+		ret = -EBUSY;
+		goto out;
+	}
+#endif
 
 	dramfreq->clk_pll_ddr0 = of_clk_get(pdev->dev.of_node, 0);
 	if (IS_ERR(dramfreq->clk_pll_ddr0)) {
@@ -991,6 +1233,13 @@ static int sunxi_dramfreq_reboot(struct notifier_block *this,
 {
 	dramfreq->pause = 1;
 
+#ifndef CONFIG_DEVFREQ_DRAM_FREQ_WITH_SOFT_NOTIFY
+	/* set irq disable */
+	sunxi_dramfreq_irq_enable_control(dramfreq, false);
+	/* set irq mask valid */
+	sunxi_dramfreq_irq_mask_control(dramfreq, true);
+#endif
+
 	printk("%s:%s: stop dramfreq done\n", __FILE__, __func__);
 	return NOTIFY_OK;
 }
@@ -1002,6 +1251,13 @@ static struct notifier_block reboot_notifier = {
 static void sunxi_dramfreq_hw_init(struct sunxi_dramfreq *dramfreq)
 {
 	volatile unsigned int reg_val;
+
+#ifndef CONFIG_DEVFREQ_DRAM_FREQ_WITH_SOFT_NOTIFY
+	writel(0x18f, dramfreq->dramcom_base + 0x0c);
+
+	/* set master idle period: 1000ms */
+	writel(0x3e7, dramfreq->dramcom_base + MDFS_BWC_PRD);
+#endif
 
 	if (dramfreq->mode == DFS_MODE) {
 		writel(0xFFFFFFFF, dramfreq->dramcom_base + MC_MDFSMRMR);
@@ -1072,11 +1328,25 @@ static int sunxi_dramfreq_probe(struct platform_device *pdev)
 	/* init some hardware paras*/
 	sunxi_dramfreq_hw_init(dramfreq);
 
-	/* set master access init state */
-	sunxi_dramfreq_masters_state_init(dramfreq);
+#ifndef CONFIG_DEVFREQ_DRAM_FREQ_WITH_SOFT_NOTIFY
+	if (request_irq(dramfreq->irq, sunxi_dramfreq_irq_handler,
+				IRQF_DISABLED, "mdfs", dramfreq)) {
+		DRAMFREQ_ERR("Request IRQ failed!\n");
+		ret = -EBUSY;
+		goto err_irq_req;
+	}
+
+	/* set irq mask invalid */
+	sunxi_dramfreq_irq_mask_control(dramfreq, false);
+#endif
 
 	return 0;
 
+#ifndef CONFIG_DEVFREQ_DRAM_FREQ_WITH_SOFT_NOTIFY
+err_irq_req:
+	mutex_destroy(&dramfreq->lock);
+	devfreq_remove_device(dramfreq->devfreq);
+#endif
 err:
 	kfree(dramfreq);
 	dramfreq = NULL;
@@ -1138,16 +1408,29 @@ static int sunxi_dramfreq_suspend(struct platform_device *pdev,
 	unsigned long cur_freq, target = dramfreq->max;
 	int err = -1;
 
-	sunxi_dramfreq_cur_pause = dramfreq->pause;
-	if (!sunxi_dramfreq_cur_pause) {
-		dramfreq->pause = 1;
-		sunxi_dramfreq_get_cur_freq(&pdev->dev, &cur_freq);
-		if (cur_freq != target) {
-			err = sunxi_dramfreq_target(&pdev->dev, &target, 0);
-			if (!err)
-				dramfreq->devfreq->previous_freq = target;
+	if (!strcmp(dramfreq->devfreq->governor_name, "adaptive")) {
+		sunxi_dramfreq_cur_pause = dramfreq->pause;
+		if (!sunxi_dramfreq_cur_pause) {
+#ifndef CONFIG_DEVFREQ_DRAM_FREQ_WITH_SOFT_NOTIFY
+			/* set irq disable */
+			sunxi_dramfreq_irq_enable_control(dramfreq, false);
+			/* set irq mask valid */
+			sunxi_dramfreq_irq_mask_control(dramfreq, true);
+#endif
+			dramfreq->pause = 1;
+			sunxi_dramfreq_get_cur_freq(&pdev->dev, &cur_freq);
+			if (cur_freq != target) {
+				err = sunxi_dramfreq_target(&pdev->dev, &target, 0);
+				if (!err)
+					dramfreq->devfreq->previous_freq = target;
+			}
 		}
 	}
+#ifdef CONFIG_DEVFREQ_GOV_TEMPTRIGGER
+	else if (!strcmp(dramfreq->devfreq->governor_name, "temptrigger")) {
+		cancel_delayed_work_sync(&sunxi_temp_work);
+	}
+#endif
 
 	printk("%s:%d\n", __func__, __LINE__);
 	return 0;
@@ -1158,14 +1441,32 @@ static int sunxi_dramfreq_resume(struct platform_device *pdev)
 	struct sunxi_dramfreq *dramfreq = platform_get_drvdata(pdev);
 	unsigned long cur_freq;
 
-	sunxi_dramfreq_get_cur_freq(&pdev->dev, &cur_freq);
-	if (dramfreq->devfreq->previous_freq != cur_freq)
-		dramfreq->devfreq->previous_freq = cur_freq;
+	if (!strcmp(dramfreq->devfreq->governor_name, "adaptive")) {
+		sunxi_dramfreq_get_cur_freq(&pdev->dev, &cur_freq);
+		if (dramfreq->devfreq->previous_freq != cur_freq)
+			dramfreq->devfreq->previous_freq = cur_freq;
 
-	if (!sunxi_dramfreq_cur_pause) {
-		dramfreq->pause = 0;
-		sunxi_dramfreq_hw_init(dramfreq);
+		if (!sunxi_dramfreq_cur_pause) {
+			dramfreq->pause = 0;
+			sunxi_dramfreq_hw_init(dramfreq);
+			/* set master access init state */
+			sunxi_dramfreq_masters_state_init(dramfreq);
+#ifndef CONFIG_DEVFREQ_DRAM_FREQ_WITH_SOFT_NOTIFY
+			/* set irq mask invalid */
+			sunxi_dramfreq_irq_mask_control(dramfreq, false);
+			/* clear irq flag */
+			sunxi_dramfreq_irq_clear_flag(dramfreq);
+			/* set irq enable */
+			sunxi_dramfreq_irq_enable_control(dramfreq, true);
+#endif
+		}
 	}
+#ifdef CONFIG_DEVFREQ_GOV_TEMPTRIGGER
+	else if (!strcmp(dramfreq->devfreq->governor_name, "temptrigger")) {
+		INIT_DELAYED_WORK(&sunxi_temp_work, sunxi_dramfreq_temp_work_func);
+		queue_delayed_work_on(0, dramfreq_temp_workqueue, &sunxi_temp_work, msecs_to_jiffies(2000));
+	}
+#endif
 
 	printk("%s:%d\n", __func__, __LINE__);
 	return 0;

@@ -1,7 +1,6 @@
 #ifndef _PM_CONFIG_SUN8IW10P1_H
 #define _PM_CONFIG_SUN8IW10P1_H
 
-
 /*
 * Copyright (c) 2011-2015 yanggq.young@allwinnertech.com
 *
@@ -12,26 +11,26 @@
 
 #include "pm_def_i.h"
 #include "asm-generic/sizes.h"
-//#include <generated/autoconf.h>
+/*#include <generated/autoconf.h>*/
 
-#define SUNXI_SRAM_A1_PBASE			(0)
-#define SUNXI_SRAM_A2_PBASE			(0)
-#define SUNXI_PIO_PBASE				(0)
+#define SUNXI_SRAM_A1_PBASE			(0x00000000)
+#define SUNXI_SRAM_A2_PBASE			(0x00004000)
+#define SUNXI_PIO_PBASE				(0x01c20800)
 #define SUNXI_R_PRCM_PBASE			(0)
-#define SUNXI_TWI2_PBASE			(0)
 #define SUNXI_MSGBOX_PBASE			(0)
 #define SUNXI_SPINLOCK_PBASE			(0)
 #define SUNXI_R_PIO_PBASE			(0)
 #define SUNXI_R_CPUCFG_PBASE			(0)
-#define SUNXI_UART0_PBASE			(0)
+#define SUNXI_UART0_PBASE			(0x01c28000)
 #define SUNXI_TWI0_PBASE			(0x01c2ac00)
 #define SUNXI_TWI1_PBASE			(0x01c2b000)
+#define SUNXI_TWI2_PBASE			(0x01c2b400)
 #define SUNXI_CPUCFG_P_REG0			(0)
 #define SUNXI_CPUCFG_GENCTL			(0)
 #define SUNXI_CPUX_PWR_CLAMP(x)			(0)
 #define SUNXI_CPUX_PWR_CLAMP_STATUS(x)		(0)
 #define SUNXI_CPU_PWROFF_REG			(0)
-#define SUNXI_RTC_PBASE		(0)
+#define SUNXI_RTC_PBASE		(0x01c20400)
 #define SUNXI_SRAMCTRL_PBASE    (0x01c00000)
 #define SUNXI_LRADC_PBASE       (0x01c21800)
 #define SUNXI_GIC_DIST_PBASE	(0)
@@ -39,10 +38,6 @@
 #define SUNXI_TIMER_PBASE		(0)
 #define SUNXI_CCM_PBASE			(0)
 
-#if 0
-#define AW_GPIO_BASE_PA         (0)
-#define AW_CCM_BASE             (0)
-#endif
 #ifdef CONFIG_FPGA_V4_PLATFORM
 #define SUNXI_IRQ_TIMER0      (38)
 #else
@@ -61,6 +56,7 @@
 #define SUNXI_IRQ_EINTG       (49)
 #define SUNXI_IRQ_EINTF       (53)
 #define SUNXI_IRQ_MBOX        (0)
+#define SUNXI_IRQ_WLAN        (139)
 
 #define SUNXI_BANK_SIZE 32
 #define SUNXI_PA_BASE	0
@@ -80,27 +76,28 @@
 #define SUNXI_PO_BASE	448
 #define AXP_PIN_BASE	1024
 
-//debug reg
-#define STANDBY_STATUS_REG 	(0xf1c20500)
-#define STANDBY_STATUS_REG_PA 	(0x01c20500)
-#define STANDBY_STATUS_REG_NUM 	(4)
+/*debug reg*/
+#define STANDBY_STATUS_REG	(0xf1c20500)
+#define STANDBY_STATUS_REG_PA	(0x01c20500)
+#define STANDBY_STATUS_REG_NUM	(4)
+#define STANDBY_SUPER_FLAG_REG  (0xf1c205f8)
+#define STANDBY_SUPER_ADDR_REG  (0xf1c205e4)
 
-//module base reg
+/*module base reg*/
 #define AW_LRADC01_BASE		(SUNXI_LRADC_PBASE)
 #define AW_CCM_BASE		(0x01c20000)
 #define AW_CCM_MOD_BASE		(0x01c20000)
 #define AW_CCM_PIO_BUS_GATE_REG_OFFSET  (0x68)
-#define AW_CCU_UART_PA		(0x01c2006C)			//uart0 gating: bit16, 0: mask, 1: pass
-#define AW_CCU_UART_RESET_PA	(0x01c202D8)			//uart0 reset: bit16, 0: reset, 1: de_assert
+#define AW_CCU_UART_PA		(0x01c2006C)	/*uart0 gating: bit16, 0: mask, 1: pass */
+#define AW_CCU_UART_RESET_PA	(0x01c202D8)	/*uart0 reset: bit16, 0: reset, 1: de_assert */
 #define AW_UART0_PBASE          (0x01c28000)
 
+/*uart & jtag para*/
+#define AW_JTAG_PH_GPIO_PA              (0x01c20800 + 0x00)	/*jtag0: Pa0-Pa3, */
+#define AW_JTAG_PF_GPIO_PA              (0x01c20800 + 0xB4)	/*jtag0: PF0, PF1, PF3, PF5        bitmap: 0x40, 4044; */
 
-//uart&jtag para
-#define AW_JTAG_PH_GPIO_PA              (0x01c20800 + 0x00)            //jtag0: Pa0-Pa3,
-#define AW_JTAG_PF_GPIO_PA              (0x01c20800 + 0xB4)             //jtag0: PF0,PF1,PF3,PF5        bitmap: 0x40,4044;
-
-#define AW_UART_PH_GPIO_PA              (0x01c20800 + 0xb4)            //uart0: use pf
-#define AW_UART_PF_GPIO_PA              (0x01c20800 + 0xB4)             //uart0: PF2,PF4,               bitmap: 0x04,0400;
+#define AW_UART_PH_GPIO_PA              (0x01c20800 + 0xb4)	/*uart0: use pf */
+#define AW_UART_PF_GPIO_PA              (0x01c20800 + 0xB4)	/*uart0: PF2, PF4,               bitmap: 0x04, 0400; */
 
 #define AW_JTAG_PH_CONFIG_VAL_MASK      (0x0000ffff)
 #define AW_JTAG_PH_CONFIG_VAL           (0x00003333)
@@ -119,19 +116,20 @@
 
 #define AW_RTC_BASE		(SUNXI_RTC_PBASE)
 #define AW_SRAMCTRL_BASE	(SUNXI_SRAMCTRL_PBASE)
-#define GPIO_REG_LENGTH		((0x258+0x4)>>2)
+#define GPIO_REG_LENGTH		((0x278+0x4)>>2)
 #define CPUS_GPIO_REG_LENGTH	((0x218+0x4)>>2)
-#define SRAM_REG_LENGTH		((0xa4+0x4)>>2)
+#define SRAM_REG_LENGTH		((0xF4+0x4)>>2)
 #define CCU_REG_LENGTH		((0x2d8+0x4)>>2)
 
-//int src no.
-#define AW_IRQ_TIMER1		(SUNXI_IRQ_TIMER1	)
+/*int src no.*/
+#define AW_IRQ_TIMER1		(SUNXI_IRQ_TIMER1)
 #define AW_IRQ_TOUCHPANEL	(0)
-#define AW_IRQ_LRADC		(SUNXI_IRQ_LRADC        )
-#define AW_IRQ_NMI		(SUNXI_IRQ_NMI          )
-#define AW_IRQ_MBOX		(SUNXI_IRQ_MBOX         )
+#define AW_IRQ_LRADC		(SUNXI_IRQ_LRADC)
+#define AW_IRQ_NMI		(SUNXI_IRQ_NMI)
+#define AW_IRQ_MBOX		(SUNXI_IRQ_MBOX)
+#define AW_IRQ_WLAN		(SUNXI_IRQ_WLAN)
 
-#define AW_IRQ_ALARM		(0)
+#define AW_IRQ_ALARM		(SUNXI_IRQ_ALARM0)
 #define AW_IRQ_IR0		(0)
 #define AW_IRQ_IR1		(0)
 #define AW_IRQ_USBOTG		(SUNXI_IRQ_USBOTG)
@@ -154,16 +152,27 @@
 #define AW_IRQ_GPIOJ		(0)
 
 /**start address for function run in sram*/
-#define SRAM_FUNC_START    	(0xf0000000)
-#define SRAM_FUNC_START_PA 	(0x00000000)
-//for mem mapping
-#define MEM_SW_VA_SRAM_BASE 	(0x00000000)
-#define MEM_SW_PA_SRAM_BASE 	(0x00000000)
-//dram area
-#define DRAM_BASE_ADDR      	(0xc0000000)
+#define SRAM_FUNC_START		(0xf0000000)
+#define SRAM_FUNC_START_PA	(0x00000000)
+/*for mem mapping*/
+#define MEM_SW_VA_SRAM_BASE	(0x00000000)
+#define MEM_SW_PA_SRAM_BASE	(0x00000000)
+/*dram area*/
 #define DRAM_BASE_ADDR_PA	(0x40000000)
-#define DRAM_TRANING_SIZE   	(16)
+#define DRAM_TRANING_SIZE	(16)
 
-#define CPU_CLK_REST_DEFAULT_VAL	(0x00010000)	//SRC is HOSC.
-#endif /*_PM_CONFIG_SUN50IW1P1_H*/
+#define CPU_CLK_REST_DEFAULT_VAL	(0x00010000)	/*SRC is HOSC. */
 
+#define SUNXI_SRAM_C_VBASE     (0xf0004000)
+#define SUNXI_SRAM_C_PBASE     (0x00004000)
+#define SUNXI_SRAM_C_SIZE      (0x9000)
+
+/**---stack point address in sram-------------*/
+/*
+ * notice: try not to use last 0xc bytes, considering the ds-5 debugger will access (last + 0xc) bytes with unknown reason,
+ * which will hangup the soc.
+ **/
+#define SP_IN_SRAM		0xf000cff0	/*end of 52k */
+#define SP_IN_SRAM_PA		0x0000cff0	/*end of 52k */
+#define SP_IN_SRAM_START	(SRAM_FUNC_START_PA | 0x3c00)	/*15k */
+#endif /*_PM_CONFIG_SUN8IW10P1_H*/

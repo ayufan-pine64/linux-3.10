@@ -2081,16 +2081,18 @@ static int sensor_s_ctrl(struct v4l2_subdev *sd, struct v4l2_control *ctrl)
 	case V4L2_CID_AUTOGAIN:
 		return sensor_s_autogain(sd, ctrl->value);
 	case V4L2_CID_EXPOSURE:
-    case V4L2_CID_AUTO_EXPOSURE_BIAS:
+/*	case V4L2_CID_AUTO_EXPOSURE_BIAS:
 		return sensor_s_exp_bias(sd, ctrl->value);
-    case V4L2_CID_EXPOSURE_AUTO:
+	case V4L2_CID_EXPOSURE_AUTO:
 		return sensor_s_autoexp(sd, (enum v4l2_exposure_auto_type) ctrl->value);
+*/
     case V4L2_CID_AUTO_N_PRESET_WHITE_BALANCE:
   		return sensor_s_wb(sd, (enum v4l2_auto_n_preset_white_balance) ctrl->value); 
     case V4L2_CID_AUTO_WHITE_BALANCE:
 		return sensor_s_autowb(sd, ctrl->value);
-    case V4L2_CID_COLORFX:
+/*	case V4L2_CID_COLORFX:
 		return sensor_s_colorfx(sd, (enum v4l2_colorfx) ctrl->value);
+*/
     case V4L2_CID_FLASH_LED_MODE:
 		return sensor_s_flash_mode(sd, (enum v4l2_flash_led_mode) ctrl->value);
 	}

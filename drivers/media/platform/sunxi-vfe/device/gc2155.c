@@ -2328,15 +2328,26 @@ static void sensor_g_flash_flag(struct v4l2_subdev *sd, unsigned int *flash_flag
 static long sensor_ioctl(struct v4l2_subdev *sd, unsigned int cmd, void *arg)
 {
 	int ret=0;
-	//struct sensor_info *info = to_state(sd);
+	struct sensor_info *info = to_state(sd);
 	switch(cmd) {
-		case GET_SENSOR_EXIF:
-			sensor_g_exif(sd, (struct sensor_exif_attribute *)arg);
-			break;
-		case GET_FLASH_FLAG:
-			sensor_g_flash_flag(sd,(unsigned int *)arg);
-		default:
-			return -EINVAL;
+	case GET_SENSOR_EXIF:
+		sensor_g_exif(sd, (struct sensor_exif_attribute *)arg);
+		break;
+	case GET_FLASH_FLAG:
+		sensor_g_flash_flag(sd, (unsigned int *)arg);
+		break;
+	case GET_CURRENT_WIN_CFG:
+		if (info->current_wins != NULL) {
+			memcpy(arg, info->current_wins,
+				sizeof(struct sensor_win_size));
+				ret = 0;
+			} else {
+			vfe_dev_err("empty wins!\n");
+			ret = -1;
+			}
+		break;
+	default:
+		return -EINVAL;
 	}
 	return ret;
 }
@@ -2411,6 +2422,7 @@ sensor_win_sizes[] = {
 		.set_size   = NULL,
 	},
 	/* 720p */
+#if 0
 	{
 		.width      = HD720_WIDTH,
 		.height     = HD720_HEIGHT,
@@ -2420,6 +2432,7 @@ sensor_win_sizes[] = {
 		.regs_size	= ARRAY_SIZE(gc2155_hd720_regs),
 		.set_size   = NULL,
 	},
+#endif
 	/* SVGA */
 	{
 		.width      = SVGA_WIDTH,
@@ -2429,6 +2442,16 @@ sensor_win_sizes[] = {
 		.regs       = sensor_svga_regs,
 		.regs_size  = ARRAY_SIZE(sensor_svga_regs),
 		.set_size   = NULL,
+	},
+	/* VGA */
+	{
+		.width		= VGA_WIDTH,
+		.height		= VGA_HEIGHT,
+		.hoffset        = (800-640)/2,
+		.voffset        = (600-480)/2,
+		.regs		= sensor_svga_regs,
+		.regs_size	= ARRAY_SIZE(sensor_svga_regs),
+		.set_size	= NULL,
 	},
 };
 
@@ -2465,6 +2488,7 @@ static int sensor_try_fmt_internal(struct v4l2_subdev *sd,
 {
 	int index;
 	struct sensor_win_size *wsize;
+	struct sensor_info *info = to_state(sd);
 
 	for (index = 0; index < N_FMTS; index++)
 		if (sensor_formats[index].mbus_code == fmt->code)
@@ -2498,6 +2522,7 @@ static int sensor_try_fmt_internal(struct v4l2_subdev *sd,
 	*/
 	fmt->width = wsize->width;
 	fmt->height = wsize->height;
+	info->current_wins = wsize;
 
 	return 0;
 }
@@ -2740,17 +2765,18 @@ static int sensor_s_ctrl(struct v4l2_subdev *sd, struct v4l2_control *ctrl)
 		return sensor_s_gain(sd, ctrl->value);
 	case V4L2_CID_AUTOGAIN:
 		return sensor_s_autogain(sd, ctrl->value);
-	case V4L2_CID_EXPOSURE:
-    case V4L2_CID_AUTO_EXPOSURE_BIAS:
+/*	case V4L2_CID_EXPOSURE:
+	case V4L2_CID_AUTO_EXPOSURE_BIAS:
 		return sensor_s_exp_bias(sd, ctrl->value);
-    case V4L2_CID_EXPOSURE_AUTO:
+	case V4L2_CID_EXPOSURE_AUTO:
 		return sensor_s_autoexp(sd, (enum v4l2_exposure_auto_type) ctrl->value);
-    case V4L2_CID_AUTO_N_PRESET_WHITE_BALANCE:
-  		return sensor_s_wb(sd, (enum v4l2_auto_n_preset_white_balance) ctrl->value); 
-    case V4L2_CID_AUTO_WHITE_BALANCE:
+	case V4L2_CID_AUTO_N_PRESET_WHITE_BALANCE:
+		return sensor_s_wb(sd, (enum v4l2_auto_n_preset_white_balance) ctrl->value);
+	case V4L2_CID_AUTO_WHITE_BALANCE:
 		return sensor_s_autowb(sd, ctrl->value);
-    case V4L2_CID_COLORFX:
+	case V4L2_CID_COLORFX:
 		return sensor_s_colorfx(sd, (enum v4l2_colorfx) ctrl->value);
+*/
     case V4L2_CID_FLASH_LED_MODE:
 		return sensor_s_flash_mode(sd, (enum v4l2_flash_led_mode) ctrl->value);
 	}

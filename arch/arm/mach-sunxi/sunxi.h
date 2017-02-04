@@ -13,17 +13,26 @@
 #ifndef __MACH_SUNXI_H
 #define __MACH_SUNXI_H
 
-#define SUNXI_REGS_PHYS_BASE	0x01c00000
-#define SUNXI_REGS_VIRT_BASE	IOMEM(0xf1c00000)
-#define SUNXI_REGS_SIZE		(SZ_2M + SZ_1M)
-
-#ifdef CONFIG_ARCH_SUN8IW10P1
-#define SUNXI_SRAM_A1_VBASE     (0xf0000000)
+#if defined(CONFIG_ARCH_SUN8IW10P1)
 #define SUNXI_SRAM_A1_PBASE     (0x00000000)
 #define SUNXI_SRAM_A1_SIZE      (0x4000)
-#endif
-#ifdef CONFIG_SMP
-extern struct smp_operations sunxi_smp_ops;
+#define SUNXI_SRAM_C_PBASE     (0x00004000)
+#define SUNXI_SRAM_C_SIZE      (0x9000)
+
+#elif defined(CONFIG_ARCH_SUN8IW11P1)
+#define SUNXI_SRAM_A1_PBASE     (0x00000000)
+#define SUNXI_SRAM_A1_SIZE      (0x4000)
+#define SUNXI_SRAM_A_PBASE      (0x00000000)
+#define SUNXI_SRAM_A_SIZE      (0xC000)
+#elif defined(CONFIG_ARCH_SUN50IW1P1)
+#define SUNXI_SRAM_BROM_PBASE     (0x00000000)
+#define SUNXI_SRAM_BROM_SIZE      (0x00010000)
+#define SUNXI_SRAM_A1_PBASE       (0x00010000)
+#define SUNXI_SRAM_A1_SIZE        (0x00008000)
+#define SUNXI_SRAM_A2_PBASE       (0x00040000)
+#define SUNXI_SRAM_A2_SIZE        (0x00014000)
+#define SUNXI_SRAM_C_PBASE        (0x00018000)
+#define SUNXI_SRAM_C_SIZE         (0x00028000)
 #endif
 
 #endif /* __MACH_SUNXI_H */

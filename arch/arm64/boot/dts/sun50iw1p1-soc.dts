@@ -36,4 +36,10 @@
 		bt_hostwake = <&r_pio PL 5 6 0 0 0>;
 		status = "okay";
 	};
+    hall:hall {
+        compatible = "allwinner,hall";
+        hall_gpio = <&r_pio PL 12 6 0 0 0>;
+        hall_pos = <0>;
+        status = "okay";
+    };
 };

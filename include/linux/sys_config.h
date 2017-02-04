@@ -20,7 +20,7 @@
 /* pin group base number name space,
  * the max pin number : 26*32=832.
  */
- #if defined(CONFIG_ARCH_SUN50IW1P1)
+ #if (defined CONFIG_ARCH_SUN50IW1P1) || (defined CONFIG_ARCH_SUN50IW2P1)
 #define SUNXI_PINCTRL 	"1c20800.pinctrl"
 #define SUNXI_R_PINCTRL "1f02c00.pinctrl"
 #else

@@ -81,6 +81,8 @@ struct zram_stats {
 	u32 pages_stored;	/* no. of pages currently stored */
 	u32 good_compress;	/* % of pages with compression ratio<=50% */
 	u32 bad_compress;	/* % of pages with compression ratio>=75% */
+	u64 time_reads;		/* total time use for read*/
+	u64 time_writes;	/* total time use for write */
 };
 
 struct zram_meta {

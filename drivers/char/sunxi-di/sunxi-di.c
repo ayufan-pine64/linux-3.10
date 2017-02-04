@@ -84,7 +84,7 @@ static struct attribute_group di_attribute_group = {
 
 #ifdef DI_RESERVED_MEM
 #define MY_BYTE_ALIGN(x) ( ( (x + (4*1024-1)) >> 12) << 12)             /* alloc based on 4K byte */
-void *sunxi_di_alloc(u32 num_bytes, unsigned long phys_addr)
+void *sunxi_di_alloc(u32 num_bytes, unsigned long *phys_addr)
 {
 	u32 actual_bytes;
 	void* address = NULL;
@@ -145,7 +145,7 @@ static int di_mem_request(__di_mem_t *di_mem)
 		return -ENOMEM;
 	}
 #else
-	di_mem->v_addr = sunxi_di_alloc(di_mem->size, di_mem->p_addr);
+	di_mem->v_addr = sunxi_di_alloc(di_mem->size, (unsigned long*)&di_mem->p_addr);
 	if (NULL == di_mem->v_addr) {
 		printk(KERN_ERR "%s: failed!\n", __func__);
 		return -ENOMEM;
@@ -204,8 +204,10 @@ static void di_timer_handle(unsigned long arg)
 	di_irq_enable(0);
 	di_irq_clear();
 	di_reset();
-	memset(di_data->mem_in_params.v_addr, 0, flag_size);
-	memset(di_data->mem_out_params.v_addr, 0, flag_size);
+	if (NULL != di_data->mem_in_params.v_addr)
+		memset(di_data->mem_in_params.v_addr, 0, flag_size);
+	if (NULL != di_data->mem_out_params.v_addr)
+		memset(di_data->mem_out_params.v_addr, 0, flag_size);
 	printk(KERN_ERR "di_timer_handle: timeout \n");
 }
 
@@ -407,7 +409,8 @@ static s32 sunxi_di_resume(struct device *dev)
 
 static long sunxi_di_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
 {
-	void __user *argp = (void __user *)arg;
+	__di_para_t di_paras;
+	__di_para_t *di_para = &di_paras;
 	s32 ret = 0;
 	u32 field = 0;
 
@@ -416,8 +419,11 @@ static long sunxi_di_ioctl(struct file *filp, unsigned int cmd, unsigned long ar
 	switch (cmd) {
 	case DI_IOCSTART:
 		{
-			__di_para_t __user *di_para = argp;
-
+			if (copy_from_user((void *)di_para,
+				(void __user *)arg, sizeof(__di_para_t))) {
+				pr_warning("copy_from_user fail\n");
+				return -EFAULT;
+			}
 			dprintk(DEBUG_DATA_INFO, "%s: input_fb.addr[0] = 0x%lx\n", __func__, (unsigned long)(di_para->input_fb.addr[0]));
 			dprintk(DEBUG_DATA_INFO, "%s: input_fb.addr[1] = 0x%lx\n", __func__, (unsigned long)(di_para->input_fb.addr[1]));
 			dprintk(DEBUG_DATA_INFO, "%s: input_fb.size.width = %d\n", __func__, di_para->input_fb.size.width);
@@ -449,7 +455,6 @@ static long sunxi_di_ioctl(struct file *filp, unsigned int cmd, unsigned long ar
 				ret = di_complete_check_get();
 			}
 			di_complete_check_set(1);
-
 			field = di_para->top_field_first?di_para->field:(1-di_para->field);
 
 			dprintk(DEBUG_DATA_INFO, "%s: field = %d\n", __func__, field);
@@ -484,6 +489,15 @@ static long sunxi_di_ioctl(struct file *filp, unsigned int cmd, unsigned long ar
 	dprintk(DEBUG_TEST, "%s: out!!\n", __func__);
 	return ret;
 }
+
+#ifdef CONFIG_COMPAT
+static long sunxi_di_compat_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
+{
+	unsigned long translated_arg = (unsigned long)compat_ptr(arg);
+
+	return sunxi_di_ioctl(filp, cmd, translated_arg);
+}
+#endif
 
 static int sunxi_di_open(struct inode *inode, struct file *file)
 {
@@ -549,9 +563,14 @@ static const struct file_operations sunxi_di_fops = {
 	.owner = THIS_MODULE,
 	.llseek = noop_llseek,
 	.unlocked_ioctl = sunxi_di_ioctl,
+#ifdef CONFIG_COMPAT
+	.compat_ioctl	= sunxi_di_compat_ioctl,
+#endif
 	.open = sunxi_di_open,
 	.release = sunxi_di_release,
 };
+
+static u64 sunxi_di_dma_mask = DMA_BIT_MASK(32);
 
 static int sunxi_di_probe(struct platform_device *pdev)
 {
@@ -611,7 +630,8 @@ static int sunxi_di_probe(struct platform_device *pdev)
 	if (IS_ERR(di_dev_class))
 		return -1;
 	di_device = device_create(di_dev_class, NULL,  MKDEV(sunxi_di_major, 0), NULL, DI_MODULE_NAME);
-
+	di_device->dma_mask = &sunxi_di_dma_mask;
+	di_device->coherent_dma_mask = DMA_BIT_MASK(32);
 	ret = sunxi_di_params_init(pdev);
 	if (ret) {
 		printk(KERN_ERR "%s di init params failed!\n", __func__);

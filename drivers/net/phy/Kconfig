@@ -13,6 +13,9 @@ menuconfig PHYLIB
 if PHYLIB
 
 comment "MII PHY device drivers"
+config SUNXI_EPHY
+	tristate "Drivers for Allwinnertech EPHY"
+	depends on MFD_ACX00
 
 config AT803X_PHY
 	tristate "Drivers for Atheros AT803X PHYs"
@@ -143,6 +146,14 @@ config MDIO_OCTEON
 	  It is required by the Octeon Ethernet device drivers.
 
 	  If in doubt, say Y.
+
+config MDIO_SUN4I
+	tristate "Allwinner sun4i MDIO interface support"
+	depends on ARCH_SUNXI
+	help
+	  This driver supports the MDIO interface found in the network
+	  interface units of the Allwinner SoC that have an EMAC (A10,
+	  A12, A10s, etc.)
 
 config MDIO_BUS_MUX
 	tristate

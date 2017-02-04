@@ -22,5 +22,4 @@ extern __s32 mem_usb_init(void);
 extern __s32 mem_usb_exit(void);
 extern __s32 mem_query_usb_event(void);
 extern __s32 mem_is_usb_status_change(__u32 port);
-#endif  /* __MEM_USB_H__ */
-
+#endif				/* __MEM_USB_H__ */

@@ -126,29 +126,27 @@ static __s32 LCD_close_flow(__u32 sel)
 
 static void LCD_power_on(__u32 sel)
 {
-    printk("mb709_mipi: %s", __func__);
 	sunxi_lcd_power_enable(sel, 0);//config lcd_power pin to open lcd power0
+    sunxi_lcd_power_enable(sel, 1);//config lcd_power pin to open lcd power0
 //	sunxi_lcd_pwm_enable(sel);//open pwm module
 }
 
 static void LCD_power_off(__u32 sel)
 {
-    printk("mb709_mipi: %s", __func__);
 	sunxi_lcd_pin_cfg(sel, 0);
-	sunxi_lcd_power_disable(sel, 0);//config lcd_power pin to close lcd power0
+	sunxi_lcd_power_disable(sel, 1);//config lcd_power pin to close lcd power0
+    sunxi_lcd_power_disable(sel, 0);//config lcd_power pin to close lcd power0
 //	sunxi_lcd_pwm_disable(sel);//close pwm module
 }
 
 static void LCD_bl_open(__u32 sel)
 {
-    printk("mb709_mipi: %s", __func__);
 	sunxi_lcd_pwm_enable(sel);//open pwm module
 	sunxi_lcd_backlight_enable(sel);//config lcd_bl_en pin to open lcd backlight
 }
 
 static void LCD_bl_close(__u32 sel)
 {
-    printk("mb709_mipi: %s", __func__);
 	sunxi_lcd_backlight_disable(sel);//config lcd_bl_en pin to close lcd backlight
 	sunxi_lcd_pwm_disable(sel);//close pwm module
 }
@@ -725,7 +723,6 @@ static struct LCM_setting_table lcm_initialization_setting[] = {
 static void LCD_panel_init(__u32 sel)
 {
 	__u32 i;
-    printk("mb709_mipi: %s", __func__);
 	sunxi_lcd_pin_cfg(sel, 1);
 	sunxi_lcd_delay_ms(10);
 
@@ -762,7 +759,6 @@ static void LCD_panel_init(__u32 sel)
 
 static void LCD_panel_exit(__u32 sel)
 {
-    printk("mb709_mipi: %s", __func__);
 	sunxi_lcd_dsi_clk_disable(sel);
 	panel_rst(0);
 	return ;

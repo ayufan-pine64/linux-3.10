@@ -26,6 +26,10 @@ struct disp_device_private_data {
 	struct clk *clk_parent;
 
 	u32 irq_no;
+
+	u32 frame_per_sec;
+	u32 usec_per_line;
+	u32 judge_line;
 };
 
 s32 disp_tv_suspend(struct disp_device* ptv);

@@ -9,8 +9,7 @@
 * the Free Software Foundation.
 */
 
-
-#define SUNXI_SRAM_A1_PBASE			(0)  
+#define SUNXI_SRAM_A1_PBASE			(0)
 #define SUNXI_SRAM_A2_PBASE			(0)
 #define SUNXI_PIO_PBASE				(0)
 #define SUNXI_R_PRCM_PBASE			(0)
@@ -25,7 +24,7 @@
 #define SUNXI_CPUCFG_P_REG0			(0)
 #define SUNXI_CPUCFG_GENCTL			(0)
 #define SUNXI_CPUX_PWR_CLAMP(x)			(0)
-#define SUNXI_CPUX_PWR_CLAMP_STATUS(x)		(0) 
+#define SUNXI_CPUX_PWR_CLAMP_STATUS(x)		(0)
 #define SUNXI_CPU_PWROFF_REG			(0)
 #define SUNXI_RTC_PBASE		(0)
 #define SUNXI_SRAMCTRL_PBASE    (0)
@@ -40,8 +39,8 @@
 #define AW_CCM_BASE             (0)
 #endif
 
-#define SUNXI_IRQ_TIMER0      (50)		    	
-#define SUNXI_IRQ_TIMER1      (51)			
+#define SUNXI_IRQ_TIMER0      (50)
+#define SUNXI_IRQ_TIMER1      (51)
 #define SUNXI_IRQ_LRADC       (0)
 #define SUNXI_IRQ_NMI         (0)
 #define SUNXI_IRQ_ALARM0      (0)
@@ -100,4 +99,3 @@
 #define AXP_PIN_BASE	1024
 
 #endif /*_PM_CONFIG_COMMON_H*/
-

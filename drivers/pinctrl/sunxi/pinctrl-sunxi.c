@@ -28,12 +28,15 @@
 #include <linux/pinctrl/pinmux.h>
 #include <linux/pinctrl/pinconf-sunxi.h>
 #include <linux/platform_device.h>
+#include <linux/debugfs.h>
+#include <linux/seq_file.h>
 #include <linux/sys_config.h>
 #include <linux/slab.h>
 #include <linux/power/aw_pm.h>
 #include <linux/power/scenelock.h>
 #include "../core.h"
 #include "pinctrl-sunxi.h"
+
 static struct irq_chip sunxi_pinctrl_edge_irq_chip;
 static struct irq_chip sunxi_pinctrl_level_irq_chip;
 
@@ -142,6 +145,8 @@ sunxi_pinctrl_desc_find_function_by_pin(struct sunxi_pinctrl *pctl,
 			}
 		}
 	}
+
+	pr_warn("can't find function %s on pin %d\n", func_name, pin_num);
 
 	return NULL;
 }
@@ -626,6 +631,20 @@ sunxi_pmx_gpio_set_direction(struct pinctrl_dev *pctldev,
 	return 0;
 }
 
+static void sunxi_pmx_gpio_disable_free(struct pinctrl_dev *pctldev,
+				struct pinctrl_gpio_range *range,
+				unsigned offset)
+{
+	struct sunxi_pinctrl *pctl = pinctrl_dev_get_drvdata(pctldev);
+	struct sunxi_desc_function *desc;
+
+	desc = sunxi_pinctrl_desc_find_function_by_pin(pctl, offset, "io_disabled");
+	if (!desc)
+		return;
+
+	sunxi_pmx_set(pctldev, offset, desc->muxval, true);
+}
+
 static const struct pinmux_ops sunxi_pmx_ops = {
 	.get_functions_count	= sunxi_pmx_get_funcs_cnt,
 	.get_function_name	= sunxi_pmx_get_func_name,
@@ -633,6 +652,7 @@ static const struct pinmux_ops sunxi_pmx_ops = {
 	.enable			= sunxi_pmx_set_mux_enable,
 	.disable		= sunxi_pmx_set_mux_disable,
 	.gpio_set_direction	= sunxi_pmx_gpio_set_direction,
+	.gpio_disable_free	= sunxi_pmx_gpio_disable_free,
 };
 
 static int sunxi_pinctrl_gpio_request(struct gpio_chip *chip, unsigned offset)
@@ -767,25 +787,16 @@ static int sunxi_pinctrl_gpio_to_irq(struct gpio_chip *chip, unsigned offset)
 
 	return irq_find_mapping(pctl->domain, irqnum);
 }
-#if 0
+
 static int sunxi_pinctrl_irq_request_resources(struct irq_data *d)
 {
 	struct sunxi_pinctrl *pctl = irq_data_get_irq_chip_data(d);
 	struct sunxi_desc_function *func;
-	int ret;
 
 	func = sunxi_pinctrl_desc_find_function_by_pin(pctl,
 					pctl->irq_array[d->hwirq], "irq");
 	if (!func)
 		return -EINVAL;
-
-	ret = gpio_lock_as_irq(pctl->chip,
-			pctl->irq_array[d->hwirq] - pctl->desc->pin_base);
-	if (ret) {
-		dev_err(pctl->dev, "unable to lock HW IRQ %lu for IRQ\n",
-			irqd_to_hwirq(d));
-		return ret;
-	}
 
 	/* Change muxing to INT mode */
 	sunxi_pmx_set(pctl->pctl_dev, pctl->irq_array[d->hwirq], func->muxval, true);
@@ -796,16 +807,21 @@ static int sunxi_pinctrl_irq_request_resources(struct irq_data *d)
 static void sunxi_pinctrl_irq_release_resources(struct irq_data *d)
 {
 	struct sunxi_pinctrl *pctl = irq_data_get_irq_chip_data(d);
+	struct sunxi_desc_function *func;
 
-	gpio_unlock_as_irq(pctl->chip,
-			   pctl->irq_array[d->hwirq] - pctl->desc->pin_base);
+	func = sunxi_pinctrl_desc_find_function_by_pin(pctl,
+					pctl->irq_array[d->hwirq], "io_disabled");
+	if (!func)
+		return;
+
+	/* Change muxing to io_disabled mode */
+	sunxi_pmx_set(pctl->pctl_dev, pctl->irq_array[d->hwirq], func->muxval, true);
 }
-#endif
+
 static int sunxi_pinctrl_irq_set_type(struct irq_data *d, unsigned int type)
 {
 	struct sunxi_pinctrl *pctl = irq_data_get_irq_chip_data(d);
 	struct irq_desc *desc = container_of(d, struct irq_desc, irq_data);
-	struct sunxi_desc_function *func;
 	u32 reg = sunxi_irq_cfg_reg(d->hwirq);
 	u8 index = sunxi_irq_cfg_offset(d->hwirq);
 	unsigned long flags;
@@ -839,15 +855,6 @@ static int sunxi_pinctrl_irq_set_type(struct irq_data *d, unsigned int type)
 		d->chip = &sunxi_pinctrl_edge_irq_chip;
 		desc->handle_irq = handle_edge_irq;
 	}
-
-	func = sunxi_pinctrl_desc_find_function_by_pin(pctl,
-				pctl->irq_array[d->hwirq], "irq");
-	if (!func){
-		return -EINVAL;
-	}
-	/* Change muxing to INT mode */
-	sunxi_pmx_set(pctl->pctl_dev, pctl->irq_array[d->hwirq], func->muxval, true);
-
 
 	spin_lock_irqsave(&pctl->lock, flags);
 
@@ -928,6 +935,8 @@ static struct irq_chip sunxi_pinctrl_edge_irq_chip = {
 	.irq_ack	= sunxi_pinctrl_irq_ack,
 	.irq_mask	= sunxi_pinctrl_irq_mask,
 	.irq_unmask	= sunxi_pinctrl_irq_unmask,
+	.irq_request_resources = sunxi_pinctrl_irq_request_resources,
+	.irq_release_resources = sunxi_pinctrl_irq_release_resources,
 	.irq_set_type	= sunxi_pinctrl_irq_set_type,
 	.irq_set_wake	= sunxi_pinctrl_irq_set_wake,
 	.irq_disable	= sunxi_pinctrl_irq_mask,
@@ -941,9 +950,11 @@ static struct irq_chip sunxi_pinctrl_level_irq_chip = {
 	 * using these to suppress irqs while they clear the irq source */
 	.irq_enable	= sunxi_pinctrl_irq_ack_unmask,
 	.irq_disable	= sunxi_pinctrl_irq_mask,
+	.irq_request_resources = sunxi_pinctrl_irq_request_resources,
+	.irq_release_resources = sunxi_pinctrl_irq_release_resources,
 	.irq_set_type	= sunxi_pinctrl_irq_set_type,
-	.flags		= IRQCHIP_EOI_IF_HANDLED ,
 	.irq_set_wake	= sunxi_pinctrl_irq_set_wake,
+	.flags		= IRQCHIP_EOI_IF_HANDLED,
 };
 
 static irqreturn_t sunxi_pinctrl_irq_handler(int irq, void *dev_id)
@@ -1084,6 +1095,498 @@ static int sunxi_pinctrl_build_state(struct platform_device *pdev)
 
 	return 0;
 }
+
+/* Show sunxi pinctrl state, provide debug information */
+void sunxi_pinctrl_state_show(void)
+{
+	struct pinctrl_dev *pctldev;
+	struct sunxi_pinctrl *pctl;
+	unsigned long config;
+	unsigned i, pin, muxsel;
+
+	pctldev = get_pinctrl_dev_from_devname(SUNXI_PINCTRL);
+	if (!pctldev) {
+		pr_err("can't get pinctrl dev for %s\n", SUNXI_PINCTRL);
+		return;
+	}
+
+	pctl = pinctrl_dev_get_drvdata(pctldev);
+
+	pr_info("pio function state: (%d pins registered)\n",
+		pctl->desc->npins);
+	pr_info("pin num (name): function    owner\n");
+
+	/* The pin number can be retrived from the pin controller descriptor */
+	for (i = 0; i < pctl->desc->npins; i++) {
+		struct pin_desc *desc;
+		struct sunxi_desc_function *func;
+
+		pin = pctldev->desc->pins[i].number;
+		desc = pin_desc_get(pctldev, pin);
+
+		/* Get real pin function */
+		config = SUNXI_PINCFG_PACK(SUNXI_PINCFG_TYPE_FUNC, 0xFFFF);
+		sunxi_pconf_get(pctldev, pin, &config);
+		muxsel = SUNXI_PINCFG_UNPACK_VALUE(config);
+
+		func = pctl->desc->pins[i].functions;
+		while (func->name) {
+			if (func->muxval == muxsel)
+				break;
+			func++;
+		}
+
+		pr_info("pin %-3d (%-4s): %-11s %s\n", pin, desc->name,
+			 func->name ? func->name : "(UNCLAIMED)",
+			 desc->mux_owner ? desc->mux_owner : "(UNCLAIMED)");
+	}
+}
+EXPORT_SYMBOL_GPL(sunxi_pinctrl_state_show);
+
+#ifdef CONFIG_DEBUG_FS
+#define SUNXI_MAX_NAME_LEN 20
+static char sunxi_dbg_pinname[SUNXI_MAX_NAME_LEN];
+static unsigned long sunxi_dbg_function;
+static unsigned long sunxi_dbg_data;
+static unsigned long sunxi_dbg_level;
+static unsigned long sunxi_dbg_pull;
+
+static int sunxi_pin_configure_show(struct seq_file *s, void *d)
+{
+	int pin;
+	unsigned long config;
+	char *dev_name="sunxi-pinctrl";
+	struct pinctrl_dev *pctldev;
+	struct sunxi_pinctrl *pctl;
+
+	/* get pinctrl device */
+	pctldev = get_pinctrl_dev_from_devname(dev_name);
+	if (!pctldev) {
+		seq_printf(s, "cannot get pinctrl device from devname\n");
+		return -EINVAL;
+	}
+
+	/* change pin name to pin index */
+	pin = pin_get_from_name(pctldev, sunxi_dbg_pinname);
+	if (pin < 0){
+		seq_printf(s, "unvalid pin for debugfs\n");
+		return -EINVAL;
+	}
+	pctl = pinctrl_dev_get_drvdata(pctldev);
+
+	/*get pin func*/
+	config = SUNXI_PINCFG_PACK(SUNXI_PINCFG_TYPE_FUNC, 0XFFFF);
+	pin_config_get(SUNXI_PINCTRL, sunxi_dbg_pinname, &config);
+	seq_printf(s, "pin[%s] funciton: %lx\n", sunxi_dbg_pinname,
+			SUNXI_PINCFG_UNPACK_VALUE(config));
+
+	/*get pin data*/
+	config = SUNXI_PINCFG_PACK(SUNXI_PINCFG_TYPE_DAT, 0XFFFF);
+	pin_config_get(SUNXI_PINCTRL, sunxi_dbg_pinname, &config);
+	seq_printf(s, "pin[%s] data: %lx\n", sunxi_dbg_pinname,
+			SUNXI_PINCFG_UNPACK_VALUE(config));
+
+	/*get pin dlevel*/
+	config = SUNXI_PINCFG_PACK(SUNXI_PINCFG_TYPE_DRV, 0XFFFF);
+	pin_config_get(SUNXI_PINCTRL,sunxi_dbg_pinname, &config);
+	seq_printf(s, "pin[%s] dlevel: %lx\n", sunxi_dbg_pinname,
+			SUNXI_PINCFG_UNPACK_VALUE(config));
+
+	/*get pin pull*/
+	config = SUNXI_PINCFG_PACK(SUNXI_PINCFG_TYPE_PUD, 0XFFFF);
+	pin_config_get(SUNXI_PINCTRL, sunxi_dbg_pinname, &config);
+	seq_printf(s, "pin[%s] pull: %lx\n", sunxi_dbg_pinname,
+			SUNXI_PINCFG_UNPACK_VALUE(config));
+
+	return 0;
+}
+
+static ssize_t sunxi_pin_configure_write(struct file *file,	const char __user *user_buf,
+		size_t count, loff_t *ppos)
+{
+	int err;
+	unsigned int pin;
+	unsigned int function;
+	unsigned int data;
+	unsigned int pull;
+	unsigned int dlevel;
+	unsigned long config;
+	char *dev_name = "sunxi-pinctrl";
+	struct pinctrl_dev *pctldev;
+	struct sunxi_pinctrl *pctl;
+
+	err=sscanf(user_buf, "%s %u %u %u %u", sunxi_dbg_pinname,
+			&function, &data, &dlevel, &pull);
+	if(err != 6)
+		return -EINVAL;
+
+	if (function > 7) {
+		pr_debug("Input Parameters function error!\n");
+		return -EINVAL;
+	}
+	sunxi_dbg_function = function;
+
+	if (data > 1) {
+		pr_debug("Input Parameters data error!\n");
+		return -EINVAL;
+	}
+	sunxi_dbg_data = data;
+
+	if (pull > 3) {
+		pr_debug("Input Parameters pull error!\n");
+		return -EINVAL;
+	}
+	sunxi_dbg_pull = pull;
+
+	if (dlevel > 3) {
+		pr_debug("Input Parameters dlevel error!\n");
+		return -EINVAL;
+	}
+	sunxi_dbg_level = dlevel;
+
+	pctldev = get_pinctrl_dev_from_devname(dev_name);
+	if (!pctldev) {
+		return -EINVAL;
+	}
+
+	pin = pin_get_from_name(pctldev, sunxi_dbg_pinname);
+	if (pin < 0){
+		return -EINVAL;
+	}
+	pctl = pinctrl_dev_get_drvdata(pctldev);
+
+	/* set function value*/
+	config = SUNXI_PINCFG_PACK(SUNXI_PINCFG_TYPE_FUNC,function);
+	pin_config_set(SUNXI_PINCTRL,sunxi_dbg_pinname,config);
+	pr_debug("pin[%s] set function:     %x;\n", sunxi_dbg_pinname, function);
+
+	/* set data value*/
+	config = SUNXI_PINCFG_PACK(SUNXI_PINCFG_TYPE_DAT, data);
+	pin_config_set(SUNXI_PINCTRL, sunxi_dbg_pinname, config);
+	pr_debug("pin[%s] set data:     %x;\n", sunxi_dbg_pinname, data);
+
+	/* set dlevel value*/
+	config = SUNXI_PINCFG_PACK(SUNXI_PINCFG_TYPE_DRV, dlevel);
+	pin_config_set(SUNXI_PINCTRL, sunxi_dbg_pinname, config);
+	pr_debug("pin[%s] set dlevel:     %x;\n", sunxi_dbg_pinname, dlevel);
+
+	/* set pull value*/
+	config = SUNXI_PINCFG_PACK(SUNXI_PINCFG_TYPE_PUD, pull);
+	pin_config_set(SUNXI_PINCTRL, sunxi_dbg_pinname, config);
+	pr_debug("pin[%s] set pull:     %x;\n", sunxi_dbg_pinname, pull);
+
+	return count;
+}
+
+static int sunxi_pin_show(struct seq_file *s, void *d)
+{
+	if (strlen(sunxi_dbg_pinname))
+		seq_printf(s, "%s\n", sunxi_dbg_pinname);
+	else
+		seq_printf(s, "No pin name set\n");
+
+	return 0;
+}
+
+static ssize_t sunxi_pin_write(struct file *file,
+	const char __user *user_buf, size_t count, loff_t *ppos)
+{
+	int err;
+
+	if (count > SUNXI_MAX_NAME_LEN)
+		return -EINVAL;
+
+	err = sscanf(user_buf, "%19s", sunxi_dbg_pinname);
+	if (err != 1)
+		return -EINVAL;
+
+	return count;
+}
+
+static int sunxi_pin_function_show(struct seq_file *s, void *d)
+{
+	unsigned long config;
+
+	config = SUNXI_PINCFG_PACK(SUNXI_PINCFG_TYPE_FUNC, 0XFFFF);
+	pin_config_get(SUNXI_PINCTRL, sunxi_dbg_pinname, &config);
+	seq_printf(s, "pin[%s] funciton: %lx\n", sunxi_dbg_pinname,
+			SUNXI_PINCFG_UNPACK_VALUE(config));
+	return 0;
+}
+
+static ssize_t sunxi_pin_function_write(struct file *file, const char __user *user_buf,
+		size_t count, loff_t *ppos)
+{
+	int err;
+	unsigned long function;
+	unsigned long config;
+
+	err = sscanf(user_buf, "%s %lu", sunxi_dbg_pinname, &function);
+	if(err != 2 )
+		return err;
+
+	if (function > 7) {
+		pr_debug("Input Parameters function error!\n");
+		return -EINVAL;
+	}
+	sunxi_dbg_function = function;
+
+	config = SUNXI_PINCFG_PACK(SUNXI_PINCFG_TYPE_FUNC,function);
+	pin_config_set(SUNXI_PINCTRL,sunxi_dbg_pinname,config);
+
+	return count;
+}
+
+static int sunxi_pin_data_show(struct seq_file *s, void *d)
+{
+	unsigned long config;
+
+	config = SUNXI_PINCFG_PACK(SUNXI_PINCFG_TYPE_DAT, 0XFFFF);
+	pin_config_get(SUNXI_PINCTRL, sunxi_dbg_pinname, &config);
+	seq_printf(s, "pin[%s] data: %lx\n", sunxi_dbg_pinname,
+			SUNXI_PINCFG_UNPACK_VALUE(config));
+	return 0;
+}
+
+static ssize_t sunxi_pin_data_write(struct file *file, const char __user *user_buf,
+		size_t count, loff_t *ppos)
+{
+	int err;
+	unsigned long data;
+	unsigned long config;
+
+	err = sscanf(user_buf, "%s %lu", sunxi_dbg_pinname, &data);
+	if(err != 2 )
+		return err;
+
+	if (data > 1) {
+		pr_debug("Input Parameters data error!\n");
+		return -EINVAL;
+	}
+	sunxi_dbg_data = data;
+
+	config = SUNXI_PINCFG_PACK(SUNXI_PINCFG_TYPE_DAT, data);
+	pin_config_set(SUNXI_PINCTRL, sunxi_dbg_pinname, config);
+
+	return count;
+}
+
+static int sunxi_pin_dlevel_show(struct seq_file *s, void *d)
+{
+	unsigned long config;
+
+	config = SUNXI_PINCFG_PACK(SUNXI_PINCFG_TYPE_DRV, 0XFFFF);
+	pin_config_get(SUNXI_PINCTRL,sunxi_dbg_pinname, &config);
+	seq_printf(s, "pin[%s] dlevel: %lx\n", sunxi_dbg_pinname,
+			SUNXI_PINCFG_UNPACK_VALUE(config));
+	return 0;
+}
+
+static ssize_t sunxi_pin_dlevel_write(struct file *file,
+	const char __user *user_buf, size_t count, loff_t *ppos)
+{
+	int err;
+	unsigned long dlevel;
+	unsigned long config;
+
+	err = sscanf(user_buf, "%s %lu", sunxi_dbg_pinname, &dlevel);
+	if(err != 2 )
+		return err;
+
+	if (dlevel > 3) {
+		pr_debug("Input Parameters dlevel error!\n");
+		return -EINVAL;
+	}
+	sunxi_dbg_level = dlevel;
+
+	config = SUNXI_PINCFG_PACK(SUNXI_PINCFG_TYPE_DRV, dlevel);
+	pin_config_set(SUNXI_PINCTRL, sunxi_dbg_pinname, config);
+
+	return count;
+}
+
+static int sunxi_pin_pull_show(struct seq_file *s, void *d)
+{
+	unsigned long config;
+
+	config = SUNXI_PINCFG_PACK(SUNXI_PINCFG_TYPE_PUD, 0XFFFF);
+	pin_config_get(SUNXI_PINCTRL, sunxi_dbg_pinname, &config);
+	seq_printf(s, "pin[%s] pull: %lx\n", sunxi_dbg_pinname,
+			SUNXI_PINCFG_UNPACK_VALUE(config));
+	return 0;
+}
+
+static ssize_t sunxi_pin_pull_write(struct file *file, const char __user *user_buf,
+		size_t count, loff_t *ppos)
+{
+	int err;
+	unsigned long pull;
+	unsigned long config;
+
+	err = sscanf(user_buf, "%s %lu", sunxi_dbg_pinname, &pull);
+	if(err != 2 )
+		return err;
+
+	if (pull > 3) {
+		pr_debug("Input Parameters pull error!\n");
+		return -EINVAL;
+	}
+	sunxi_dbg_pull = pull;
+
+	config = SUNXI_PINCFG_PACK(SUNXI_PINCFG_TYPE_PUD, pull);
+	pin_config_set(SUNXI_PINCTRL, sunxi_dbg_pinname, config);
+
+	return count;
+}
+
+static int sunxi_platform_show(struct seq_file *s, void *d)
+{
+#if defined(CONFIG_ARCH_SUN8IW10P1)
+	seq_printf(s, "SUN8IW10P1\n");
+#elif defined(CONFIG_ARCH_SUN8IW11P1)
+	seq_printf(s, "SUN8IW11P1\n");
+#elif defined(CONFIG_ARCH_SUN50IW1P1)
+	seq_printf(s, "SUN50IW1P1\n");
+#elif defined(CONFIG_ARCH_SUN50IW2P1)
+	seq_printf(s, "SUN50IW2P1\n");
+#else
+	seq_printf(s, "NOT MATCH\n");
+#endif
+	return 0;
+}
+
+static ssize_t sunxi_platform_write(struct file *file, const char __user *user_buf,
+		size_t count, loff_t *ppos)
+{
+	return count;
+}
+
+static int sunxi_pin_configure_open(struct inode *inode, struct file *file)
+{
+	return single_open(file, sunxi_pin_configure_show, inode->i_private);
+}
+
+static int sunxi_pin_open(struct inode *inode, struct file *file)
+{
+	return single_open(file, sunxi_pin_show, inode->i_private);
+}
+
+static int sunxi_pin_function_open(struct inode *inode, struct file *file)
+{
+	return single_open(file, sunxi_pin_function_show, inode->i_private);
+}
+
+static int sunxi_pin_data_open(struct inode *inode, struct file *file)
+{
+	return single_open(file, sunxi_pin_data_show, inode->i_private);
+}
+
+static int sunxi_pin_dlevel_open(struct inode *inode, struct file *file)
+{
+	return single_open(file, sunxi_pin_dlevel_show, inode->i_private);
+}
+
+static int sunxi_pin_pull_open(struct inode *inode, struct file *file)
+{
+	return single_open(file, sunxi_pin_pull_show, inode->i_private);
+}
+
+static int sunxi_platform_open(struct inode *inode, struct file *file)
+{
+	return single_open(file, sunxi_platform_show, inode->i_private);
+}
+
+static const struct file_operations sunxi_pin_configure_ops = {
+	.open		= sunxi_pin_configure_open,
+	.write		= sunxi_pin_configure_write,
+	.read		= seq_read,
+	.llseek		= seq_lseek,
+	.release	= single_release,
+	.owner		= THIS_MODULE,
+};
+
+static const struct file_operations sunxi_pin_ops = {
+	.open		= sunxi_pin_open,
+	.write		= sunxi_pin_write,
+	.read		= seq_read,
+	.llseek		= seq_lseek,
+	.release	= single_release,
+	.owner		= THIS_MODULE,
+};
+
+static const struct file_operations sunxi_pin_function_ops = {
+	.open		= sunxi_pin_function_open,
+	.write		= sunxi_pin_function_write,
+	.read		= seq_read,
+	.llseek		= seq_lseek,
+	.release	= single_release,
+	.owner		= THIS_MODULE,
+};
+
+static const struct file_operations sunxi_pin_data_ops = {
+	.open		= sunxi_pin_data_open,
+	.write		= sunxi_pin_data_write,
+	.read		= seq_read,
+	.llseek		= seq_lseek,
+	.release	= single_release,
+	.owner		= THIS_MODULE,
+};
+
+static const struct file_operations sunxi_pin_dlevel_ops = {
+	.open		= sunxi_pin_dlevel_open,
+	.write		= sunxi_pin_dlevel_write,
+	.read		= seq_read,
+	.llseek		= seq_lseek,
+	.release	= single_release,
+	.owner		= THIS_MODULE,
+};
+
+static const struct file_operations sunxi_pin_pull_ops = {
+	.open		= sunxi_pin_pull_open,
+	.write		= sunxi_pin_pull_write,
+	.read		= seq_read,
+	.llseek		= seq_lseek,
+	.release	= single_release,
+	.owner		= THIS_MODULE,
+};
+
+static const struct file_operations sunxi_platform_ops = {
+	.open		= sunxi_platform_open,
+	.write		= sunxi_platform_write,
+	.read		= seq_read,
+	.llseek		= seq_lseek,
+	.release	= single_release,
+	.owner		= THIS_MODULE,
+};
+
+static struct dentry *debugfs_root;
+
+static void sunxi_pinctrl_debugfs(void)
+{
+	debugfs_root = debugfs_create_dir("sunxi_pinctrl", NULL);
+	if (IS_ERR(debugfs_root) || !debugfs_root) {
+		pr_debug("failed to create debugfs directory\n");
+		debugfs_root = NULL;
+		return;
+	}
+
+	debugfs_create_file("sunxi_pin_configure",(S_IRUGO | S_IWUSR | S_IWGRP),
+			    debugfs_root, NULL, &sunxi_pin_configure_ops);
+	debugfs_create_file("sunxi_pin", (S_IRUGO | S_IWUSR | S_IWGRP),
+			    debugfs_root, NULL, &sunxi_pin_ops);
+	debugfs_create_file("function", (S_IRUGO | S_IWUSR | S_IWGRP),
+			    debugfs_root, NULL, &sunxi_pin_function_ops);
+	debugfs_create_file("data", (S_IRUGO | S_IWUSR | S_IWGRP),
+			    debugfs_root, NULL, &sunxi_pin_data_ops);
+	debugfs_create_file("dlevel", (S_IRUGO | S_IWUSR | S_IWGRP),
+			    debugfs_root, NULL, &sunxi_pin_dlevel_ops);
+	debugfs_create_file("pull", (S_IRUGO | S_IWUSR | S_IWGRP),
+			    debugfs_root, NULL, &sunxi_pin_pull_ops);
+	debugfs_create_file("platform", (S_IRUGO | S_IWUSR | S_IWGRP),
+			    debugfs_root, NULL, &sunxi_platform_ops);
+
+}
+#endif
 
 int sunxi_pinctrl_init(struct platform_device *pdev,
 		       const struct sunxi_pinctrl_desc *desc)
@@ -1253,6 +1756,10 @@ int sunxi_pinctrl_init(struct platform_device *pdev,
 				return ret;
 		}
 	}
+
+#ifdef CONFIG_DEBUG_FS
+	sunxi_pinctrl_debugfs();
+#endif
 
 	dev_info(&pdev->dev, "initialized sunXi PIO driver\n");
 

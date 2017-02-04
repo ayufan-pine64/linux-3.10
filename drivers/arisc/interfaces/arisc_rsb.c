@@ -21,10 +21,6 @@
 
 #include "../arisc_i.h"
 
-#if (defined CONFIG_ARCH_SUN8IW3P1) || (defined CONFIG_ARCH_SUN8IW5P1) || (defined CONFIG_ARCH_SUN8IW6P1) || \
-    (defined CONFIG_ARCH_SUN8IW7P1) || (defined CONFIG_ARCH_SUN8IW9P1) || (defined CONFIG_ARCH_SUN9IW1P1) || \
-    (defined CONFIG_ARCH_SUN50IW1P1)
-
 /*
  * used for indicate aduio codec been initialized,
  * modules like audio & trc mabye initialize,
@@ -260,4 +256,3 @@ int arisc_rsb_set_rtsaddr(u32 devaddr, u32 rtsaddr)
 	return result;
 }
 EXPORT_SYMBOL(arisc_rsb_set_rtsaddr);
-#endif

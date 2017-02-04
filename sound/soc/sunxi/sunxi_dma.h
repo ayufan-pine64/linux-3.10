@@ -21,6 +21,11 @@ struct sunxi_dma_params {
 	u8 dst_maxburst;
 	u8 dma_drq_type_num;
 };
+
+struct sunxi_hdmi_priv {
+	unsigned int hdmi_format;
+};
+
 extern int asoc_dma_platform_register(struct device *dev,unsigned int flags);
 extern void asoc_dma_platform_unregister(struct device *dev);
 #endif

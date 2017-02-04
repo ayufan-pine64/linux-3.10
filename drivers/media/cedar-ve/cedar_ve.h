@@ -27,12 +27,10 @@ enum IOCTL_CMD {
 
 	IOCTL_READ_REG = 0x300,
 	IOCTL_WRITE_REG,
-	
 	IOCTL_SET_VOL = 0x400,
 
-#if ((defined CONFIG_ARCH_SUN8IW8P1) || (defined CONFIG_ARCH_SUN50I))
 	IOCTL_WAIT_JPEG_DEC = 0x500,
-#endif
+
 	IOCTL_GET_REFCOUNT,
 };
 
@@ -72,6 +70,25 @@ struct cedarv_engine_task_info {
 
 struct cedarv_regop {
     unsigned long addr;
+    unsigned int value;
+};
+
+struct cedarv_env_infomation_compat {
+	unsigned int phymem_start;
+	int  phymem_total_size;
+	u32  address_macc;
+};
+
+struct __cedarv_task_compat {
+	int task_prio;
+	int ID;
+	u32 timeout;
+	unsigned int frametime;
+	unsigned int block_mode;
+};
+
+struct cedarv_regop_compat {
+	u32 addr;
     unsigned int value;
 };
 /*--------------------------------------------------------------------------------*/

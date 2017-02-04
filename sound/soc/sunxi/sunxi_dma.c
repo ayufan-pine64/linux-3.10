@@ -1,9 +1,10 @@
 /*
  * sound\soc\sunxi\sunxi_dma.c
  * (C) Copyright 2014-2016
- * Reuuimlla Technology Co., Ltd. <www.reuuimllatech.com>
+ * AllWinner Technology Co., Ltd. <www.allwinnertech.com>
  * huangxin <huangxin@Reuuimllatech.com>
  * Liu shaohua <liushaohua@allwinnertech.com>
+ * wolfgang huang <huangjinhui@allwinnertech.com>
  * some simple description for this code
  *
  * This program is free software; you can redistribute it and/or
@@ -27,9 +28,8 @@
 #include <linux/dmaengine.h>
 #include <asm/dma.h>
 #include "sunxi_dma.h"
-#include "sunxi_tdm_utils.h"
 
-static int raw_flag = 1;
+static int raw_flag;
 static dma_addr_t hdmiraw_dma_addr = 0;
 static dma_addr_t hdmipcm_dma_addr = 0;
 static unsigned char *hdmiraw_dma_area;	/* DMA area */
@@ -162,28 +162,23 @@ static int sunxi_pcm_hw_params(struct snd_pcm_substream *substream,
 	int ret;
 
 	dmap = snd_soc_dai_get_dma_data(rtd->cpu_dai, substream);
+
 	ret = snd_hwparams_to_dma_slave_config(substream, params, &slave_config);
 	if (ret) {
 		dev_err(dev, "hw params config failed with err %d\n", ret);
 		return ret;
 	}
-		if (SNDRV_PCM_FORMAT_S8 == params_format(params)) {
-		slave_config.src_addr_width = DMA_SLAVE_BUSWIDTH_1_BYTE;
-		slave_config.dst_addr_width = DMA_SLAVE_BUSWIDTH_1_BYTE;
-	} else if (SNDRV_PCM_FORMAT_S16_LE == params_format(params)) {
-		slave_config.src_addr_width = DMA_SLAVE_BUSWIDTH_2_BYTES;
-		slave_config.dst_addr_width = DMA_SLAVE_BUSWIDTH_2_BYTES;
-	} else {
-		slave_config.src_addr_width = DMA_SLAVE_BUSWIDTH_4_BYTES;
-		slave_config.dst_addr_width = DMA_SLAVE_BUSWIDTH_4_BYTES;
-	}
+
 	slave_config.dst_maxburst = dmap->dst_maxburst;
 	slave_config.src_maxburst = dmap->src_maxburst;
+
 	if (substream->stream == SNDRV_PCM_STREAM_PLAYBACK) {
 		slave_config.dst_addr = dmap->dma_addr;
+		slave_config.src_addr_width = slave_config.dst_addr_width;
 		slave_config.slave_id = sunxi_slave_id(dmap->dma_drq_type_num, DRQSRC_SDRAM);
 	} else {
 		slave_config.src_addr =	dmap->dma_addr;
+		slave_config.dst_addr_width = slave_config.src_addr_width;
 		slave_config.slave_id = sunxi_slave_id(DRQDST_SDRAM, dmap->dma_drq_type_num);
 	}
 
@@ -194,6 +189,7 @@ static int sunxi_pcm_hw_params(struct snd_pcm_substream *substream,
 	}
 
 	snd_pcm_set_runtime_buffer(substream, &substream->dma_buffer);
+
 	return 0;
 }
 
@@ -201,43 +197,39 @@ static int sunxi_pcm_hw_params(struct snd_pcm_substream *substream,
 static int sunxi_pcm_hdmi_hw_params(struct snd_pcm_substream *substream,
 	struct snd_pcm_hw_params *params)
 {
-
-	struct sunxi_dma_params *dmap;
-	struct snd_soc_dai *cpu_dai 	= NULL;
-	struct sunxi_tdm_info  *sunxi_tdmhdmi = NULL;
 	struct snd_soc_pcm_runtime *rtd = substream->private_data;
-	struct device *dev = rtd->platform->dev;
+	struct snd_soc_card *card = rtd->card;
+	struct device *dev = card->dev;
 	struct dma_chan *chan = snd_dmaengine_pcm_get_chan(substream);
 	struct dma_slave_config slave_config;
+	struct sunxi_dma_params *dmap;
+	struct sunxi_hdmi_priv *sunxi_hdmi = snd_soc_card_get_drvdata(card);
 	int ret;
-	cpu_dai 	= rtd->cpu_dai;
-	sunxi_tdmhdmi = snd_soc_dai_get_drvdata(cpu_dai);
 
-	raw_flag = sunxi_tdmhdmi->others;
+	raw_flag = sunxi_hdmi->hdmi_format;
+	pr_info("raw_flag value is %u\n", raw_flag);
 	dmap = snd_soc_dai_get_dma_data(rtd->cpu_dai, substream);
+
 	ret = snd_hwparams_to_dma_slave_config(substream, params, &slave_config);
 	if (ret) {
 		dev_err(dev, "hw params config failed with err %d\n", ret);
 		return ret;
 	}
-	if (SNDRV_PCM_FORMAT_S8 == params_format(params)) {
-		slave_config.src_addr_width = DMA_SLAVE_BUSWIDTH_1_BYTE;
-		slave_config.dst_addr_width = DMA_SLAVE_BUSWIDTH_1_BYTE;
-	} else if (SNDRV_PCM_FORMAT_S16_LE == params_format(params)) {
-		slave_config.src_addr_width = DMA_SLAVE_BUSWIDTH_2_BYTES;
-		slave_config.dst_addr_width = DMA_SLAVE_BUSWIDTH_2_BYTES;
-	} else {
-		slave_config.src_addr_width = DMA_SLAVE_BUSWIDTH_4_BYTES;
-		slave_config.dst_addr_width = DMA_SLAVE_BUSWIDTH_4_BYTES;
-	}
+
 	slave_config.dst_addr = dmap->dma_addr;
 	slave_config.dst_maxburst = dmap->dst_maxburst;
 	slave_config.src_maxburst = dmap->src_maxburst;
+
 	if (substream->stream == SNDRV_PCM_STREAM_PLAYBACK) {
+		slave_config.dst_addr =	dmap->dma_addr;
+		slave_config.src_addr_width = slave_config.dst_addr_width;
 		slave_config.slave_id = sunxi_slave_id(dmap->dma_drq_type_num, DRQSRC_SDRAM);
 	} else {
+		slave_config.src_addr =	dmap->dma_addr;
+		slave_config.dst_addr_width = slave_config.src_addr_width;
 		slave_config.slave_id = sunxi_slave_id(DRQDST_SDRAM, dmap->dma_drq_type_num);
 	}
+
 	/*raw_flag>1. rawdata*/
 	if (raw_flag > 1) {
 		slave_config.dst_addr_width = DMA_SLAVE_BUSWIDTH_4_BYTES;
@@ -258,6 +250,7 @@ static int sunxi_pcm_hdmi_hw_params(struct snd_pcm_substream *substream,
 	} else {
 		strcpy(substream->pcm->card->id, "sndhdmi");
 	}
+
 	ret = dmaengine_slave_config(chan, &slave_config);
 	if (ret < 0) {
 		dev_err(dev, "dma slave config failed with err %d\n", ret);
@@ -265,6 +258,7 @@ static int sunxi_pcm_hdmi_hw_params(struct snd_pcm_substream *substream,
 	}
 
 	snd_pcm_set_runtime_buffer(substream, &substream->dma_buffer);
+
 	return 0;
 }
 

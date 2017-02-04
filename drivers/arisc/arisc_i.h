@@ -63,6 +63,8 @@
 #define DRV_VERSION "1.05"
 #elif defined CONFIG_ARCH_SUN50IW1P1
 #define DRV_VERSION "1.10"
+#elif defined CONFIG_ARCH_SUN50IW2P1
+#define DRV_VERSION "1.20"
 #elif defined CONFIG_ARCH_SUN9IW1P1
 #define DRV_VERSION "2.00"
 #else
@@ -83,8 +85,15 @@ extern int arisc_config_dram_paras(void);
 extern int arisc_sysconfig_ir_paras(void);
 extern int arisc_config_pmu_paras(void);
 extern int arisc_suspend_flag_query(void);
-extern noinline int invoke_scp_fn_smc(u64 function_id, u64 arg0, u64 arg1,
+#ifdef CONFIG_ARM
+extern asmlinkage int invoke_scp_fn_smc(u32 function_id, u32 arg0, u32 arg1,
+					 u32 arg2);
+#endif
+
+#ifdef CONFIG_ARM64
+extern asmlinkage int invoke_scp_fn_smc(u64 function_id, u64 arg0, u64 arg1,
 					 u64 arg2);
+#endif
 #if (defined CONFIG_ARCH_SUN8IW7P1)
 extern void arisc_power_off(void);
 #endif

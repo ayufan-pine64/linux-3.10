@@ -40,9 +40,11 @@ static ssize_t store_pause(struct device *dev, struct device_attribute *attr,
 		goto out;
 
 	if (value && (!dramfreq->pause))
-		dramfreq->governor_state_update(STATE_PAUSE);
+		dramfreq->governor_state_update(
+			dramfreq->devfreq->governor_name, STATE_PAUSE);
 	else if ((!value) && dramfreq->pause)
-		dramfreq->governor_state_update(STATE_RUNNING);
+		dramfreq->governor_state_update(
+			dramfreq->devfreq->governor_name, STATE_RUNNING);
 
 	ret = count;
 
@@ -68,6 +70,7 @@ static int devfreq_adaptive_func(struct devfreq *df, unsigned long *freq)
 	}
 
 	if (!dramfreq->pause) {
+#if defined(CONFIG_ARCH_SUN50I) || defined(CONFIG_ARCH_SUN8IW11)
 		if (dramfreq->key_masters[MASTER_DE] == 0 &&
 			dramfreq->key_masters[MASTER_GPU] == 0 &&
 			dramfreq->key_masters[MASTER_CSI] == 0) {
@@ -79,6 +82,27 @@ static int devfreq_adaptive_func(struct devfreq *df, unsigned long *freq)
 		} else {
 			*freq = df->max_freq;
 		}
+#elif defined(CONFIG_ARCH_SUN8IW10)
+#ifdef CONFIG_EINK_PANEL_USED
+		if (dramfreq->key_masters[MASTER_EINK0] == 0
+			&& dramfreq->key_masters[MASTER_EDMA] == 0
+			&& dramfreq->key_masters[MASTER_EINK1] == 0) {
+			*freq = SUNXI_DRAMFREQ_IDLE;
+		} else {
+			*freq = df->max_freq;
+		}
+#else
+		if (dramfreq->key_masters[MASTER_DE] == 0 &&
+			dramfreq->key_masters[MASTER_CSI] == 0) {
+			*freq = SUNXI_DRAMFREQ_IDLE;
+		} else if (dramfreq->key_masters[MASTER_DE] == 1 &&
+			dramfreq->key_masters[MASTER_CSI] == 0) {
+			*freq = SUNXI_DRAMFREQ_NORMAL;
+		} else {
+			*freq = df->max_freq;
+		}
+#endif
+#endif
 	} else {
 		*freq = df->max_freq;
 	}
@@ -102,7 +126,7 @@ static int adaptive_init(struct devfreq *devfreq)
 		return -EINVAL;
 	}
 
-	dramfreq->governor_state_update(STATE_INIT);
+	dramfreq->governor_state_update(devfreq->governor_name, STATE_INIT);
 
 	return 0;
 }
@@ -119,7 +143,7 @@ static void adaptive_exit(struct devfreq *devfreq)
 		return;
 	}
 
-	dramfreq->governor_state_update(STATE_EXIT);
+	dramfreq->governor_state_update(devfreq->governor_name, STATE_EXIT);
 }
 
 static int devfreq_adaptive_handler(struct devfreq *devfreq,

@@ -343,6 +343,8 @@ __turn_mmu_on_loc:
 	.long	__turn_mmu_on_end
 
 #if defined(CONFIG_SMP)
+	.text
+__REF
 ENTRY(secondary_startup)
 	/*
 	 * Common entry point for secondary CPUs.
@@ -386,6 +388,7 @@ ENDPROC(secondary_startup)
 	/*
 	 * r6  = &secondary_data
 	 */
+__REF
 ENTRY(__secondary_switched)
 	ldr	sp, [r7, #4]			@ get secondary_data.stack
 	mov	fp, #0

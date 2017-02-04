@@ -96,12 +96,14 @@
 #define F_N8X5_K4X2(nv,kv) FACTOR_ALL(nv,8,5,kv,4,2,0,0,0,0,0,0,0,0,0,0,0,0)
 #define F_N8X7_M0X2(nv,mv) FACTOR_ALL(nv,8,7,0,0,0,mv,0,2,0,0,0,0,0,0,0,0,0)
 #define F_N8X5_K4X2_M0X2(nv,kv,mv) FACTOR_ALL(nv,8,5,kv,4,2,mv,0,2,0,0,0,0,0,0,0,0,0)
+
 #define F_N8X5_K4X2_M0X2_P16x2(nv,kv,mv,pv) \
                FACTOR_ALL(nv,8,5, \
                           kv,4,2, \
                           mv,0,2, \
                           pv,16,2, \
                           0,0,0,0,0,0)
+
 #define F_N8X7_N116X5_M0X2_M14x4(nv,kv,mv,pv) \
                FACTOR_ALL(nv,8,7, \
                           kv,16,5, \

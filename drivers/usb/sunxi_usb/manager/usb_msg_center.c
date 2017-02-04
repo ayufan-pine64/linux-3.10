@@ -125,7 +125,7 @@ static void modify_msg(struct usb_msg *msg)
 
 static void insmod_host_driver(struct usb_msg_center_info *center_info)
 {
-	DMSG_INFO("\n\ninsmod_host_driver\n\n");
+	DMSG_INFO("\ninsmod_host_driver\n\n");
 
 	set_usb_role(center_info, USB_ROLE_HOST);
 
@@ -142,7 +142,7 @@ static void insmod_host_driver(struct usb_msg_center_info *center_info)
 
 static void rmmod_host_driver(struct usb_msg_center_info *center_info)
 {
-	DMSG_INFO("\n\nrmmod_host_driver\n\n");
+	DMSG_INFO("\nrmmod_host_driver\n\n");
 
 	#if defined(CONFIG_USB_SUNXI_EHCI0)
 		sunxi_usb_disable_ehci(0);
@@ -158,7 +158,7 @@ static void rmmod_host_driver(struct usb_msg_center_info *center_info)
 
 static void insmod_device_driver(struct usb_msg_center_info *center_info)
 {
-	DMSG_INFO("\n\ninsmod_device_driver\n\n");
+	DMSG_INFO("\ninsmod_device_driver\n\n");
 
 	set_usb_role(center_info, USB_ROLE_DEVICE);
 
@@ -169,7 +169,7 @@ static void insmod_device_driver(struct usb_msg_center_info *center_info)
 
 static void rmmod_device_driver(struct usb_msg_center_info *center_info)
 {
-	DMSG_INFO("\n\nrmmod_device_driver\n\n");
+	DMSG_INFO("\nrmmod_device_driver\n\n");
 
 	set_usb_role(center_info, USB_ROLE_NULL);
 

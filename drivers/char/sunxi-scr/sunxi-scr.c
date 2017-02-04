@@ -1,13 +1,18 @@
 /*
- * sunxi-scr.c smartcard driver
+ * drivers/char/sunxi-scr/sunxi-scr.c
  *
- * Copyright (C) 2013-2014 allwinner.
- *	Ming Li<liming@allwinnertech.com>
+ * Copyright (C) 2016 Allwinner.
+ * fuzhaoke <fuzhaoke@allwinnertech.com>
  *
- *  This program is free software; you can redistribute it and/or modify
- *  it under the terms of the GNU General Public License version 2 as
- *  published by the Free Software Foundation.
+ * SUNXI SCR Controller Driver
+ *
+ * This program is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU General Public License as
+ * published by the Free Software Foundation; either version 2 of
+ * the License, or (at your option) any later version.
  */
+
+#include <linux/kernel.h>
 #include <linux/module.h>
 #include <linux/delay.h>
 #include <linux/clk.h>
@@ -27,652 +32,1000 @@
 #include <linux/of.h>
 #include <linux/of_device.h>
 #include <asm/irq.h>
+#include <linux/io.h>
+#include <linux/slab.h>
 #include "sunxi-scr.h"
-#include "smartcard.h"
-#include "sunxi-scr-common.h"
 
-static scr_struct scr;
-static scatr_struct scatr;
-static upps_struct pps;
-static atr_buffer atr_data;
-static int sunxi_scr_major = -1;
+/* ====================  For debug  =============================== */
+#define SCR_ENTER()		pr_info("%s()%d - %s\n", __func__, __LINE__, "Enter ...")
+#define SCR_EXIT()		pr_info("%s()%d - %s\n", __func__, __LINE__, "Exit")
+#define SCR_DBG(fmt, arg...)	pr_debug("%s()%d - "fmt, __func__, __LINE__, ##arg)
+#define SCR_INFO(fmt, arg...)	pr_info("%s()%d - "fmt, __func__, __LINE__, ##arg)
+#define SCR_WARN(fmt, arg...)	pr_warn("%s()%d - "fmt, __func__, __LINE__, ##arg)
+#define SCR_ERR(fmt, arg...)	pr_err("%s()%d - "fmt, __func__, __LINE__, ##arg)
+
+static struct sunxi_scr *pscr;
+static int sunxi_scr_major;
 static struct class *scr_dev_class;
-static struct workqueue_struct *scr_wq = NULL;
-static struct work_struct  scr_work;
-static struct device *scr_device = NULL;
-static char scr_dev_name[] = "sim0";
-static struct pinctrl *scr_pinctrl = NULL;
-static cardPara card_para = {0};
-static DEFINE_SPINLOCK(rx_lock);
-u32 scr_debug_mask = 0x0;
+static struct device *scr_device;
+static uint8_t scr_buf_tx[SCR_FIFO_RX_SIZE] = { 0 };
 
-__inline uint32_t scr_buffer_is_empty(pscr_buffer pbuf)
+struct scr_data_rx {
+	uint8_t buf_rx[SCR_FIFO_RX_SIZE];
+	uint16_t rx_cnt;  /* valid count of data */
+};
+
+static struct scr_data_rx scr_buf_rx;
+
+
+static void sunxi_scr_do_atr(struct sunxi_scr *pscr);
+
+
+/* =================  smart card reader basic interface  =================== */
+/* clear control and status register */
+static inline void scr_clear_csr_reg(void __iomem *reg_base)
 {
-	return (pbuf->wptr==pbuf->rptr);
+	writel(0x0, reg_base + SCR_CSR_OFF);
 }
 
-__inline uint32_t scr_buffer_is_full(pscr_buffer pbuf)
+/* get control and status register config */
+static inline uint32_t scr_get_csr_config(void __iomem *reg_base)
 {
-	return ((pbuf->wptr^pbuf->rptr)==(SCR_BUFFER_SIZE_MASK+1));
+	return readl(reg_base + SCR_CSR_OFF);
 }
 
-__inline void scr_buffer_flush(pscr_buffer pbuf)
+/* get detect status 0:card remove, 1:card insert */
+static inline uint8_t scr_get_det_status(void __iomem *reg_base)
 {
-	pbuf->wptr = pbuf->rptr = 0;
+	uint32_t reg_val;
+
+	reg_val = readl(reg_base + SCR_CSR_OFF);
+
+	return (reg_val >> 31) & 0x1;
 }
 
-static void scr_fill_buffer(pscr_buffer pbuf, uint8_t data)
+/* set detect polarity, 0:low active, 1:high active */
+static inline void scr_set_det_polar(void __iomem *reg_base, uint8_t config)
 {
-	pbuf->buffer[pbuf->wptr&SCR_BUFFER_SIZE_MASK] = data;
-	pbuf->wptr ++;
-	pbuf->wptr &= (SCR_BUFFER_SIZE_MASK<<1)|0x1;    /* bit0:bit7 */
+	uint32_t reg_val;
+
+	reg_val = readl(reg_base + SCR_CSR_OFF);
+	reg_val &= ~(0x1 << 24);
+	reg_val |= ((config & 0x1) << 24);
+	writel(reg_val, reg_base + SCR_CSR_OFF);
 }
 
-uint8_t scr_dump_buffer(pscr_buffer pbuf)
+/* set protocol 0:T0, 1:T1, 2~3:reserved */
+static inline void scr_set_t_protocol(void __iomem *reg_base, uint8_t config)
 {
-	uint8_t data;
+	uint32_t reg_val;
 
-	data = pbuf->buffer[pbuf->rptr&SCR_BUFFER_SIZE_MASK];
-	pbuf->rptr ++;
-	pbuf->rptr &= (SCR_BUFFER_SIZE_MASK<<1)|0x1;	/* bit0:bit7 */
-
-	return data;
+	reg_val = readl(reg_base + SCR_CSR_OFF);
+	reg_val &= ~(0x3 << 22);
+	reg_val |= ((config & 0x3) << 22);
+	writel(reg_val, reg_base + SCR_CSR_OFF);
 }
 
-void scr_display_buffer_data(pscr_buffer pbuf)
+/* when enable(1), both RX&TX FIFO will be flush before ATR start */
+static inline void scr_set_atr_flush(void __iomem *reg_base, uint8_t config)
 {
-	uint32_t i=0;
+	uint32_t reg_val;
 
-	if(!scr_buffer_is_empty(pbuf))
-	{
-		/* pbuf->rptr < pbuf->wptr */
-		for(i=pbuf->rptr; (i&((SCR_BUFFER_SIZE_MASK<<1)|0x1)) != pbuf->wptr; i++)
-		{
-			dprintk(DEBUG_DATA_INFO, "0x%x ", pbuf->buffer[i&SCR_BUFFER_SIZE_MASK]);
-		}
-		dprintk(DEBUG_DATA_INFO, "\n");
-	}
-	else
-	{
-		dprintk(DEBUG_DATA_INFO, "Buffer is Empty when Display!!\n");
-	}
+	reg_val = readl(reg_base + SCR_CSR_OFF);
+	reg_val &= ~(0x1 << 21);
+	reg_val |= ((config & 0x1) << 21);
+	writel(reg_val, reg_base + SCR_CSR_OFF);
 }
 
-void scr_copy_atr_data(pscr_buffer pbuf, atr_buffer *atr_data)
+/* when enable(1), TS charater(first ATR character) will be stored in FIFO */
+static inline void scr_set_ts_recv(void __iomem *reg_base, uint8_t config)
 {
-	uint32_t i=0;
-	atr_data->atr_len = 0;
+	uint32_t reg_val;
 
-	if(!scr_buffer_is_empty(pbuf))
-	{
-		/* pbuf->rptr < pbuf->wptr */
-		for(i=pbuf->rptr; (i&((SCR_BUFFER_SIZE_MASK<<1)|0x1)) != pbuf->wptr; i++)
-		{
-			atr_data->buffer[atr_data->atr_len] = pbuf->buffer[i&SCR_BUFFER_SIZE_MASK];
-			dprintk(DEBUG_DATA_INFO, "0x%x ", atr_data->buffer[atr_data->atr_len]);
-			atr_data->atr_len++;
-		}
-		dprintk(DEBUG_DATA_INFO, "\n");
-	}
-	else
-	{
-		printk(KERN_ERR "%s: Buffer is Empty when Display!!\n", __func__);
-	}
+	reg_val = readl(reg_base + SCR_CSR_OFF);
+	reg_val &= ~(0x1 << 20);
+	reg_val |= ((config & 0x1) << 20);
+	writel(reg_val, reg_base + SCR_CSR_OFF);
 }
 
-static void scr_work_func(struct work_struct *work)
+/* scclk output state during clock stop, 0:low level, 1:high level */
+static inline void scr_set_clk_polar(void __iomem *reg_base, uint8_t config)
 {
-	if(scr.irq_accsta & SCR_INTSTA_INS)
-	{
-		scr.irq_accsta &= ~SCR_INTSTA_INS;
-		scr.detected = 1;
-		scr.atr_resp = SCR_ATR_RESP_INVALID;
-		dprintk(DEBUG_INT, "\n\nSmartCard Inserted!!\n");
-	}
+	uint32_t reg_val;
 
-	if(scr.irq_accsta & SCR_INTSTA_REM)
-	{
-		scr.irq_accsta &= ~SCR_INTSTA_REM;
-		scr.detected = 0;
-		scr.atr_resp = SCR_ATR_RESP_INVALID;
-		dprintk(DEBUG_INT, "SmartCard Removed!!\n\n");
-	}
-
-	if(scr.irq_accsta & SCR_INTSTA_ACT)
-	{
-		scr.irq_accsta &= ~SCR_INTSTA_ACT;
-		scr.activated = 1;
-		scr.atr_resp = SCR_ATR_RESP_INVALID;
-		dprintk(DEBUG_INT, "SmartCard Activated!!\n");
-	}
-
-	if(scr.irq_accsta & SCR_INTSTA_DEACT)
-	{
-		scr.irq_accsta &= ~SCR_INTSTA_DEACT;
-		scr.activated = 0;
-		scr.atr_resp = SCR_ATR_RESP_INVALID;
-		dprintk(DEBUG_INT, "SmartCard Deactivated!!\n");
-	}
-
-	if(scr.irq_accsta & SCR_INTSTA_TXFDONE)
-	{
-		scr.irq_accsta &= ~SCR_INTSTA_TXFDONE;
-		dprintk(DEBUG_INT, "SmartCard TxFIFO Done!!\n");
-	}
-
-	if(scr.irq_accsta & SCR_INTSTA_TXFEMPTY)
-	{
-		scr.irq_accsta &= ~SCR_INTSTA_TXFEMPTY;
-		dprintk(DEBUG_INT, "SmartCard TxFIFO Empty!!\n");
-	}
-
-	if(scr.irq_accsta & SCR_INTSTA_TXFTH)
-	{
-		scr.irq_accsta &= ~SCR_INTSTA_TXFTH;
-		dprintk(DEBUG_INT, "SmartCard TxFIFO Threshold!!\n");
-	}
-
-	if(scr.irq_accsta & SCR_INTSTA_TXDONE)
-	{
-		scr.irq_accsta &= ~SCR_INTSTA_TXDONE;
-		dprintk(DEBUG_INT, "SmartCard Tx Done!!\n");
-	}
-
-	if(scr.irq_accsta & SCR_INTSTA_TXPERR)
-	{
-		scr.irq_accsta &= ~SCR_INTSTA_TXPERR;
-		dprintk(DEBUG_INT, "SmartCard Tx Parity Error!!\n");
-	}
-
-	if(scr.irq_accsta & SCR_INTSTA_RXFFULL)
-	{
-		scr.irq_accsta &= ~SCR_INTSTA_RXFFULL;
-		dprintk(DEBUG_INT, "SmartCard Rx FIFO Full!!\n");
-	}
-
-	if(scr.irq_accsta & SCR_INTSTA_RXPERR)
-	{
-		scr.irq_accsta &= ~SCR_INTSTA_RXPERR;
-		dprintk(DEBUG_INT, "SmartCard Rx Parity Error!!\n");
-	}
-
-	if(scr.irq_accsta & SCR_INTSTA_CLOCK)
-	{
-		scr.irq_accsta &= ~SCR_INTSTA_CLOCK;
-		dprintk(DEBUG_INT, "SmartCard Stop/Start Clock!!\n");
-	}
-
-	if(scr.irq_accsta & SCR_INTSTA_CHTO)
-	{
-		scr.irq_accsta &= ~SCR_INTSTA_CHTO;
-		scr.chto_flag ++;
-		dprintk(DEBUG_INT, "SmartCard Character Timeout!!\n");
-	}
-
-	if(scr.irq_accsta & SCR_INTSTA_ATRFAIL)
-	{
-		scr.irq_accsta &= ~SCR_INTSTA_ATRFAIL;
-		scr.atr_resp = SCR_ATR_RESP_FAIL;
-		dprintk(DEBUG_INT, "SmartCard ATR Fail!!\n");
-	}
-
-	if(scr.irq_accsta & SCR_INTSTA_ATRDONE)
-	{
-		unsigned long irqflags;
-
-		scr.irq_accsta &= ~SCR_INTSTA_ATRDONE;
-		spin_lock_irqsave(&rx_lock, irqflags);
-		scr_copy_atr_data(&(scr.rxbuf), &atr_data);
-		scr_buffer_flush(&scr.rxbuf);
-		spin_unlock_irqrestore(&rx_lock, irqflags);
-
-		smartcard_atr_decode(&scr, &scatr, (uint8_t*)atr_data.buffer, &pps, 1);
-		scr.atr_resp = SCR_ATR_RESP_OK;
-		dprintk(DEBUG_INT, "SmartCard ATR Done!!\n");
-	}
-	return;
+	reg_val = readl(reg_base + SCR_CSR_OFF);
+	reg_val &= ~(0x1 << 19);
+	reg_val |= ((config & 0x1) << 19);
+	writel(reg_val, reg_base + SCR_CSR_OFF);
 }
 
-/* data irq must immediate processing. */
-static void irq_immediate(void)
+/* parity error character receive enable,
+ * 0:disable, 1:enable store error parity in RX FIFO
+ */
+static inline void scr_set_recv_parity(void __iomem *reg_base, uint8_t config)
 {
-	unsigned long irqflags;
+	uint32_t reg_val;
 
-	if(scr.irq_accsta & SCR_INTSTA_RXFTH)
-	{
-		scr.irq_accsta &= ~SCR_INTSTA_RXFTH;
+	reg_val = readl(reg_base + SCR_CSR_OFF);
+	reg_val &= ~(0x1 << 18);
+	reg_val |= ((config & 0x1) << 18);
+	writel(reg_val, reg_base + SCR_CSR_OFF);
+}
 
-		spin_lock_irqsave(&rx_lock, irqflags);
-		if(!scr_buffer_is_full(&(scr.rxbuf)))
-		{
-			while(!scr_rxfifo_is_empty(&scr))
-			{
-				scr_fill_buffer(&(scr.rxbuf), scr_read_fifo(&scr));
+static inline uint8_t scr_get_recv_parity(void __iomem *reg_base)
+{
+	uint32_t reg_val;
+
+	reg_val = readl(reg_base + SCR_CSR_OFF);
+
+	return (reg_val >> 18) & 0x1;
+}
+
+/* 0:lsb first, 1:msb first */
+static inline void scr_set_data_order(void __iomem *reg_base, uint8_t config)
+{
+	uint32_t reg_val;
+
+	reg_val = readl(reg_base + SCR_CSR_OFF);
+	reg_val &= ~(0x1 << 17);
+	reg_val |= ((config & 0x1) << 17);
+	writel(reg_val, reg_base + SCR_CSR_OFF);
+}
+
+/* when enable(1), invert data level */
+static inline void scr_set_data_invert(void __iomem *reg_base, uint8_t config)
+{
+	uint32_t reg_val;
+
+	reg_val = readl(reg_base + SCR_CSR_OFF);
+	reg_val &= ~(0x1 << 16);
+	reg_val |= ((config & 0x1) << 16);
+	writel(reg_val, reg_base + SCR_CSR_OFF);
+}
+
+/* deinit card after stop use and auto clear when finish */
+static inline void scr_set_deactivation(void __iomem *reg_base)
+{
+	uint32_t reg_val;
+
+	reg_val = readl(reg_base + SCR_CSR_OFF);
+	reg_val |= (0x1 << 11);
+	writel(reg_val, reg_base + SCR_CSR_OFF);
+}
+
+/* init card before start use and auto clear when finish */
+static inline void scr_set_activation(void __iomem *reg_base)
+{
+	uint32_t reg_val;
+
+	reg_val = readl(reg_base + SCR_CSR_OFF);
+	reg_val |= (0x1 << 10);
+	writel(reg_val, reg_base + SCR_CSR_OFF);
+}
+
+/* reset card */
+static inline void scr_set_warmreset(void __iomem *reg_base)
+{
+	uint32_t reg_val;
+
+	reg_val = readl(reg_base + SCR_CSR_OFF);
+	reg_val |= (0x1 << 9);
+	writel(reg_val, reg_base + SCR_CSR_OFF);
+}
+
+static inline void scr_set_clk_stop(void __iomem *reg_base)
+{
+	uint32_t reg_val;
+
+	reg_val = readl(reg_base + SCR_CSR_OFF);
+	reg_val |= (0x1 << 8);
+	writel(reg_val, reg_base + SCR_CSR_OFF);
+}
+
+static inline void scr_set_clk_restart(void __iomem *reg_base)
+{
+	uint32_t reg_val;
+
+	reg_val = readl(reg_base + SCR_CSR_OFF);
+	reg_val &= ~(0x1 << 8);
+	writel(reg_val, reg_base + SCR_CSR_OFF);
+}
+
+static inline void scr_global_interrupt_enable(void __iomem *reg_base)
+{
+	uint32_t reg_val;
+
+	reg_val = readl(reg_base + SCR_CSR_OFF);
+	reg_val |= (0x1 << 2);
+	writel(reg_val, reg_base + SCR_CSR_OFF);
+}
+
+static inline void scr_global_interrupt_disable(void __iomem *reg_base)
+{
+	uint32_t reg_val;
+
+	reg_val = readl(reg_base + SCR_CSR_OFF);
+	reg_val &= ~(0x1 << 2);
+	writel(reg_val, reg_base + SCR_CSR_OFF);
+}
+
+/* enable receive data stored in RX FIFO */
+static inline void scr_receive_enable(void __iomem *reg_base)
+{
+	uint32_t reg_val;
+
+	reg_val = readl(reg_base + SCR_CSR_OFF);
+	reg_val |= (0x1 << 1);
+	writel(reg_val, reg_base + SCR_CSR_OFF);
+}
+
+/* disable receive data stored in RX FIFO */
+static inline void scr_receive_disable(void __iomem *reg_base)
+{
+	uint32_t reg_val;
+
+	reg_val = readl(reg_base + SCR_CSR_OFF);
+	reg_val &= ~(0x1 << 1);
+	writel(reg_val, reg_base + SCR_CSR_OFF);
+}
+
+/* enable transmit data stored in TX FIFO */
+static inline void scr_transmit_enable(void __iomem *reg_base)
+{
+	uint32_t reg_val;
+
+	reg_val = readl(reg_base + SCR_CSR_OFF);
+	reg_val |= (0x1 << 0);
+	writel(reg_val, reg_base + SCR_CSR_OFF);
+}
+
+/* disable transmit data stored in TX FIFO */
+static inline void scr_transmit_disable(void __iomem *reg_base)
+{
+	uint32_t reg_val;
+
+	reg_val = readl(reg_base + SCR_CSR_OFF);
+	reg_val &= ~(0x1 << 0);
+	writel(reg_val, reg_base + SCR_CSR_OFF);
+}
+
+/* set each interrupt bit mask */
+static inline void scr_set_interrupt_enable(void __iomem *reg_base, uint32_t bm)
+{
+	uint32_t reg_val;
+
+	reg_val = readl(reg_base + SCR_INTEN_OFF);
+	reg_val |= bm;
+	writel(reg_val, reg_base + SCR_INTEN_OFF);
+}
+
+/* disable interrupt bit mask */
+static inline void scr_set_interrupt_disable(void __iomem *reg_base, uint32_t bm)
+{
+	uint32_t reg_val;
+
+	reg_val = readl(reg_base + SCR_INTEN_OFF);
+	reg_val &= ~bm;
+	writel(reg_val, reg_base + SCR_INTEN_OFF);
+}
+
+/* get all interrupt status */
+static inline uint32_t scr_get_interrupt_status(void __iomem *reg_base)
+{
+	return readl(reg_base + SCR_INTST_OFF);
+}
+
+/* write 1 to clear interrupt flag */
+static inline void scr_clear_interrupt_status(void __iomem *reg_base, uint32_t bm)
+{
+	writel(bm, reg_base + SCR_INTST_OFF);
+}
+
+/* flush RX FIFO and auto clear when finish */
+static inline void scr_flush_rxfifo(void __iomem *reg_base)
+{
+	uint32_t reg_val;
+
+	reg_val = readl(reg_base + SCR_FCSR_OFF);
+	reg_val |= (0x1 << 10);
+	writel(reg_val, reg_base + SCR_FCSR_OFF);
+}
+
+static inline bool scr_rxfifo_is_full(void __iomem *reg_base)
+{
+	return (readl(reg_base + SCR_FCSR_OFF) >> 9) & 0x1;
+}
+
+static inline bool scr_rxfifo_is_empty(void __iomem *reg_base)
+{
+	return (readl(reg_base + SCR_FCSR_OFF) >> 8) & 0x1;
+}
+
+/* flush TX FIFO and auto clear when finish */
+static inline void scr_flush_txfifo(void __iomem *reg_base)
+{
+	uint32_t reg_val;
+
+	reg_val = readl(reg_base + SCR_FCSR_OFF);
+	reg_val |= (0x1 << 2);
+	writel(reg_val, reg_base + SCR_FCSR_OFF);
+}
+
+static inline bool scr_txfifo_is_full(void __iomem *reg_base)
+{
+	return (readl(reg_base + SCR_FCSR_OFF) >> 1) & 0x1;
+}
+
+static inline bool scr_txfifo_is_empty(void __iomem *reg_base)
+{
+	return readl(reg_base + SCR_FCSR_OFF) & 0x1;
+}
+
+static inline void scr_set_rxfifo_threshold(void __iomem *reg_base, uint8_t thh)
+{
+	uint32_t reg_val;
+	reg_val = readl(reg_base + SCR_FCNT_OFF);
+	reg_val &= ~(0xffU << 24);
+	reg_val |= thh << 24;
+	writel(reg_val, reg_base + SCR_FCNT_OFF);
+}
+
+static inline void scr_set_txfifo_threshold(void __iomem *reg_base, uint8_t thh)
+{
+	uint32_t reg_val;
+
+	reg_val = readl(reg_base + SCR_FCNT_OFF);
+	reg_val &= ~(0xffU << 16);
+	reg_val |= thh << 16;
+	writel(reg_val, reg_base + SCR_FCNT_OFF);
+}
+
+static inline uint8_t scr_get_rxfifo_count(void __iomem *reg_base)
+{
+	return (readl(reg_base + SCR_FCNT_OFF) >> 8) & 0xff;
+}
+
+static inline uint8_t scr_get_txfifo_count(void __iomem *reg_base)
+{
+	return readl(reg_base + SCR_FCNT_OFF) & 0xff;
+}
+
+static inline void scr_set_rx_repeat(void __iomem *reg_base, uint8_t repeat)
+{
+	uint32_t reg_val;
+
+	reg_val = readl(reg_base + SCR_RPT_OFF);
+	reg_val &= ~(0xf << 4);
+	reg_val |= (repeat & 0xf) << 4;
+	writel(reg_val, reg_base + SCR_RPT_OFF);
+}
+
+static inline void scr_set_tx_repeat(void __iomem *reg_base, uint8_t repeat)
+{
+	uint32_t reg_val;
+
+	reg_val = readl(reg_base + SCR_RPT_OFF);
+	reg_val &= ~(0xf << 0);
+	reg_val |= (repeat & 0xf) << 0;
+	writel(reg_val, reg_base + SCR_RPT_OFF);
+}
+
+/* baud = F_sysclk/(2*(BAUDDIV+1)), BAUDDIV=bit[31:16] */
+static inline void scr_set_baud_divisor(void __iomem *reg_base, uint16_t divisor)
+{
+	uint32_t reg_val;
+
+	reg_val = readl(reg_base + SCR_DIV_OFF);
+	reg_val &= ~(0xffffU << 16);
+	reg_val |= divisor << 16;
+	writel(reg_val, reg_base + SCR_DIV_OFF);
+}
+
+static inline uint16_t scr_get_baud_divisor(void __iomem *reg_base)
+{
+	return readl(reg_base + SCR_DIV_OFF) >> 16 & 0xffff;
+}
+
+/* F_scclk = F_sysclk/(2*(SCCLK+1)), SCCLK=bit[15:0] */
+static inline void scr_set_scclk_divisor(void __iomem *reg_base, uint16_t divisor)
+{
+	uint32_t reg_val;
+
+	reg_val = readl(reg_base + SCR_DIV_OFF);
+	reg_val &= ~0xffffU;
+	reg_val |= divisor;
+	writel(reg_val, reg_base + SCR_DIV_OFF);
+}
+
+static inline uint16_t scr_get_scclk_divisor(void __iomem *reg_base)
+{
+	return readl(reg_base + SCR_DIV_OFF) & 0xffff;
+}
+
+/* ATR start time limit, it define the maximum time of ATR response
+ * limit_time = 128*ATR*T_scclk, ATR=bit[23:16], T_scclk=1/F_scclk
+ */
+static inline void scr_set_atr_time(void __iomem *reg_base, uint8_t scclk)
+{
+	uint32_t reg_val;
+
+	reg_val = readl(reg_base + SCR_LTIM_OFF);
+	reg_val &= ~(0xff << 16);
+	reg_val |= scclk << 16;
+	writel(reg_val, reg_base + SCR_LTIM_OFF);
+}
+
+/* reset duration, dura = 128*RST*T_scclk, RST=bit[15:8], T_scclk=1/F_scclk */
+static inline void scr_set_reset_time(void __iomem *reg_base, uint8_t scclk)
+{
+	uint32_t reg_val;
+
+	reg_val = readl(reg_base + SCR_LTIM_OFF);
+	reg_val &= ~(0xff << 8);
+	reg_val |= scclk << 8;
+	writel(reg_val, reg_base + SCR_LTIM_OFF);
+}
+
+/* reset duration, dura = 128*ACT*T_scclk, ACT=bit[7:0], T_scclk=1/F_scclk */
+static inline void scr_set_activation_time(void __iomem *reg_base, uint8_t scclk)
+{
+	uint32_t reg_val;
+
+	reg_val = readl(reg_base + SCR_LTIM_OFF);
+	reg_val &= ~0xff;
+	reg_val |= scclk;
+	writel(reg_val, reg_base + SCR_LTIM_OFF);
+}
+
+static inline uint32_t scr_get_line_time(void __iomem *reg_base)
+{
+	return readl(reg_base + SCR_LTIM_OFF);
+}
+
+/* character limit, maximum time of two consecutive character, ETU as unit */
+static inline void scr_set_chlimit_time(void __iomem *reg_base, uint16_t etu)
+{
+	uint32_t reg_val;
+
+	reg_val = readl(reg_base + SCR_CTIM_OFF);
+	reg_val &= ~(0xffffU << 16);
+	reg_val |= etu << 16;
+	writel(reg_val, reg_base + SCR_CTIM_OFF);
+}
+
+/* character guard time, delay time of each character, ETU as unit */
+static inline void scr_set_guard_time(void __iomem *reg_base, uint8_t etu)
+{
+	uint32_t reg_val;
+
+	reg_val = readl(reg_base + SCR_CTIM_OFF);
+	reg_val &= ~0xff;
+	reg_val |= etu;
+	writel(reg_val, reg_base + SCR_CTIM_OFF);
+}
+
+static inline uint32_t scr_get_character_time(void __iomem *reg_base)
+{
+	return readl(reg_base + SCR_CTIM_OFF);
+}
+
+static inline uint32_t scr_get_fsm(void __iomem *reg_base)
+{
+	return readl(reg_base + SCR_FSM_OFF);
+}
+
+static inline void scr_write_fifo(void __iomem *reg_base, uint8_t data)
+{
+	writel(data, reg_base + SCR_FIFO_OFF);
+}
+
+static inline uint8_t scr_read_fifo(void __iomem *reg_base)
+{
+	return readl(reg_base + SCR_FIFO_OFF) & 0xff;
+}
+
+/* =========================  end  =================================== */
+
+/* IRQ interrupt handler */
+static irqreturn_t sunxi_scr_interrupt(int irqno, void *dev_id)
+{
+	struct sunxi_scr *pscr = (struct sunxi_scr *)dev_id;
+	uint32_t rx_cnt = 0, i = 0;
+	u32 irq_status = 0;
+
+	irq_status = scr_get_interrupt_status(pscr->reg_base);
+	scr_clear_interrupt_status(pscr->reg_base, irq_status);
+
+	SCR_DBG("irq_status = 0x%08x\n", irq_status);
+	if (irq_status & SCR_INTSTA_INS) {
+		SCR_DBG("SmartCard Inserted!!\n");
+		scr_set_activation(pscr->reg_base);
+	}
+
+	if (irq_status & SCR_INTSTA_REM) {
+		SCR_DBG("SmartCard Removed!!\n\n");
+		scr_set_deactivation(pscr->reg_base);
+	}
+
+	if (irq_status & SCR_INTSTA_ACT) {
+		SCR_DBG("SmartCard Activated!!\n");
+		memset(&scr_buf_rx, 0, sizeof(struct scr_data_rx));
+	}
+
+	if (irq_status & SCR_INTSTA_DEACT) {
+		SCR_DBG("SmartCard Deactivated!!\n");
+	}
+
+	if ((irq_status & SCR_INTSTA_RXDONE) ||
+	    (irq_status & SCR_INTSTA_RXFTH) ||
+	    (irq_status & SCR_INTSTA_RXFFULL)) {
+		SCR_DBG("SmartCard Rx interrupt!!\n");
+		rx_cnt = scr_get_rxfifo_count(pscr->reg_base);
+		SCR_DBG("rx_cnt=%d\n", rx_cnt);
+		if (rx_cnt > (SCR_FIFO_RX_SIZE - scr_buf_rx.rx_cnt)) {
+			SCR_ERR("There are not more space filled in RX buffer");
+		} else {
+			spin_lock(&pscr->rx_lock);
+			for (i = 0; i < rx_cnt; i++) {
+				scr_buf_rx.buf_rx[scr_buf_rx.rx_cnt] =
+					scr_read_fifo(pscr->reg_base);
+				scr_buf_rx.rx_cnt++;
 			}
-			spin_unlock_irqrestore(&rx_lock, irqflags);
+			spin_unlock(&pscr->rx_lock);
 		}
-		else
-		{
-			spin_unlock_irqrestore(&rx_lock, irqflags);
-			dprintk(DEBUG_INT, "SmartCard RxBuffer Overflow 1!!\n");
-		}
-
-		if (0 != scr_debug_mask)
-			scr_display_buffer_data(&(scr.rxbuf));
-
-		dprintk(DEBUG_INT, "SmartCard Rx FIFO Threshold First!!\n");
 	}
 
-	if(scr.irq_accsta & SCR_INTSTA_RXDONE)
-	{
-		scr.irq_accsta &= ~SCR_INTSTA_RXDONE;
-
-		spin_lock_irqsave(&rx_lock, irqflags);
-		if(!scr_buffer_is_full(&(scr.rxbuf)))
-		{
-			while(!scr_rxfifo_is_empty(&scr))
-			{
-				scr_fill_buffer(&(scr.rxbuf), scr_read_fifo(&scr));
-			}
-			spin_unlock_irqrestore(&rx_lock, irqflags);
-		}
-		else
-		{
-			spin_unlock_irqrestore(&rx_lock, irqflags);
-			dprintk(DEBUG_INT, "SmartCard RxBuffer Overflow 2!!\n");
-		}
-		if (0 != scr_debug_mask)
-			scr_display_buffer_data(&(scr.rxbuf));
-		dprintk(DEBUG_INT, "SmartCard Rx Done!!\n");
+	if (irq_status & SCR_INTSTA_RXPERR) {
+		SCR_DBG("SmartCard Rx Parity Error!!\n");
 	}
 
-}
+	if (irq_status & SCR_INTSTA_ATRFAIL) {
+		SCR_DBG("SmartCard ATR Fail!!\n");
+		pscr->atr_resp = SCR_ATR_RESP_FAIL;
+		/* set activation again */
+		scr_set_activation(pscr->reg_base);
+	}
 
-static irqreturn_t scr_irq_service(int irqno, void *dev_id)
-{
-	uint32_t temp = scr_get_interrupt_status(&scr);
-	scr_clear_interrupt_status(&scr, temp);
+	if (irq_status & SCR_INTSTA_ATRDONE) {
+		SCR_DBG("SmartCard ATR Done!!\n");
+		memcpy(pscr->scr_atr_des.atr_data, scr_buf_rx.buf_rx, scr_buf_rx.rx_cnt);
+		pscr->scr_atr_des.atr_len = scr_buf_rx.rx_cnt;
+		pscr->atr_resp = SCR_ATR_RESP_OK;
+		/* parse ATR data to reconfig smart card */
+		sunxi_scr_do_atr(pscr);
+	}
+	if (irq_status & SCR_INTSTA_CHTO) {
+		SCR_DBG("character timeout/ transmit finish!!\n");
+		pscr->rx_transmit_status = SCR_RX_TRANSMIT_DONE;
+	}
 
+	if (irq_status & SCR_INTSTA_TXFEMPTY) {
+		SCR_DBG("SmartCard TX Empty!!\n");
+	}
 
-	scr.irq_accsta |= temp;
-	scr.irq_cursta = temp;
+	if (irq_status & SCR_INTSTA_TXDONE) {
+		SCR_DBG("SmartCard TX Done!!\n");
+	}
 
-	dprintk(DEBUG_INT, "%s: enter!!scr.irq_accsta:%x  \n", __func__, scr.irq_accsta);
-	if ((scr.irq_accsta & SCR_INTSTA_RXFTH) || (scr.irq_accsta & SCR_INTSTA_RXDONE))
-		irq_immediate();
-	else
-	queue_work(scr_wq, &scr_work);
+	if (irq_status & SCR_INTSTA_TXPERR) {
+		SCR_DBG("SmartCard TX Error!!\n");
+	}
+
+	if (irq_status & SCR_INTSTA_TXFDONE) {
+		SCR_DBG("SmartCard TX FIFO Done!!\n");
+	}
+
 	return IRQ_HANDLED;
 }
 
-static int scr_request_gpio(void)
+static int scr_request_gpio(struct sunxi_scr *pscr)
 {
 	int ret = 0;
 	struct pinctrl_state *pctrl_state = NULL;
 
-	if (NULL != scr.scr_device)
-		scr.scr_device->dev.init_name = &scr_dev_name[0];
-
-	scr_pinctrl = devm_pinctrl_get(&(scr.scr_device->dev));
-	if (IS_ERR_OR_NULL(scr_pinctrl)) {
-		printk(KERN_ERR "%s: request pinctrl handle for device failed\n",
-		__func__);
+	pscr->scr_pinctrl = devm_pinctrl_get(&(pscr->scr_device->dev));
+	if (IS_ERR_OR_NULL(pscr->scr_pinctrl)) {
+		SCR_ERR("request pinctrl handle fail!\n");
 		return -EINVAL;
 	}
 
-	pctrl_state = pinctrl_lookup_state(scr_pinctrl, PINCTRL_STATE_DEFAULT);
+	pctrl_state = pinctrl_lookup_state(pscr->scr_pinctrl, PINCTRL_STATE_DEFAULT);
 	if (IS_ERR(pctrl_state)) {
-		printk(KERN_ERR "%s:pinctrl_lookup_state failed! return %p \n", __func__,
-			pctrl_state);
-		return -1;
+		SCR_ERR("pinctrl_lookup_state fail! return %p\n", pctrl_state);
+		return -EINVAL;
 	}
 
-	ret = pinctrl_select_state(scr_pinctrl, pctrl_state);
+	ret = pinctrl_select_state(pscr->scr_pinctrl, pctrl_state);
 	if (ret < 0)
-		printk(KERN_ERR "%s:pinctrl_select_state failed! return %d \n", __func__,
-		ret);
+		SCR_ERR("pinctrl_select_state fail! return %d\n", ret);
 
 	return ret;
 }
 
-static void scr_release_gpio(void)
+static void scr_release_gpio(struct sunxi_scr *pscr)
 {
-	if (!IS_ERR_OR_NULL(scr_pinctrl))
-		devm_pinctrl_put(scr_pinctrl);
-	scr_pinctrl = NULL;
+	if (!IS_ERR_OR_NULL(pscr->scr_pinctrl))
+		devm_pinctrl_put(pscr->scr_pinctrl);
+	pscr->scr_pinctrl = NULL;
+	return ;
 }
 
-static unsigned long scr_clk_cfg(void)
+static uint32_t scr_init_reg(struct sunxi_scr *pscr)
 {
-	unsigned long rate = 0;
+	scr_global_interrupt_disable(pscr->reg_base);
+	scr_set_interrupt_disable(pscr->reg_base, 0xffffffff);
+	scr_clear_interrupt_status(pscr->reg_base, 0xffffffff);
 
-	rate = clk_get_rate(scr.scr_clk);
-	dprintk(DEBUG_INIT, "%s line %d: scr_clk= 0x%ld\n", __func__, __LINE__, rate);
+	scr_flush_txfifo(pscr->reg_base);
+	scr_flush_rxfifo(pscr->reg_base);
 
-	if (clk_prepare_enable(scr.scr_clk)) {
-		printk(KERN_DEBUG "try to enable scr_clk failed!\n");
-	}
+	scr_set_txfifo_threshold(pscr->reg_base, pscr->txfifo_thh);
+	scr_set_rxfifo_threshold(pscr->reg_base, pscr->rxfifo_thh);
 
-	return rate;
-}
+	scr_set_tx_repeat(pscr->reg_base, pscr->tx_repeat);
+	scr_set_rx_repeat(pscr->reg_base, pscr->rx_repeat);
 
-static void scr_clk_uncfg(void)
-{
-	if(NULL == scr.scr_clk || IS_ERR(scr.scr_clk)) {
-		printk("scr_clk handle is invalid, just return!\n");
-		return;
-	} else {
-		clk_disable_unprepare(scr.scr_clk);
-	}
-	return;
-}
+	scr_set_scclk_divisor(pscr->reg_base, pscr->scclk_div);
+	scr_set_baud_divisor(pscr->reg_base, pscr->baud_div);
+	scr_set_activation_time(pscr->reg_base, pscr->act_time);
+	scr_set_reset_time(pscr->reg_base, pscr->rst_time);
+	scr_set_atr_time(pscr->reg_base, pscr->atr_time);
+	scr_set_guard_time(pscr->reg_base, pscr->guard_time);
+	scr_set_chlimit_time(pscr->reg_base, pscr->chlimit_time);
+	scr_set_atr_flush(pscr->reg_base, 1);
+	scr_set_ts_recv(pscr->reg_base, 1);
+	scr_set_t_protocol(pscr->reg_base, pscr->card_para.protocol_type);
 
-static uint32_t scr_init_reg(pscr_struct pscr)
-{
-	unsigned long rate = 0;
+	scr_receive_enable(pscr->reg_base);
+	scr_transmit_enable(pscr->reg_base);
 
-	rate = scr_clk_cfg();
-	/* rate'unit is hz，card_para.freq'unit is khz */
-	pscr->scclk_div = rate/card_para.freq/2000-1;
-	pscr->baud_div = (scr.scclk_div + 1)*(card_para.f/card_para.d)-1;
+	scr_set_interrupt_enable(pscr->reg_base, pscr->inten_bm);
+	scr_global_interrupt_enable(pscr->reg_base);
 
-	dprintk(DEBUG_INIT, "%s: scclk_div=%d, baud_div=%d\n", __func__,
-		pscr->scclk_div, pscr->baud_div);
-
-	scr_global_interrupt_disable(pscr);
-
-	scr_set_csr_config(pscr, pscr->csr_config);
-
-	scr_clear_interrupt_status(pscr, 0xffffffff);
-	scr_set_interrupt_disable(pscr, 0xffffffff);
-
-	scr_flush_txfifo(pscr);
-	scr_flush_rxfifo(pscr);
-
-	scr_set_txfifo_threshold(pscr, pscr->txfifo_thh);
-	scr_set_rxfifo_threshold(pscr, pscr->rxfifo_thh);
-
-	scr_set_tx_repeat(pscr, pscr->tx_repeat);
-	scr_set_rx_repeat(pscr, pscr->rx_repeat);
-
-	scr_set_scclk_divisor(pscr, pscr->scclk_div);
-	scr_set_baud_divisor(pscr, pscr->baud_div);
-	scr_set_activation_time(pscr, pscr->act_time);
-	scr_set_reset_time(pscr, pscr->rst_time);
-	scr_set_atrlimit_time(pscr, pscr->atr_time);
-	scr_set_guard_time(pscr, pscr->guard_time);
-	scr_set_chlimit_time(pscr, pscr->chlimit_time);
-
-	scr_receive_enable(pscr);
-	scr_transmit_enable(pscr);
-	scr_auto_vpp_enable(pscr);
-
-	scr_set_interrupt_enable(pscr, pscr->inten_bm);
-	scr_global_interrupt_enable(&scr);
-
-	/* the default seting is no recv check*/
-	if  (1==card_para.recv_no_parity)
-		scr_set_recv_parity(pscr, card_para.recv_no_parity&0x01);
-
-	pscr->irq_accsta = 0x00;
-	pscr->irq_cursta = 0x00;
-	pscr->rxbuf.rptr = 0;
-	pscr->rxbuf.wptr = 0;
-	pscr->txbuf.rptr = 0;
-	pscr->txbuf.wptr = 0;
-
-	pscr->detected = 0;
-	pscr->activated = 0;
-	pscr->atr_resp = SCR_ATR_RESP_INVALID;
-
-	pscr->chto_flag = 0;
-
-	msleep(1000);
+	scr_set_recv_parity(pscr->reg_base,
+			    pscr->card_para.recv_no_parity);
 
 	return 0;
 }
 
-static void scr_clear_reg(void)
+static void sunxi_scr_param_init(struct sunxi_scr *pscr)
 {
-	scr_clear_ctl_reg(&scr);
+	/* init register parameters */
+	pscr->inten_bm = 0xfffffff0;
+	pscr->txfifo_thh = SCR_FIFO_DEPTH;
+	pscr->rxfifo_thh = SCR_FIFO_DEPTH;
+	pscr->tx_repeat = 0x3;
+	pscr->rx_repeat = 0x3;
+	pscr->scclk_div = 0;	/* (APB1CLK/4000000) PCLK/14, <175, && SCCLK >= 1M && =<4M */
+	pscr->baud_div = 0;	/* ETU = 372*SCCLK */
+	pscr->act_time = 2;	/* =1*256, 100 */
+	pscr->rst_time = 0xff;	/* 2*256, >=400 */
+	pscr->atr_time = 0xff;	/* scr.atr_time = (40000>>8)+1; //=256*256, 400~40000 */
+	pscr->guard_time = 2;	/* =2*ETUs */
+	pscr->chlimit_time = 100 * (10 + pscr->guard_time); /* interval time (400-1) characters */
+	pscr->atr_resp = SCR_ATR_RESP_INVALID;
+	pscr->rx_transmit_status = SCR_RX_TRANSMIT_NOYET;
+
+	/* init card parameters */
+	pscr->card_para.f = 372;
+	pscr->card_para.d = 1;
+	pscr->card_para.freq = 3579;	/* 3.579MHz, unit is KHz, expect baud=9600bps*/
+	pscr->card_para.recv_no_parity = 1;
+	pscr->card_para.protocol_type = 0;
+
+	/* init atr data */
+	pscr->smc_atr_para.TS = 0x3B;
+	pscr->smc_atr_para.TK_NUM = 0x00;
+
+	pscr->smc_atr_para.T = 0;	/* T=0 Protocol */
+	pscr->smc_atr_para.FMAX = 4;	/* 4MHz, unit is MHz */
+	pscr->smc_atr_para.F = 372;
+	pscr->smc_atr_para.D = 1;
+	pscr->smc_atr_para.I = 50;	/* 50mA */
+	pscr->smc_atr_para.P = 5;	/* 5V */
+	pscr->smc_atr_para.N = 2;
+
+	/* pscr->clk_freq'unit is hz but pscr->card_para.freq'unit is khz */
+	pscr->scclk_div = pscr->clk_freq / pscr->card_para.freq / 2000 - 1;
+	pscr->baud_div = (pscr->scclk_div + 1) * (pscr->card_para.f / pscr->card_para.d) - 1;
+
+	SCR_DBG("clk_freq=%d, scclk_div=%d, baud_div=%d\n",
+		pscr->clk_freq, pscr->scclk_div, pscr->baud_div);
+
+	/* init registers */
+	scr_init_reg(pscr);
 	return ;
 }
 
-static void card_para_default(void)
+/* use ATR data to reconfig smart card control register */
+static void sunxi_scr_do_atr(struct sunxi_scr *pscr)
 {
-	card_para.f = 372;
-	card_para.d = 1;
-	card_para.freq = 4000;		              //4Mhz，unit khz
-	card_para.recv_no_parity = 1;
-}
-static void sunxi_scr_params_init(void)
-{
-	scr.csr_config = 0x0100000;
-	/* disable tx irq */
-	scr.inten_bm = 0xfffffff0;	              //scr.inten_bm = 0xffffffff;
-	scr.txfifo_thh = SCR_FIFO_DEPTH/2;
-	scr.rxfifo_thh = SCR_FIFO_DEPTH/4;
-	scr.tx_repeat = 0x3;
-	scr.rx_repeat = 0x3;
-	scr.scclk_div = 0;                            //(APB1CLK/4000000) PCLK/14, <175, && SCCLK >= 1M && =<4M
-	scr.baud_div = 0;                             //ETU = 372*SCCLK
-	scr.act_time = 1;                             //=1*256, 100;
-	scr.rst_time = 0xff;                          //=2*256, >=400
-	scr.atr_time = 0xff;                          //scr.atr_time = (40000>>8)+1; //=256*256, 400~40000
-	scr.guard_time = 2;                           //=2*ETUs
-	scr.chlimit_time = 1024*(10+scr.guard_time);  //1K Characters
-}
+	struct scr_atr *pscr_atr_des = &pscr->scr_atr_des;
+	struct smc_atr_para *psmc_atr_para = &pscr->smc_atr_para;
+	struct smc_pps_para *psmc_pps_para = &pscr->smc_pps_para;
 
-/**
-* 1. the card actually send a lot number data one time, if call the read twice, should copy data according to
-*    the length want to read. second read from the last place to start copy.
-* 2. timeout seting is 255*20ms = 4.5s
-* 3. when write, clear rxbuf
-*/
-static ssize_t
-sunxi_scr_read(struct file *file, char __user *buf,
-				size_t size, loff_t *ppos)
-{
-	int32_t i = 0;
-	int32_t rxlen = 0;
-	void *from = NULL;
-	unsigned long irqflags;
-	dprintk(DEBUG_INIT, "%s: enter! size:%ld!\n", __func__, size);
+	SCR_DBG("\nBefore Decode:\n"
+		"psmc_atr_para->TS   = 0x%x\n"
+		"psmc_atr_para->T    = %d\n"
+		"psmc_atr_para->FMAX = %d(MHz), Current: %d(KHz)\n"
+		"psmc_atr_para->F    = %d\n"
+		"psmc_atr_para->D    = %d\n",
+		psmc_atr_para->TS,
+		psmc_atr_para->T,
+		psmc_atr_para->FMAX,
+		pscr->card_para.freq, psmc_atr_para->F, psmc_atr_para->D);
 
-	do {
-		spin_lock_irqsave(&rx_lock, irqflags);
-		if (!scr_buffer_is_empty(&scr.rxbuf)) {
-			rxlen = (scr.rxbuf.wptr - scr.rxbuf.rptr);
-			if (rxlen>=size) {
-				from = scr.rxbuf.buffer+scr.rxbuf.rptr;
-				spin_unlock_irqrestore(&rx_lock, irqflags);
-				break;
-			}
-		}
-		spin_unlock_irqrestore(&rx_lock, irqflags);
-		dprintk(DEBUG_INIT, "%s: rxlen:%d\n",  __func__, rxlen);
-		msleep(20);
-		i ++;
-	} while (i < 225);
+	smartcard_atr_decode(psmc_atr_para, psmc_pps_para,
+			     (uint8_t *)&pscr_atr_des->atr_data, 1);
 
-	dprintk(DEBUG_INIT, "%s: rxlen:%d\n",  __func__, rxlen);
 
-	if (size>rxlen)
-		size = rxlen;
-	if (copy_to_user(buf, from, size)) {
-		return -EFAULT;
+	SCR_DBG("\nAfter Decode:\n"
+		"psmc_atr_para->TS   = 0x%x\n"
+		"psmc_atr_para->T    = %d\n"
+		"psmc_atr_para->FMAX = %d(MHz), Current: %d(KHz)\n"
+		"psmc_atr_para->F    = %d\n"
+		"psmc_atr_para->D    = %d\n",
+		psmc_atr_para->TS,
+		psmc_atr_para->T,
+		psmc_atr_para->FMAX,
+		pscr->card_para.freq, psmc_atr_para->F, psmc_atr_para->D);
+
+
+	/* use default F&D or set by up layer
+	   pscr->card_para.f = pscr->smc_atr_para.F;
+	   pscr->card_para.d = pscr->smc_atr_para.D;
+	   pscr->card_para.freq = psmc_atr_para->FMAX * 1000;
+
+	   pscr->scclk_div = pscr->clk_freq/pscr->card_para.freq/2000-1;
+	   pscr->baud_div = (pscr->scclk_div + 1)*(pscr->card_para.f/pscr->card_para.d)-1;
+
+	   scr_set_scclk_divisor(pscr->reg_base, pscr->scclk_div);
+	   scr_set_baud_divisor(pscr->reg_base, pscr->baud_div);
+	 */
+	pscr->card_para.protocol_type = psmc_atr_para->T;
+	scr_set_t_protocol(pscr->reg_base, pscr->card_para.protocol_type);
+
+	if (0x3f == psmc_atr_para->TS) {
+		/* 0x3b:direct convention, 0x3f:inverse convention */
+		scr_set_data_order(pscr->reg_base, 1);
+		scr_set_data_invert(pscr->reg_base, 1);
 	}
-	scr.rxbuf.rptr += size;
 
-	return size;
+	return ;
 }
 
-static ssize_t
-sunxi_scr_write( struct file * file, const char __user * buf,
-				size_t size, loff_t *ppos )
+static uint32_t sunxi_scr_clk_init(struct sunxi_scr *pscr)
 {
-	uint32_t count = size;
-	uint8_t data = 0;
-	int32_t i = 0;
-	unsigned long irqflags;
+	struct platform_device *pdev = pscr->scr_device;
+	struct device_node *node = pdev->dev.of_node;
 
-	dprintk(DEBUG_INIT, "%s: enter!!\n", __func__);
-
-	if (count > (SCR_BUFFER_SIZE_MASK+1))
-		return -EFAULT;
-	scr_buffer_flush(&scr.txbuf);
-	if (copy_from_user(&(scr.txbuf.buffer), buf, count))
-		return -EFAULT;
-	else {
-		scr.txbuf.wptr = count;
-		scr.txbuf.wptr &= (SCR_BUFFER_SIZE_MASK<<1)|0x1;
+	if (NULL == pdev || !of_device_is_available(node)) {
+		SCR_DBG("platform_device invalid!\n");
+		return -EINVAL;
 	}
-	scr_display_buffer_data(&(scr.txbuf));
-	for (i=0; i<count; ) {
-		if (!scr_buffer_is_empty(&scr.txbuf)) {
-			if (!scr_txfifo_is_full(&scr)) {
-				data = scr_dump_buffer(&scr.txbuf);
-				scr_write_fifo(&scr, data);
-				i++;
-			} else {
-				dprintk(DEBUG_INIT, "%s: txfifo full\n", __func__);
-				msleep(1);
-			}
-		} else
-			break;
-	}
-	scr_buffer_flush(&scr.txbuf);
-	spin_lock_irqsave(&rx_lock, irqflags);
-	scr_buffer_flush(&scr.rxbuf);
-	spin_unlock_irqrestore(&rx_lock, irqflags);
 
-	return count;
+	pscr->scr_clk = of_clk_get(node, 0);
+	if (!pscr->scr_clk || IS_ERR(pscr->scr_clk)) {
+		SCR_DBG("try to get scr clock fail!\n");
+		return -EINVAL;
+	}
+
+	pscr->scr_clk_source = of_clk_get(node, 1);
+	if (!pscr->scr_clk_source || IS_ERR(pscr->scr_clk_source)) {
+		SCR_DBG("err: try to get scr_clk_source clock fail!\n");
+		return -EINVAL;
+	}
+
+	if (of_property_read_u32(node, "clock-frequency", &pscr->clk_freq)) {
+		SCR_DBG("get clock-frequency fail! use default 24Mhz\n");
+		pscr->clk_freq = 24000000;
+	}
+
+	if (clk_set_parent(pscr->scr_clk, pscr->scr_clk_source)) {
+		SCR_DBG("set scr_clk parent to scr_clk_source fail!\n");
+		return -EINVAL;
+	}
+
+	if (clk_set_rate(pscr->scr_clk, pscr->clk_freq)) {
+		SCR_DBG("set ir scr_clk freq  failed!\n");
+		return -EINVAL;
+	}
+
+	if (clk_prepare_enable(pscr->scr_clk)) {
+		SCR_DBG("try to enable scr_clk failed!\n");
+		return -EINVAL;
+	}
+
+	return 0;
 }
 
-static long sunxi_scr_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
+static uint32_t sunxi_scr_clk_exit(struct sunxi_scr *pscr)
 {
-	void __user *argp = (void __user *)arg;
-
-	/* if SCR_ATR_RESP_FAIL == scr.atr_resp, we must make the received data as atr */
-	uint8_t tryTimes = 0;
-	dprintk(DEBUG_INIT, "%s: enter!!\n", __func__);
-
-	switch (cmd) {
-	case SCR_IOCRESET:
-		{
-			atr_buffer __user *atreq = argp;
-			unsigned long irqflags;
-			scr_start_warmreset(&scr);
-			while (1) {
-				dprintk(DEBUG_DATA_INFO, "%s: atr_resp=%d, activated=%d!!\n",
-					__func__, scr.atr_resp, scr.activated);
-				if (1 == scr.activated) {
-					if (SCR_ATR_RESP_OK == scr.atr_resp) {
-						if (copy_to_user(atreq, &(atr_data), sizeof(atr_data)))
-							return -EFAULT;
-						else
-							break;
-					} else if (SCR_ATR_RESP_FAIL == scr.atr_resp){
-						tryTimes++;
-						if (tryTimes==4) {
-							spin_lock_irqsave(&rx_lock, irqflags);
-							scr_copy_atr_data(&(scr.rxbuf), &atr_data);
-							scr_buffer_flush(&scr.rxbuf);
-							spin_unlock_irqrestore(&rx_lock, irqflags);
-							if (copy_to_user(atreq, &(atr_data), sizeof(atr_data)))
-								return -EFAULT;
-							else
-								break;
-						}
-					}
-				} else {
-					scr_start_activation(&scr);
-				}
-				msleep(10);
-			}
-		}
-		break;
-	case SCR_IOCGSTATUS:
-		{
-			uint32_t detected = scr_detected(&scr);
-
-			dprintk(DEBUG_DATA_INFO, "%s: %d   detected=%d!!\n", __func__,
-				__LINE__, detected);
-			if (copy_to_user(argp, &(detected),
-						 sizeof(detected))) {
-					return -EFAULT;
-			}
-		}
-		break;
-	case SCR_IOCGPARA:
-		{
-			cardPara __user *card_Para_eq = argp;
-
-			dprintk(DEBUG_DATA_INFO, "f/d=%d, freq=%d, recv_no_parity=%d!!\n",
-				card_para.f, card_para.freq, card_para.recv_no_parity);
-
-			if (copy_to_user(card_Para_eq, &(card_para),
-						 sizeof(card_para)))
-				return -EFAULT;
-		}
-		break;
-	case SCR_IOCSPARA:
-		{
-			int temp_data = 0;
-
-			if (copy_from_user(&card_para, argp, sizeof(card_para)))
-				return -EFAULT;
-
-			dprintk(DEBUG_DATA_INFO, "d=%d, freq=%d, recv_no_parity=%d!!\n",
-				card_para.d, card_para.freq, card_para.recv_no_parity);
-
-			if (0 != card_para.d)
-				temp_data = card_para.f/card_para.d;
-			else {
-				printk(KERN_ERR "card_para ERR d=0!!\n");
-				return -1;
-			}
-
-			scr.scclk_div = (12000/card_para.freq)-1;
-			scr_set_scclk_divisor(&scr, scr.scclk_div);
-
-			scr.baud_div = (scr.scclk_div + 1)*temp_data-1;
-			scr_set_baud_divisor(&scr, scr.baud_div);
-
-//			card_para.recv_no_parity &= 0x1;
-//			scr_set_recv_parity(&scr, (uint32_t)(card_para.recv_no_parity));
-		}
-		break;
-	default:
-		break;
+	if (NULL == pscr->scr_clk || IS_ERR(pscr->scr_clk)) {
+		SCR_ERR("scr_clk handle is invalid, just return!\n");
+		return -EINVAL;
+	} else {
+		clk_disable_unprepare(pscr->scr_clk);
+		clk_put(pscr->scr_clk);
+		pscr->scr_clk = NULL;
 	}
+	if (NULL == pscr->scr_clk_source || IS_ERR(pscr->scr_clk_source)) {
+		SCR_ERR("scr_clk_source handle is invalid, just return!\n");
+		return -EINVAL;
+	} else {
+		clk_put(pscr->scr_clk_source);
+		pscr->scr_clk_source = NULL;
+	}
+
 	return 0;
 }
 
 static int sunxi_scr_open(struct inode *inode, struct file *file)
 {
-	int32_t ret = 0;
+	file->private_data = pscr;
 
-	dprintk(DEBUG_INIT, "%s: enter!!\n", __func__);
-	card_para_default();
-	ret = scr_request_gpio();
-	if (0 != ret)
-		return ret;
-	scr_init_reg(&scr);
+	if (pscr->open_cnt > 0) {
+		SCR_DBG("smart card opened already\n");
+		pscr->open_cnt++;
+		return 0;
+	}
+
+	if (SCR_CARD_IN == scr_get_det_status(pscr->reg_base)) {
+		sunxi_scr_param_init(pscr);
+		scr_set_activation(pscr->reg_base);
+	} else {
+		SCR_ERR("There is not smart card insert!\n");
+		return -ENODEV;
+	}
+
+	pscr->open_cnt++;
 
 	return 0;
 }
 
 static int sunxi_scr_release(struct inode *inode, struct file *file)
 {
-	dprintk(DEBUG_INIT, "%s: enter!!\n", __func__);
-	if (1 == scr.activated)
-		scr_start_deactivation(&scr);
-	scr_clear_reg();
-	scr_clk_uncfg();
-	scr_release_gpio();
+	struct sunxi_scr *pscr = file->private_data;
+
+	if (--pscr->open_cnt) {
+		SCR_DBG("There is not really close, just return!\n");
+		return 0;
+	}
+	scr_set_deactivation(pscr->reg_base);
+	scr_clear_csr_reg(pscr->reg_base);
 
 	return 0;
+}
+
+static ssize_t
+sunxi_scr_read(struct file *file, char __user *buf, size_t size, loff_t *ppos)
+{
+	struct sunxi_scr *pscr = file->private_data;
+	uint32_t rx_size = 0;
+	int try_num = 100;
+
+	while ((SCR_RX_TRANSMIT_NOYET == pscr->rx_transmit_status) && try_num--) {
+		msleep(50);
+	};
+	if (try_num < 0) {
+		SCR_ERR("read timeout\n");
+		return -EAGAIN;
+	}
+
+	rx_size = scr_buf_rx.rx_cnt;
+	if (rx_size > size)
+		rx_size = size;
+
+	if (copy_to_user(buf, scr_buf_rx.buf_rx, rx_size))
+		return -EFAULT;
+	scr_flush_rxfifo(pscr->reg_base);
+
+	return rx_size;
+}
+
+static ssize_t
+sunxi_scr_write(struct file *file, const char __user *buf, size_t size, loff_t *ppos)
+{
+	struct sunxi_scr *pscr = file->private_data;
+	int try_num = 100;
+	int i;
+
+	if (copy_from_user(scr_buf_tx, buf, size))
+		return -EFAULT;
+
+	scr_flush_txfifo(pscr->reg_base);
+	memset(&scr_buf_rx, 0, sizeof(struct scr_data_rx));
+	pscr->rx_transmit_status = SCR_RX_TRANSMIT_NOYET;
+	for (i = 0; i < size; i++) {
+		while (scr_txfifo_is_full(pscr->reg_base) && try_num--) {
+			msleep(50);
+		}
+		if (try_num < 0) {
+			SCR_ERR("TX FIFO full, write timeout\n");
+			break;
+		}
+		scr_write_fifo(pscr->reg_base, scr_buf_tx[i]);
+		try_num = 100;
+	}
+	SCR_DBG("writed %d byte\n", i);
+	return i;
+}
+
+static long sunxi_scr_ioctl(struct file *file, uint32_t cmd, unsigned long arg)
+{
+	struct sunxi_scr *pscr = file->private_data;
+	uint32_t tmp = 0, ret = 0;
+	int try_num;
+
+	SCR_ENTER();
+
+	switch (cmd) {
+	/* get smart card status 0:SCR_CARD_OUT, 1:SCR_CARD_IN */
+	case SCR_IOCGSTATUS:
+		tmp = scr_get_det_status(pscr->reg_base);
+		ret = put_user(tmp, (int __user *)arg);
+		break;
+
+	/* reset card and store ATR data immediately */
+	case SCR_IOCRESET:
+		scr_set_activation(pscr->reg_base);
+		mdelay(10);
+		break;
+
+	/* get ATR data, the arg type is struct scr_atr */
+	case SCR_IOCGATR:
+		try_num = 10;
+		while (SCR_ATR_RESP_OK != pscr->atr_resp && try_num--) {
+			msleep(50);
+		};
+		if (try_num < 0) {
+			SCR_ERR("SCR_IOCGATR timeout!\n");
+			ret = -EAGAIN;
+			break;
+		}
+		ret = copy_to_user((void __user *)arg, &pscr->scr_atr_des,
+				   sizeof(struct scr_atr)) ? -EFAULT : 0;
+		break;
+
+	/* get current card parameters & status */
+	case SCR_IOCGPARA:
+		ret = copy_to_user((void __user *)arg, &pscr->card_para,
+				   sizeof(struct scr_card_para)) ? -EFAULT : 0;
+		break;
+
+	/* set current card parameters & status */
+	case SCR_IOCSPARA:
+		if (copy_from_user(&pscr->card_para, (void __user *)arg,
+				   sizeof(struct scr_card_para))) {
+			SCR_ERR("get card para from user error!\n");
+			ret = -EFAULT;
+			break;
+		}
+		pscr->scclk_div = pscr->clk_freq / pscr->card_para.freq / 2000 - 1;
+		pscr->baud_div = (pscr->scclk_div + 1) * (pscr->card_para.f / pscr->card_para.d) - 1;
+		scr_set_scclk_divisor(pscr->reg_base, pscr->scclk_div);
+		scr_set_baud_divisor(pscr->reg_base, pscr->baud_div);
+		scr_set_recv_parity(pscr->reg_base, pscr->card_para.recv_no_parity);
+		scr_set_t_protocol(pscr->reg_base, pscr->card_para.protocol_type);
+		break;
+
+	/* get the parse parameters come from ATR data */
+	case SCR_IOCGATRPARA:
+		ret = copy_to_user((void __user *)arg, &pscr->smc_atr_para,
+				   sizeof(struct smc_atr_para)) ? -EFAULT : 0;
+		break;
+
+	/* get the pps parse parameters come from ATR data */
+	case SCR_IOCGPPSPARA:
+		ret = copy_to_user((void __user *)arg, &pscr->smc_pps_para,
+				   sizeof(struct smc_pps_para)) ? -EFAULT : 0;
+		break;
+
+	default:
+		SCR_ERR("Invalid iocontrol command!\n");
+		break;
+	}
+	return ret;
 }
 
 static const struct file_operations sunxi_scr_fops = {
@@ -689,142 +1042,208 @@ static int sunxi_scr_probe(struct platform_device *pdev)
 {
 	struct device_node *node = pdev->dev.of_node;
 	struct resource *mem_res = NULL;
+	int ret = 0;
 
-	dprintk(DEBUG_INIT, "%s: enter!!\n", __func__);
+	SCR_ENTER();
 
-	scr.scr_device = pdev;
-	if (!of_device_is_available(node)) {
-		printk("%s: smartcard status disable!!\n", __func__);
-		return -EPERM;
+	pscr = kzalloc(sizeof(struct sunxi_scr), GFP_KERNEL);
+	if (!pscr) {
+		SCR_ERR("kzalloc struct sunxi_scr fail!\n");
+		return -ENOMEM;
 	}
 
-	scr.irq_no = platform_get_irq(pdev, 0);
-	if (scr.irq_no < 0) {
-		printk(KERN_ERR "%s:get irq number failed!\n",  __func__);
-		return -EINVAL;
+	pscr->scr_device = pdev;
+	if (!of_device_is_available(node)) {
+		SCR_ERR("invalid node!\n");
+		ret = -EINVAL;
+		goto emloc;
+	}
+
+	if (sunxi_scr_clk_init(pscr)) {
+		SCR_ERR("sunxi_scr_clk_init fail!\n");
+		ret = -EINVAL;
+		goto eclk;
+	}
+
+	pscr->irq_no = platform_get_irq(pdev, 0);
+	if (pscr->irq_no < 0) {
+		SCR_ERR("get irq number fail!\n");
+		ret = -EINVAL;
+		goto eclk;
 	}
 
 	mem_res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
 	if (mem_res == NULL) {
-		printk(KERN_ERR "%s: failed to get MEM res\n", __func__);
-		return -ENXIO;
+		SCR_ERR("failed to get MEM res\n");
+		ret = -ENXIO;
+		goto eclk;
 	}
 
-	if (!request_mem_region(mem_res->start, resource_size(mem_res), mem_res->name)) {
-		printk(KERN_ERR  "%s: failed to request mem region\n", __func__);
-		return -EINVAL;
+	if (!request_mem_region(mem_res->start,
+		resource_size(mem_res), mem_res->name)) {
+		SCR_ERR("failed to request mem region\n");
+		ret = -EINVAL;
+		goto eclk;
 	}
 
-	scr.reg_base = ioremap(mem_res->start, resource_size(mem_res));
-	if (!scr.reg_base) {
-		printk(KERN_ERR  "%s: failed to io remap\n", __func__);
-		return -EIO;
+	pscr->reg_base = ioremap(mem_res->start, resource_size(mem_res));
+	if (!pscr->reg_base) {
+		SCR_ERR("failed to io remap\n");
+		ret = -EIO;
+		goto eiomem;
+	}
+	pscr->mem_res = mem_res;
+
+	if (request_irq(pscr->irq_no, sunxi_scr_interrupt,
+			IRQF_TRIGGER_NONE, "scr", pscr)) {
+		SCR_ERR("request irq fail!\n");
+		ret = -EINVAL;
+		goto eiomap;
 	}
 
-	scr.scr_clk = of_clk_get(node, 0);
-	if (!scr.scr_clk || IS_ERR(scr.scr_clk)) {
-		printk(KERN_ERR "try to get scr clock failed!\n");
-		return -EINVAL;
+	if (scr_request_gpio(pscr)) {
+		SCR_ERR("failed to request gpio\n");
+		ret = -EINVAL;
+		goto eirq;
 	}
 
-	scr.scr_clk_source = of_clk_get(node, 1);
-	if(!scr.scr_clk_source || IS_ERR(scr.scr_clk_source)) {
-		printk("%s err: try to get scr_clk_source clock failed!\n", __func__);
-		return -EINVAL;
+	spin_lock_init(&pscr->rx_lock);
+	sunxi_scr_param_init(pscr);
+
+	/* creat character device */
+	sunxi_scr_major = register_chrdev(0, SCR_MODULE_NAME, &sunxi_scr_fops);
+	if (sunxi_scr_major < 0) {
+		SCR_ERR("register_chrdev fail!\n");
+		ret = -ENODEV;
+		goto eirq;
 	}
-
-	if (of_property_read_u32(node, "clock-frequency", &scr.clk_freq))
-		scr.clk_freq = 24000000;
-
-	if(clk_set_parent(scr.scr_clk, scr.scr_clk_source))
-		printk("%s: set scr_clk parent to scr_clk_source failed!\n", __func__);
-
-	if (clk_set_rate(scr.scr_clk, scr.clk_freq)) {
-		printk(KERN_DEBUG "set ir scr_clk freq to 24M failed!\n");
-	}
-
-	sunxi_scr_params_init();
-
-	scr_wq = create_singlethread_workqueue("scr_wq");
-	if (!scr_wq) {
-		printk(KERN_ERR "Creat scr workqueue failed.\n");
-		return -ENOMEM;
-	}
-
-	INIT_WORK(&scr_work, scr_work_func);
-
-	if (request_irq(scr.irq_no, scr_irq_service, 0, "scr", NULL)) {
-		return -1;
-	}
-
-	if (sunxi_scr_major == -1) {
-		if ((sunxi_scr_major = register_chrdev (0, SCR_MODULE_NAME, &sunxi_scr_fops)) < 0) {
-			printk(KERN_ERR "%s: Failed to register character device\n", __func__);
-			return -1;
-		} else
-			dprintk(DEBUG_INIT, "%s: sunxi_scr_major = %d\n", __func__, sunxi_scr_major);
-	}
-
 	scr_dev_class = class_create(THIS_MODULE, SCR_MODULE_NAME);
-	if (IS_ERR(scr_dev_class))
-		return -1;
-	scr_device = device_create(scr_dev_class, NULL,  MKDEV(sunxi_scr_major, 0), NULL, SCR_MODULE_NAME);
+	if (IS_ERR(scr_dev_class)) {
+		SCR_ERR("class_create fail!\n");
+		ret = -ENODEV;
+		goto edev;
+	}
+	scr_device = device_create(scr_dev_class, NULL, MKDEV(sunxi_scr_major, 0),
+				   NULL, SCR_MODULE_NAME);
+	if (IS_ERR(scr_device)) {
+		SCR_ERR("device_create fail!\n");
+		ret = -ENODEV;
+		goto ecla;
+	}
+
+	platform_set_drvdata(pdev, pscr);
 
 	return 0;
+
+ecla:
+	class_destroy(scr_dev_class);
+
+edev:
+	unregister_chrdev(sunxi_scr_major, SCR_MODULE_NAME);
+
+eirq:
+	free_irq(pscr->irq_no, pscr);
+
+eiomap:
+	iounmap(pscr->reg_base);
+
+eiomem:
+	release_mem_region(mem_res->start, resource_size(mem_res));
+
+eclk:
+	sunxi_scr_clk_exit(pscr);
+
+emloc:
+	kfree(pscr);
+
+	return ret;
 
 }
 
 static int sunxi_scr_remove(struct platform_device *pdev)
 {
-	if (sunxi_scr_major > 0) {
-		device_destroy(scr_dev_class, MKDEV(sunxi_scr_major, 0));
-		class_destroy(scr_dev_class);
-		unregister_chrdev(sunxi_scr_major, SCR_MODULE_NAME);
-	}
-	free_irq(scr.irq_no, NULL);
-	cancel_work_sync(&scr_work);
-	if (NULL != scr_wq) {
-		flush_workqueue(scr_wq);
-		destroy_workqueue(scr_wq);
-		scr_wq = NULL;
-	}
+	struct sunxi_scr *pscr = platform_get_drvdata(pdev);
 
-	if(NULL == scr.scr_clk || IS_ERR(scr.scr_clk)) {
-		printk("scr_clk handle is invalid, just return!\n");
-		return -1;
-	} else {
-		clk_disable_unprepare(scr.scr_clk);
-		clk_put(scr.scr_clk);
-		scr.scr_clk = NULL;
-	}
-	if(NULL == scr.scr_clk_source || IS_ERR(scr.scr_clk_source)) {
-		printk("scr_clk_source handle is invalid, just return!\n");
-		return -1;
-	} else {
-		clk_put(scr.scr_clk_source);
-		scr.scr_clk_source = NULL;
-	}
+	device_destroy(scr_dev_class, MKDEV(sunxi_scr_major, 0));
+	class_destroy(scr_dev_class);
+	unregister_chrdev(sunxi_scr_major, SCR_MODULE_NAME);
+	free_irq(pscr->irq_no, pscr);
+	iounmap(pscr->reg_base);
+	release_mem_region(pscr->mem_res->start,
+			   resource_size(pscr->mem_res));
+	scr_release_gpio(pscr);
+	sunxi_scr_clk_exit(pscr);
 
-	printk(KERN_INFO "%s: module unloaded\n", __func__);
+	SCR_EXIT();
 
 	return 0;
 }
 
+#ifdef CONFIG_PM
+static int sunxi_scr_suspend(struct device *dev)
+{
+	struct platform_device *pdev = to_platform_device(dev);
+	struct sunxi_scr *pscr = platform_get_drvdata(pdev);
+
+	pscr->suspended = true;
+
+	if (sunxi_scr_clk_exit(pscr)) {
+		SCR_ERR("SCR suspend failed !\n");
+		pscr->suspended = false;
+		return -1;
+	}
+	scr_release_gpio(pscr);
+	disable_irq_nosync(pscr->irq_no);
+
+	SCR_DBG("SCR suspend okay\n");
+	return 0;
+}
+
+static int sunxi_scr_resume(struct device *dev)
+{
+	struct platform_device *pdev = to_platform_device(dev);
+	struct sunxi_scr *pscr = platform_get_drvdata(pdev);
+
+
+	pscr->suspended = false;
+
+	if (sunxi_scr_clk_init(pscr)) {
+		SCR_ERR("SCR resume failed !\n");
+		return -1;
+	}
+	scr_request_gpio(pscr);
+	enable_irq(pscr->irq_no);
+
+	SCR_DBG("SCR resume okay\n");
+	return 0;
+}
+
+static const struct dev_pm_ops sunxi_scr_dev_pm_ops = {
+	.suspend = sunxi_scr_suspend,
+	.resume = sunxi_scr_resume,
+};
+
+#define SUNXI_SCR_DEV_PM_OPS (&sunxi_scr_dev_pm_ops)
+#else
+#define SUNXI_SCR_DEV_PM_OPS NULL
+#endif
+
 static const struct of_device_id sunxi_scr_match[] = {
-	{ .compatible = "allwinner,sunxi-scr", },
+	{.compatible = "allwinner,sunxi-scr",},
 	{},
 };
+
 MODULE_DEVICE_TABLE(of, sunxi_scr_match);
 
-
 static struct platform_driver scr_platform_driver = {
-	.probe  = sunxi_scr_probe,
+	.probe = sunxi_scr_probe,
 	.remove = sunxi_scr_remove,
 	.driver = {
-		.name	 = SCR_MODULE_NAME,
-		.owner = THIS_MODULE,
-		.of_match_table = sunxi_scr_match,
-	},
+		   .name = SCR_MODULE_NAME,
+		   .owner = THIS_MODULE,
+		   .pm = SUNXI_SCR_DEV_PM_OPS,
+		   .of_match_table = sunxi_scr_match,
+		   },
 };
 
 static int __init sunxi_scr_init(void)
@@ -839,8 +1258,6 @@ static void __exit sunxi_scr_exit(void)
 
 module_init(sunxi_scr_init);
 module_exit(sunxi_scr_exit);
-module_param_named(scr_debug_mask, scr_debug_mask, int, 0644);
-MODULE_DESCRIPTION("Smart Card driver");
-MODULE_AUTHOR("Ming Li");
+MODULE_DESCRIPTION("Smart Card Driver");
+MODULE_AUTHOR("fuzhaoke");
 MODULE_LICENSE("GPL");
-

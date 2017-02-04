@@ -1,5 +1,24 @@
 #include "disp_private.h"
 
+#if defined(SUPPORT_EINK) && defined(CONFIG_EINK_PANEL_USED)
+
+s32 disp_delay_ms(u32 ms)
+{
+#if defined(__LINUX_PLAT__)
+	mdelay(ms);
+#endif
+#ifdef __BOOT_OSAL__
+	/* assume cpu runs at 1000Mhz,10 clock one cycle */
+	wBoot_timer_delay(ms);
+#endif
+#ifdef __UBOOT_PLAT__
+    __msdelay(ms);
+#endif
+	return 0;
+}
+
+#else
+
 s32 disp_delay_ms(u32 ms)
 {
 #if defined(__LINUX_PLAT__)
@@ -9,7 +28,8 @@ s32 disp_delay_ms(u32 ms)
 	schedule_timeout(timeout);
 #endif
 #ifdef __BOOT_OSAL__
-	wBoot_timer_delay(ms);//assume cpu runs at 1000Mhz,10 clock one cycle
+	/* assume cpu runs at 1000Mhz,10 clock one cycle */
+	wBoot_timer_delay(ms);
 #endif
 #ifdef __UBOOT_PLAT__
     __msdelay(ms);
@@ -17,6 +37,7 @@ s32 disp_delay_ms(u32 ms)
 	return 0;
 }
 
+#endif/*endif SUPPORT_EINK*/
 
 s32 disp_delay_us(u32 us)
 {

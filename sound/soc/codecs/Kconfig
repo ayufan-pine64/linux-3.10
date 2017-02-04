@@ -61,7 +61,7 @@ config SND_SOC_ALL_CODECS
 	select SND_SOC_SN95031 if INTEL_SCU_IPC
 	select SND_SOC_SPDIF
 	select SND_SOC_SSM2602 if SND_SOC_I2C_AND_SPI
-	select SND_SOC_STA32X if I2C
+#	select SND_SOC_STA32X if I2C
 	select SND_SOC_STA529 if I2C
 	select SND_SOC_STAC9766 if SND_SOC_AC97_BUS
 	select SND_SOC_TAS5086 if I2C
@@ -316,8 +316,8 @@ config SND_SOC_SPDIF
 config SND_SOC_SSM2602
 	tristate
 
-config SND_SOC_STA32X
-	tristate
+#config SND_SOC_STA32X
+#	tristate
 
 config SND_SOC_STA529
 	tristate
@@ -525,3 +525,23 @@ config SND_SOC_ML26124
 
 config SND_SOC_TPA6130A2
 	tristate
+config SND_SOC_ACX00DAPM_CODEC
+	tristate "SUNXI AudioCodec ACX00 DAPM"
+	depends on MFD_ACX00
+	default n
+	help
+	  Say Y or M if you want to add support for ACX00 audiocodec.
+
+config SND_SOC_STA32X
+	tristate "STA32X AudioCodec"
+	depends on ARCH_SUN8IW10
+	default n
+	help
+	  Say Y or M if you want to add support for STA32X audiocodec.
+
+config SND_SOC_CX2081X
+	tristate "CX2081X AudioCodec"
+	depends on ARCH_SUN8IW10
+	default n
+	help
+	  Say Y or M if you want to add support for CX2081X audiocodec.

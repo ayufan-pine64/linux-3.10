@@ -28,6 +28,7 @@
 #include <linux/slab.h>
 #include <linux/debugfs.h>
 #include <linux/dma/sunxi-dma.h>
+#include <linux/sunxi-smc.h>
 #include <linux/of.h>
 #include <linux/of_irq.h>
 #include <linux/of_address.h>
@@ -40,9 +41,11 @@
 #include "dmaengine.h"
 #include "virt-dma.h"
 
-#if defined(CONFIG_ARCH_SUN8IW1)
+#if defined(CONFIG_ARCH_SUN8IW1) \
+	|| defined(CONFIG_ARCH_SUN8IW11)
 #define NR_MAX_CHAN	16			/* total of channels */
-#elif defined(CONFIG_ARCH_SUN8IW7)
+#elif defined(CONFIG_ARCH_SUN8IW7) \
+	|| defined(CONFIG_ARCH_SUN50IW2P1)
 #define NR_MAX_CHAN	12			/* total of channels */
 #else
 #define NR_MAX_CHAN	8			/* total of channels */
@@ -58,11 +61,21 @@
 #define DMA_IRQ_EN(x)	(0x000 + ((x) << 2))	/* Interrupt enable register */
 #define DMA_IRQ_STAT(x)	(0x010 + ((x) << 2))	/* Inetrrupt status register */
 
-#if defined(CONFIG_ARCH_SUN9I)
+#if defined(CONFIG_ARCH_SUN9I) \
+	|| defined(CONFIG_ARCH_SUN50I)
 #define DMA_SECU	0x20			/* DMA security register */
-#define DMA_GATE	0x28			/* DMA gating rgister */
-#else
+#endif
+
+#if defined(CONFIG_ARCH_SUN8IW1)
+#undef DMA_GATE					/* Doesn't have gating register */
+#elif defined(CONFIG_ARCH_SUN8IW3) \
+	|| defined(CONFIG_ARCH_SUN8IW5) \
+	|| defined(CONFIG_ARCH_SUN8IW6) \
+	|| defined(CONFIG_ARCH_SUN8IW8) \
+	|| defined(CONFIG_ARCH_SUN8IW9)
 #define DMA_GATE	0x20			/* DMA gating rgister */
+#else
+#define DMA_GATE	0x28			/* DMA gating rgister */
 #endif
 
 #define DMA_STAT	0x30			/* DMA Status Register RO */
@@ -76,6 +89,25 @@
 #define DMA_PARA(x)	(0x11C + ((x) << 6))	/* Parameter register RO */
 
 #if defined(CONFIG_ARCH_SUN9I)
+#define LINK_END	0x1FFFF800		/* lastest link must be 0x1ffff800 */
+#else
+#define LINK_END	0xFFFFF800		/* lastest link must be 0xfffff800 */
+#endif
+
+/* DMA opertions mode */
+#if defined(CONFIG_ARCH_SUN8IW1) \
+	|| defined(CONFIG_ARCH_SUN8IW3) \
+	|| defined(CONFIG_ARCH_SUN8IW5) \
+	|| defined(CONFIG_ARCH_SUN8IW6) \
+	|| defined(CONFIG_ARCH_SUN8IW8) \
+	|| defined(CONFIG_ARCH_SUN8IW9)
+
+#define DMA_OP_MODE(x)
+#define SRC_HS_MASK
+#define DST_HS_MASK
+#define SET_OP_MODE(d, x, val)  do { } while (0)
+
+#else
 
 #define DMA_OP_MODE(x)	(0x128 + ((x) << 6))	/* DMA mode options register */
 #define SRC_HS_MASK	(0x1 << 2)		/* bit 2: Source handshark mode */
@@ -84,16 +116,6 @@
 #define SET_OP_MODE(d, x, val)	({	\
 		writel(val, d->base + DMA_OP_MODE(x));	\
 		})
-
-#define LINK_END	0x1FFFF800		/* lastest link must be 0x1ffff800 */
-
-#else
-
-#define DMA_OP_MODE(x)
-#define SRC_HS_MASK
-#define DST_HS_MASK
-#define SET_OP_MODE(d, x, val)	do{}while(0)
-#define LINK_END	0xFFFFF800		/* lastest link must be 0xfffff800 */
 
 #endif
 
@@ -109,20 +131,30 @@
 
 /* The detail information of DMA configuration */
 #define SRC_WIDTH(x)	((x) << 9)
-#ifdef CONFIG_ARCH_SUN9I
-#define SRC_BURST(x)	((x) << 6)
-#else
+#if defined(CONFIG_ARCH_SUN8IW1) \
+	|| defined(CONFIG_ARCH_SUN8IW3) \
+	|| defined(CONFIG_ARCH_SUN8IW5) \
+	|| defined(CONFIG_ARCH_SUN8IW6) \
+	|| defined(CONFIG_ARCH_SUN8IW8) \
+	|| defined(CONFIG_ARCH_SUN8IW9)
 #define SRC_BURST(x)	((x) << 7)
+#else
+#define SRC_BURST(x)	((x) << 6)
 #endif
 #define SRC_IO_MODE	(0x01 << 5)
 #define SRC_LINEAR_MODE	(0x00 << 5)
 #define SRC_DRQ(x)	((x) << 0)
 
 #define DST_WIDTH(x)	((x) << 25)
-#ifdef CONFIG_ARCH_SUN9I
-#define DST_BURST(x)	((x) << 22)
-#else
+#if defined(CONFIG_ARCH_SUN8IW1) \
+	|| defined(CONFIG_ARCH_SUN8IW3) \
+	|| defined(CONFIG_ARCH_SUN8IW5) \
+	|| defined(CONFIG_ARCH_SUN8IW6) \
+	|| defined(CONFIG_ARCH_SUN8IW8) \
+	|| defined(CONFIG_ARCH_SUN8IW9)
 #define DST_BURST(x)	((x) << 23)
+#else
+#define DST_BURST(x)	((x) << 22)
 #endif
 #define DST_IO_MODE	(0x01 << 21)
 #define DST_LINEAR_MODE	(0x00 << 21)
@@ -156,6 +188,7 @@ struct sunxi_dma_lli {
 struct sunxi_dmadev {
 	struct dma_device	dma_dev;
 	void __iomem		*base;
+	phys_addr_t             pbase;
 	struct clk		*ahb_clk;	/* AHB clock gate for DMA */
 
 	spinlock_t		lock;
@@ -316,7 +349,10 @@ static void sunxi_free_desc(struct virt_dma_desc *vd)
 		phy = next_phy;
 	}
 
+	txd->vd.tx.callback = NULL;
+	txd->vd.tx.callback_param = NULL;
 	kfree(txd);
+	txd = NULL;
 }
 
 static inline void sunxi_dump_com_regs(struct sunxi_chan *ch)
@@ -330,8 +366,10 @@ static inline void sunxi_dump_com_regs(struct sunxi_chan *ch)
 			"\tmask1(%04x): 0x%08x\n"
 			"\tpend0(%04x): 0x%08x\n"
 			"\tpend1(%04x): 0x%08x\n"
-#ifdef CONFIG_ARCH_SUN9I
+#ifdef DMA_SECU
 			"\tsecur(%04x): 0x%08x\n"
+#endif
+#ifdef DMA_GATE
 			"\t_gate(%04x): 0x%08x\n"
 #endif
 			"\tstats(%04x): 0x%08x\n",
@@ -339,8 +377,10 @@ static inline void sunxi_dump_com_regs(struct sunxi_chan *ch)
 			DMA_IRQ_EN(1),  readl(sdev->base + DMA_IRQ_EN(1)),
 			DMA_IRQ_STAT(0),readl(sdev->base + DMA_IRQ_STAT(0)),
 			DMA_IRQ_STAT(1),readl(sdev->base + DMA_IRQ_STAT(1)),
-#ifdef CONFIG_ARCH_SUN9I
+#ifdef DMA_SECU
 			DMA_SECU, readl(sdev->base + DMA_SECU),
+#endif
+#ifdef DMA_GATE
 			DMA_GATE, readl(sdev->base + DMA_GATE),
 #endif
 			DMA_STAT, readl(sdev->base + DMA_STAT));
@@ -407,6 +447,8 @@ static void sunxi_dma_pause(struct sunxi_chan *ch)
 static int sunxi_terminate_all(struct sunxi_chan *ch)
 {
 	struct sunxi_dmadev *sdev = to_sunxi_dmadev(ch->vc.chan.device);
+	struct virt_dma_desc *vd = NULL;
+	struct virt_dma_chan *vc = NULL;
 	u32 chan_num = ch->vc.chan.chan_id;
 	unsigned long flags;
 	LIST_HEAD(head);
@@ -417,14 +459,25 @@ static int sunxi_terminate_all(struct sunxi_chan *ch)
 	list_del_init(&ch->node);
 	spin_unlock(&sdev->lock);
 
-	if (ch->desc)
-		ch->desc = NULL;
-
-	ch->cyclic = false;
-
+	/* We should entry PAUSE state first to avoid missing data
+	 * count which transferring on bus.
+	 */
 	writel(CHAN_PAUSE, sdev->base + DMA_PAUSE(chan_num));
 	writel(CHAN_STOP, sdev->base + DMA_ENABLE(chan_num));
 	writel(CHAN_RESUME, sdev->base + DMA_PAUSE(chan_num));
+
+	/* At cyclic mode, desc is not be managed by virt-dma,
+	 * we need to add it to desc_completed
+	 */
+	if (ch->cyclic) {
+		ch->cyclic = false;
+		if (ch->desc) {
+			vd = &(ch->desc->vd);
+			vc = &(ch->vc);
+			list_add_tail(&vd->node, &vc->desc_completed);
+		}
+	}
+	ch->desc = NULL;
 
 	vchan_get_all_descriptors(&ch->vc, &head);
 	spin_unlock_irqrestore(&ch->vc.lock, flags);
@@ -604,10 +657,7 @@ static irqreturn_t sunxi_dma_interrupt(int irq, void *dev_id)
 
 	/* Get the status of irq */
 	status_lo = readl(sdev->base + DMA_IRQ_STAT(0));
-#if !defined(CONFIG_ARCH_SUN8IW3) \
-	|| !defined(CONFIG_ARCH_SUN8IW5) \
-	|| !defined(CONFIG_ARCH_SUN8IW6) \
-	|| !defined(CONFIG_ARCH_SUN8IW8)
+#if NR_MAX_CHAN > HIGH_CHAN
 	status_hi = readl(sdev->base + DMA_IRQ_STAT(1));
 #endif
 
@@ -616,10 +666,7 @@ static irqreturn_t sunxi_dma_interrupt(int irq, void *dev_id)
 
 	/* Clear the bit of irq status */
 	writel(status_lo, sdev->base + DMA_IRQ_STAT(0));
-#if !defined(CONFIG_ARCH_SUN8IW3) \
-	|| !defined(CONFIG_ARCH_SUN8IW5) \
-	|| !defined(CONFIG_ARCH_SUN8IW6) \
-	|| !defined(CONFIG_ARCH_SUN8IW8)
+#if NR_MAX_CHAN > HIGH_CHAN
 	writel(status_hi, sdev->base + DMA_IRQ_STAT(1));
 #endif
 
@@ -640,7 +687,19 @@ static irqreturn_t sunxi_dma_interrupt(int irq, void *dev_id)
 
 		desc = ch->desc;
 		if (ch->cyclic) {
-			vchan_cyclic_callback(&desc->vd);
+			struct virt_dma_desc *vd;
+			dma_async_tx_callback cb = NULL;
+			void *cb_data = NULL;
+
+			vd = &desc->vd;
+			if (vd) {
+				cb = vd->tx.callback;
+				cb_data = vd->tx.callback_param;
+			}
+			spin_unlock_irqrestore(&ch->vc.lock, flags);
+			if (cb)
+				cb(cb_data);
+			spin_lock_irqsave(&ch->vc.lock, flags);
 		} else {
 			ch->desc = NULL;
 			vchan_cookie_complete(&desc->vd);
@@ -1056,6 +1115,10 @@ static void sunxi_dma_hw_init(struct sunxi_dmadev *dev)
 	struct sunxi_dmadev *sunxi_dev = dev;
 
 	clk_prepare_enable(sunxi_dev->ahb_clk);
+#if defined(CONFIG_SUNXI_SMC)
+	sunxi_smc_writel(0xff, sunxi_dev->pbase + DMA_SECU);
+#endif
+
 #if defined(CONFIG_ARCH_SUN8IW3) || \
 	defined(CONFIG_ARCH_SUN8IW5) || \
 	defined(CONFIG_ARCH_SUN8IW6) || \
@@ -1085,6 +1148,7 @@ static int sunxi_probe(struct platform_device *pdev)
 		goto io_err;
 	}
 
+	sunxi_dev->pbase = res->start;
 	sunxi_dev->base = ioremap(res->start, resource_size(res));
 	if (!sunxi_dev->base) {
 		dev_err(&pdev->dev, "Remap I/O memory failed!\n");

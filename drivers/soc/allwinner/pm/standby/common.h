@@ -20,44 +20,36 @@
 
 static inline __u64 standby_uldiv(__u64 dividend, __u32 divisior)
 {
-    __u64   tmpDiv = (__u64)divisior;
-    __u64   tmpQuot = 0;
-    __s32   shift = 0;
+	__u64 tmpDiv = (__u64) divisior;
+	__u64 tmpQuot = 0;
+	__s32 shift = 0;
 
-    if(!divisior)
-    {
-        /* divide 0 error abort */
-        return 0;
-    }
+	if (!divisior) {
+		/* divide 0 error abort */
+		return 0;
+	}
 
-    while(!(tmpDiv & ((__u64)1<<63)))
-    {
-        tmpDiv <<= 1;
-        shift ++;
-    }
+	while (!(tmpDiv & ((__u64) 1 << 63))) {
+		tmpDiv <<= 1;
+		shift++;
+	}
 
-    do
-    {
-        if(dividend >= tmpDiv)
-        {
-            dividend -= tmpDiv;
-            tmpQuot = (tmpQuot << 1) | 1;
-        }
-        else
-        {
-            tmpQuot = (tmpQuot << 1) | 0;
-        }
-        tmpDiv >>= 1;
-        shift --;
-    } while(shift >= 0);
+	do {
+		if (dividend >= tmpDiv) {
+			dividend -= tmpDiv;
+			tmpQuot = (tmpQuot << 1) | 1;
+		} else {
+			tmpQuot = (tmpQuot << 1) | 0;
+		}
+		tmpDiv >>= 1;
+		shift--;
+	} while (shift >= 0)
+		;
 
-    return tmpQuot;
+	return tmpQuot;
 }
-
-
 
 void standby_memcpy(void *dest, void *src, int n);
 void standby_delay_cycle(int cycle);
 
-#endif  //__COMMON_H__
-
+#endif	/*__COMMON_H__*/

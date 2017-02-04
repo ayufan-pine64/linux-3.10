@@ -65,12 +65,6 @@ static s32 goodix_tool_read( char *page, char **start, off_t off, int count, int
 static s32 (*tool_i2c_read)(u8 *, u16);
 static s32 (*tool_i2c_write)(u8 *, u16);
 
-static const struct file_operations proc_fops = {
-    .owner = THIS_MODULE,
-    .write = goodix_tool_write,
-    .read = goodix_tool_read,
-};
-
 s32 DATA_LENGTH = 0;
 s8 IC_TYPE[16] = {0};
 
@@ -204,15 +198,14 @@ s32 init_wr_node(struct i2c_client *client)
         
         register_i2c_func();
         
-//        goodix_proc_entry = proc_create(GOODIX_ENTRY_NAME, 0666, NULL);
-        goodix_proc_entry = proc_create(GOODIX_ENTRY_NAME, 0666, NULL,&proc_fops);
+        goodix_proc_entry = create_proc_entry(GOODIX_ENTRY_NAME, 0666, NULL);
         if (goodix_proc_entry == NULL) {
                 GTP_ERROR("Couldn't create proc entry!");
                 return FAIL;
         }else {
                 GTP_INFO("Create proc entry success!");
-//                goodix_proc_entry->write_proc = goodix_tool_write;
-//                goodix_proc_entry->read_proc = goodix_tool_read;
+                goodix_proc_entry->write_proc = goodix_tool_write;
+                goodix_proc_entry->read_proc = goodix_tool_read;
         }
         
         return SUCCESS;

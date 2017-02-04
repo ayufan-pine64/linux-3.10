@@ -4,6 +4,8 @@
 #include <linux/regulator/driver.h>
 #include <linux/regulator/machine.h>
 
+extern char *get_pmu_cur_name(void);
+
 /*
  * struct regulator
  *
@@ -14,9 +16,9 @@ struct regulator {
 	struct list_head list;
 	unsigned int always_on:1;
 	unsigned int bypass:1;
-	int uA_load;
-	int min_uV;
-	int max_uV;
+	int ua_load;
+	int min_uv;
+	int max_uv;
 	char *supply_name;
 	struct device_attribute dev_attr;
 	struct regulator_dev *rdev;
@@ -25,90 +27,107 @@ struct regulator {
 
 struct virtual_consumer_data {
 	struct mutex lock;
-	struct regulator *regulator;
 	int enabled;
-	int min_uV;
-	int max_uV;
-	int min_uA;
-	int max_uA;
-	unsigned int mode;
+	int min_uv;
+	int max_uv;
+	int min_ua;
+	int max_ua;
+	char regu_name[16];
 };
 
 static void update_voltage_constraints(struct virtual_consumer_data *data)
 {
 	int ret = 0;
+	struct regulator *regu;
 
-	if (data->min_uV && data->max_uV
-	    && data->min_uV <= data->max_uV) {
-		ret = regulator_set_voltage(data->regulator,
-					    data->min_uV, data->max_uV);
+	regu = regulator_get(NULL, data->regu_name);
+	if (IS_ERR(regu)) {
+		pr_err("%s: regulator get %s failed\n",
+				__func__, data->regu_name);
+		return;
+	}
+
+	if (data->min_uv && data->max_uv && data->min_uv <= data->max_uv) {
+		ret = regulator_set_voltage(regu, data->min_uv, data->max_uv);
 		if (ret != 0) {
-			printk(KERN_ERR "regulator_set_voltage() failed: %d\n",
-			       ret);
+			pr_err("regulator_set_voltage() failed: %d\n", ret);
 			return;
 		}
 	}
 
-	if (data->min_uV && data->max_uV ) {
-		ret = data->regulator->rdev->desc->ops->enable(data->regulator->rdev);
+	if (data->min_uv && data->max_uv) {
+		ret = regu->rdev->desc->ops->enable(regu->rdev);
 		if (ret != 0)
-			printk(KERN_ERR "regulator_enable() failed: %d\n",
-				ret);
+			pr_err("regulator_enable() failed: %d\n", ret);
 	}
 
-	if (!(data->min_uV && data->max_uV)) {
-		ret = data->regulator->rdev->desc->ops->disable(data->regulator->rdev);
+	if (!(data->min_uv && data->max_uv)) {
+		ret = regu->rdev->desc->ops->disable(regu->rdev);
 		if (ret != 0)
-			printk(KERN_ERR "regulator_disable() failed: %d\n",
-				ret);
+			pr_err("regulator_disable() failed: %d\n", ret);
 	}
+
+	regulator_put(regu);
 }
 
-static void update_current_limit_constraints(struct virtual_consumer_data
-						*data)
+static void update_current_limit_constraints(struct virtual_consumer_data *data)
 {
 	int ret;
+	struct regulator *regu;
 
-	if (data->max_uA
-	    && data->min_uA <= data->max_uA) {
-		ret = regulator_set_current_limit(data->regulator,
-					data->min_uA, data->max_uA);
+	regu = regulator_get(NULL, data->regu_name);
+	if (IS_ERR(regu)) {
+		pr_err("%s: regulator get %s failed\n",
+				__func__, data->regu_name);
+		return;
+	}
+
+	if (data->max_ua && data->min_ua <= data->max_ua) {
+		ret = regulator_set_current_limit(regu,
+				data->min_ua, data->max_ua);
 		if (ret != 0) {
-			pr_err("regulator_set_current_limit() failed: %d\n",
-			       ret);
+			pr_err("regulator_set_current_limit failed\n");
 			return;
 		}
 	}
 
-	if (data->max_uA && !data->enabled) {
-		ret = regulator_enable(data->regulator);
+	if (data->max_ua && !data->enabled) {
+		ret = regulator_enable(regu);
 		if (ret == 0)
 			data->enabled = 1;
 		else
-			printk(KERN_ERR "regulator_enable() failed: %d\n",
-				ret);
+			pr_err("regulator_enable() failed: %d\n", ret);
 	}
 
-	if (!(data->min_uA && data->max_uA) && data->enabled) {
-		ret = regulator_disable(data->regulator);
+	if (!(data->min_ua && data->max_ua) && data->enabled) {
+		ret = regulator_disable(regu);
 		if (ret == 0)
 			data->enabled = 0;
 		else
-			printk(KERN_ERR "regulator_disable() failed: %d\n",
-				ret);
+			pr_err("regulator_disable() failed: %d\n", ret);
 	}
+
+	regulator_put(regu);
 }
 
-static ssize_t show_min_uV(struct device *dev,
-			   struct device_attribute *attr, char *buf)
+static ssize_t show_min_uv(struct device *dev,
+			struct device_attribute *attr, char *buf)
 {
 	struct virtual_consumer_data *data = dev_get_drvdata(dev);
-	data->min_uV = regulator_get_voltage(data->regulator);
-	return sprintf(buf, "%d\n", data->min_uV);
+	struct regulator *regu;
+
+	regu = regulator_get(NULL, data->regu_name);
+	if (IS_ERR(regu))
+		return sprintf(buf, "%s: failed\n", __func__);
+
+	data->min_uv = regulator_get_voltage(regu);
+	regulator_put(regu);
+
+	return sprintf(buf, "%d\n", data->min_uv);
 }
 
-static ssize_t set_min_uV(struct device *dev, struct device_attribute *attr,
-			  const char *buf, size_t count)
+static ssize_t set_min_uv(struct device *dev, struct device_attribute *attr,
+					const char *buf, size_t count)
 {
 	struct virtual_consumer_data *data = dev_get_drvdata(dev);
 	long val;
@@ -117,24 +136,22 @@ static ssize_t set_min_uV(struct device *dev, struct device_attribute *attr,
 		return count;
 
 	mutex_lock(&data->lock);
-
-	data->min_uV = val;
+	data->min_uv = val;
 	update_voltage_constraints(data);
-
 	mutex_unlock(&data->lock);
 
 	return count;
 }
 
-static ssize_t show_max_uV(struct device *dev,
-			   struct device_attribute *attr, char *buf)
+static ssize_t show_max_uv(struct device *dev,
+				struct device_attribute *attr, char *buf)
 {
 	struct virtual_consumer_data *data = dev_get_drvdata(dev);
-	return sprintf(buf, "%d\n", data->max_uV);
+	return sprintf(buf, "%d\n", data->max_uv);
 }
 
-static ssize_t set_max_uV(struct device *dev, struct device_attribute *attr,
-			  const char *buf, size_t count)
+static ssize_t set_max_uv(struct device *dev, struct device_attribute *attr,
+					const char *buf, size_t count)
 {
 	struct virtual_consumer_data *data = dev_get_drvdata(dev);
 	long val;
@@ -143,25 +160,22 @@ static ssize_t set_max_uV(struct device *dev, struct device_attribute *attr,
 		return count;
 
 	mutex_lock(&data->lock);
-
-	data->min_uV = regulator_get_voltage(data->regulator);
-	data->max_uV = val;
+	data->max_uv = val;
 	update_voltage_constraints(data);
-
 	mutex_unlock(&data->lock);
 
 	return count;
 }
 
-static ssize_t show_min_uA(struct device *dev,
-			   struct device_attribute *attr, char *buf)
+static ssize_t show_min_ua(struct device *dev,
+			struct device_attribute *attr, char *buf)
 {
 	struct virtual_consumer_data *data = dev_get_drvdata(dev);
-	return sprintf(buf, "%d\n", data->min_uA);
+	return sprintf(buf, "%d\n", data->min_ua);
 }
 
-static ssize_t set_min_uA(struct device *dev, struct device_attribute *attr,
-			  const char *buf, size_t count)
+static ssize_t set_min_ua(struct device *dev, struct device_attribute *attr,
+					const char *buf, size_t count)
 {
 	struct virtual_consumer_data *data = dev_get_drvdata(dev);
 	long val;
@@ -170,24 +184,22 @@ static ssize_t set_min_uA(struct device *dev, struct device_attribute *attr,
 		return count;
 
 	mutex_lock(&data->lock);
-
-	data->min_uA = val;
+	data->min_ua = val;
 	update_current_limit_constraints(data);
-
 	mutex_unlock(&data->lock);
 
 	return count;
 }
 
-static ssize_t show_max_uA(struct device *dev,
-			   struct device_attribute *attr, char *buf)
+static ssize_t show_max_ua(struct device *dev,
+			struct device_attribute *attr, char *buf)
 {
 	struct virtual_consumer_data *data = dev_get_drvdata(dev);
-	return sprintf(buf, "%d\n", data->max_uA);
+	return sprintf(buf, "%d\n", data->max_ua);
 }
 
-static ssize_t set_max_uA(struct device *dev, struct device_attribute *attr,
-			  const char *buf, size_t count)
+static ssize_t set_max_ua(struct device *dev, struct device_attribute *attr,
+					const char *buf, size_t count)
 {
 	struct virtual_consumer_data *data = dev_get_drvdata(dev);
 	long val;
@@ -196,77 +208,22 @@ static ssize_t set_max_uA(struct device *dev, struct device_attribute *attr,
 		return count;
 
 	mutex_lock(&data->lock);
-
-	data->max_uA = val;
+	data->max_ua = val;
 	update_current_limit_constraints(data);
-
 	mutex_unlock(&data->lock);
 
 	return count;
 }
 
-static ssize_t show_mode(struct device *dev,
-			 struct device_attribute *attr, char *buf)
-{
-	struct virtual_consumer_data *data = dev_get_drvdata(dev);
-
-	switch (data->mode) {
-	case REGULATOR_MODE_FAST:
-		return sprintf(buf, "fast\n");
-	case REGULATOR_MODE_NORMAL:
-		return sprintf(buf, "normal\n");
-	case REGULATOR_MODE_IDLE:
-		return sprintf(buf, "idle\n");
-	case REGULATOR_MODE_STANDBY:
-		return sprintf(buf, "standby\n");
-	default:
-		return sprintf(buf, "unknown\n");
-	}
-}
-
-static ssize_t set_mode(struct device *dev, struct device_attribute *attr,
-			const char *buf, size_t count)
-{
-	struct virtual_consumer_data *data = dev_get_drvdata(dev);
-	unsigned int mode;
-	int ret;
-
-	if (strncmp(buf, "fast", strlen("fast")) == 0)
-		mode = REGULATOR_MODE_FAST;
-	else if (strncmp(buf, "normal", strlen("normal")) == 0)
-		mode = REGULATOR_MODE_NORMAL;
-	else if (strncmp(buf, "idle", strlen("idle")) == 0)
-		mode = REGULATOR_MODE_IDLE;
-	else if (strncmp(buf, "standby", strlen("standby")) == 0)
-		mode = REGULATOR_MODE_STANDBY;
-	else {
-		dev_err(dev, "Configuring invalid mode\n");
-		return count;
-	}
-
-	mutex_lock(&data->lock);
-	ret = regulator_set_mode(data->regulator, mode);
-	if (ret == 0)
-		data->mode = mode;
-	else
-		dev_err(dev, "Failed to configure mode: %d\n", ret);
-	mutex_unlock(&data->lock);
-
-	return count;
-}
-
-static DEVICE_ATTR(min_microvolts, 0644, show_min_uV, set_min_uV);
-static DEVICE_ATTR(max_microvolts, 0644, show_max_uV, set_max_uV);
-static DEVICE_ATTR(min_microamps, 0644, show_min_uA, set_min_uA);
-static DEVICE_ATTR(max_microamps, 0644, show_max_uA, set_max_uA);
-static DEVICE_ATTR(mode, 0644, show_mode, set_mode);
+static DEVICE_ATTR(min_microvolts, 0644, show_min_uv, set_min_uv);
+static DEVICE_ATTR(max_microvolts, 0644, show_max_uv, set_max_uv);
+static DEVICE_ATTR(min_microamps,  0644, show_min_ua, set_min_ua);
+static DEVICE_ATTR(max_microamps,  0644, show_max_ua, set_max_ua);
 
 static struct device_attribute *attributes_virtual[] = {
 	&dev_attr_min_microvolts,
 	&dev_attr_max_microvolts,
 	&dev_attr_min_microamps,
 	&dev_attr_max_microamps,
-	&dev_attr_mode,
 };
 #endif
-

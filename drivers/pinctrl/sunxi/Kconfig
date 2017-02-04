@@ -45,20 +45,38 @@ config PINCTRL_SUN8I_A23_R
 
 config PINCTRL_SUN8IW10P1
 	def_bool ARCH_SUN8IW10
-        bool "Pinctrl sun8iw10p1 PIO controller"
+	depends on ARCH_SUN8IW10
+	bool "Pinctrl sun8iw10p1 PIO controller"
 	select PINCTRL_SUNXI_COMMON
-	
+
 config PINCTRL_SUN8IW11P1
 	def_bool ARCH_SUN8IW11
 	depends on ARCH_SUN8IW11
 	bool "Pinctrl sun8iw11p1 PIO controller"
 	select PINCTRL_SUNXI_COMMON
-	
+
 config PINCTRL_SUN50IW1P1
-        bool "Pinctrl sun50i PIO controller"
+	def_bool ARCH_SUN50IW1P1
+	depends on ARCH_SUN50IW1P1
+	bool "Pinctrl sun50iw1p1 PIO controller"
 	select PINCTRL_SUNXI_COMMON
+
 config PINCTRL_SUN50IW1P1_R
-        bool "Pinctrl sun50i R_PIO controller"
-	#depends on RESET_CONTROLLER
+	def_bool ARCH_SUN50IW1P1
+	depends on ARCH_SUN50IW1P1
+	bool "Pinctrl sun50iw1p1 R_PIO controller"
 	select PINCTRL_SUNXI_COMMON
+
+config PINCTRL_SUN50IW2P1
+	def_bool ARCH_SUN50IW2P1
+	depends on ARCH_SUN50IW2P1
+	bool "Pinctrl sun50iw2p1 PIO controller"
+	select PINCTRL_SUNXI_COMMON
+
+config PINCTRL_SUN50IW2P1_R
+	def_bool ARCH_SUN50IW2P1
+	depends on ARCH_SUN50IW2P1
+	bool "Pinctrl sun50iw2p1 R_PIO controller"
+	select PINCTRL_SUNXI_COMMON
+
 endmenu

@@ -1,8 +1,9 @@
 /*
  * sound\soc\sunxi\sunxi_snddmic.c
  * (C) Copyright 2010-2016
- * Reuuimlla Technology Co., Ltd. <www.reuuimllatech.com>
- * huangxin <huangxin@Reuuimllatech.com>
+ * Allwinner Technology Co., Ltd. <www.allwinnertech.com>
+ * huangxin <huangxin@allwinnertech.com>
+ * wolfgang huang <huangjinhui@allwinnertech.com>
  *
  * some simple description for this code
  *
@@ -22,8 +23,6 @@
 #include <sound/soc-dapm.h>
 #include <linux/io.h>
 #include <linux/of.h>
-#include "sunxi_dmic.h"
-#include "codec-utils.h"
 
 static int sunxi_snddmic_hw_params(struct snd_pcm_substream *substream,
 					struct snd_pcm_hw_params *params)
@@ -31,21 +30,30 @@ static int sunxi_snddmic_hw_params(struct snd_pcm_substream *substream,
 	struct snd_soc_pcm_runtime *rtd = substream->private_data;
 	struct snd_soc_dai *cpu_dai = rtd->cpu_dai;
 	int ret = 0;
-	int freq = 22579200;
+	int freq;
 
 	switch (params_rate(params)) {
-		case 8000:
-		case 16000:
-		case 32000:
-		case 64000:
-		case 128000:
-		case 12000:
-		case 24000:
-		case 48000:
-		case 96000:
-		case 192000:
-			freq = 24576000;
-			break;
+	case	8000:
+	case	16000:
+	case	32000:
+	case	12000:
+	case	24000:
+	case	48000:
+	case	96000:
+	case	192000:
+		freq = 24576000;
+		break;
+	case	11025:
+	case	22050:
+	case	44100:
+	case	88200:
+	case	176400:
+		freq = 22579200;
+		break;
+	default:
+		pr_debug("invalid rate setting\n");
+		return -EINVAL;
+		break;
 	}
 
 	ret = snd_soc_dai_set_sysclk(cpu_dai, 0 , freq, 0);
@@ -60,11 +68,13 @@ static struct snd_soc_ops sunxi_snddmic_ops = {
 };
 
 static struct snd_soc_dai_link sunxi_snddmic_dai_link = {
-	.name 			= "DMIC",
-	.stream_name 	= "SUNXI-DMIC",
-	.cpu_dai_name 	= "sunxi-dmic",
-	.platform_name 	= "sunxi-dmic",
-	.ops 			= &sunxi_snddmic_ops,
+	.name		= "DMIC",
+	.stream_name	= "SUNXI-DMIC",
+	.cpu_dai_name	= "sunxi-dmic",
+	.platform_name	= "sunxi-dmic",
+	.codec_name	= "dmic-codec",
+	.codec_dai_name = "dmic-hifi",
+	.ops		= &sunxi_snddmic_ops,
 };
 
 static struct snd_soc_card snd_soc_sunxi_snddmic = {
@@ -79,29 +89,46 @@ static int sunxi_snddmic_dev_probe(struct platform_device *pdev)
 	int ret = 0;
 	struct snd_soc_card *card = &snd_soc_sunxi_snddmic;
 	struct device_node *np = pdev->dev.of_node;
+	struct platform_device *sunxi_snd_dmic_codec_device;
 	card->dev = &pdev->dev;
+
 	sunxi_snddmic_dai_link.cpu_dai_name = NULL;
 	sunxi_snddmic_dai_link.cpu_of_node = of_parse_phandle(np,
-				"sunxi,dmic-controller", 0);
+					"sunxi,dmic-controller", 0);
 	if (!sunxi_snddmic_dai_link.cpu_of_node) {
-		dev_err(&pdev->dev,
-			"Property 'sunxi,dmic-controller' missing or invalid\n");
-			ret = -EINVAL;
+		dev_err(&pdev->dev, "Property 'sunxi,dmic-controller' missing or invalid\n");
+		ret = -EINVAL;
+		return ret;
 	}
 	sunxi_snddmic_dai_link.platform_name = NULL;
 	sunxi_snddmic_dai_link.platform_of_node = sunxi_snddmic_dai_link.cpu_of_node;
 
-	if (sunxi_snddmic_dai_link.codec_dai_name == NULL
-			&& sunxi_snddmic_dai_link.codec_name == NULL){
-			codec_utils_probe(pdev);
-			sunxi_snddmic_dai_link.codec_dai_name = pdev->name;
-			sunxi_snddmic_dai_link.codec_name 	= pdev->name;
+	sunxi_snd_dmic_codec_device = platform_device_alloc("dmic-codec", -1);
+	if (!sunxi_snd_dmic_codec_device) {
+		dev_err(&pdev->dev, "dmic codec alloc failed\n");
+		ret = -ENOMEM;
+		return ret;
+	}
+
+	ret = platform_device_add(sunxi_snd_dmic_codec_device);
+	if (ret) {
+		dev_err(&pdev->dev, "dmic codec add failed\n");
+		ret = -EBUSY;
+		goto err_dmic_put;
 	}
 
 	ret = snd_soc_register_card(card);
 	if (ret) {
 		dev_err(&pdev->dev, "snd_soc_register_card() failed: %d\n", ret);
+		ret = -EBUSY;
+		goto err_dmic_del;
 	}
+	return ret;
+
+err_dmic_del:
+	platform_device_del(sunxi_snd_dmic_codec_device);
+err_dmic_put:
+	platform_device_put(sunxi_snd_dmic_codec_device);
 	return ret;
 }
 
@@ -128,24 +155,9 @@ static struct platform_driver sunxi_dmic_driver = {
 	.remove = sunxi_snddmic_dev_remove,
 };
 
-static int __init sunxi_snddmic_init(void)
-{
-	int err = 0;
+module_platform_driver(sunxi_dmic_driver);
 
-	if ((err = platform_driver_register(&sunxi_dmic_driver)) < 0)
-		return err;
-
-	return 0;
-}
-module_init(sunxi_snddmic_init);
-
-static void __exit sunxi_snddmic_exit(void)
-{
-	platform_driver_unregister(&sunxi_dmic_driver);
-}
-module_exit(sunxi_snddmic_exit);
-MODULE_AUTHOR("huangxin");
-MODULE_DESCRIPTION("SUNXI_SNDDMIC ALSA SoC audio driver");
+MODULE_AUTHOR("wolfgang huang <huangjinhui@allwinnertech.com>");
+MODULE_DESCRIPTION("SUNXI DMIC Machine ASoC driver");
+MODULE_ALIAS("platform:snddmic");
 MODULE_LICENSE("GPL");
-
-

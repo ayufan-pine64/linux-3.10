@@ -62,6 +62,11 @@ typedef enum CPU_WAKEUP_SRC {
 /* the wakeup source of main cpu: cpu0, only used in normal standby */
 	CPU0_MSGBOX_SRC		= CPU0_WAKEUP_MSGBOX,  /* external interrupt, pmu event for ex. */
 	CPU0_KEY_SRC		= CPU0_WAKEUP_KEY,     /* key event, volume home menu enter */
+	CPU0_EXINT_SRC		= CPU0_WAKEUP_EXINT,
+	CPU0_IR_SRC		= CPU0_WAKEUP_IR,
+	CPU0_ALARM_SRC		= CPU0_WAKEUP_ALARM,
+	CPU0_USB_SRC		= CPU0_WAKEUP_USB,
+	CPU0_TIMEOUT_SRC	= CPU0_WAKEUP_TIMEOUT,
 
 /* the wakeup source of assistant cpu: cpus */
 	CPUS_LOWBATT_SRC	= CPUS_WAKEUP_LOWBATT,  /* low battery event */
@@ -78,6 +83,7 @@ typedef enum CPU_WAKEUP_SRC {
 	CPUS_GPIO_SRC		= CPUS_WAKEUP_GPIO,     /* GPIO interrupt event, only used in extended standby */
 	CPUS_USBMOUSE_SRC	= CPUS_WAKEUP_USBMOUSE, /* USBMOUSE key event, only used in extended standby */
 	CPUS_LRADC_SRC		= CPUS_WAKEUP_LRADC ,   /* key event, volume home menu enter, only used in extended standby */
+	CPUS_WLAN_SRC		= CPUS_WAKEUP_WLAN ,    /* WLAN interrupt */
 	CPUS_CODEC_SRC		= CPUS_WAKEUP_CODEC,    /* codec irq, only used in extended standby*/
 	CPUS_BAT_TEMP_SRC	= CPUS_WAKEUP_BAT_TEMP, /* baterry temperature low and high */
 	CPUS_FULLBATT_SRC	= CPUS_WAKEUP_FULLBATT, /* baterry full */
@@ -167,4 +173,3 @@ static inline int scene_set_volt(aw_power_scene_e scene_type, unsigned int bitma
 #endif
 
 #endif
-

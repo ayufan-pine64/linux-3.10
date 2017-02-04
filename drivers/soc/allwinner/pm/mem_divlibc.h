@@ -9,4 +9,3 @@ extern void __aeabi_uidiv(void);
 extern void __aeabi_uidivmod(void);
 
 #endif /*_MEM_DIVLIBC_H*/
-

@@ -132,19 +132,32 @@ struct sunxi_clk_periph {
 	struct clk_ops*                 priv_clkops;
 	struct sunxi_reg_ops*           priv_regops;
 };
+
+struct periph_init_data {
+	const char              *name;
+	unsigned long           flags;
+	const char              **parent_names;
+	int                     num_parents;
+	struct sunxi_clk_periph *periph;
+};
+
 static inline u32 periph_readl(struct sunxi_clk_periph * periph, void __iomem * reg)
 {
 	return (((unsigned long)periph->priv_regops)?periph->priv_regops->reg_readl(reg):readl(reg));
 }
+
 static inline void periph_writel(struct sunxi_clk_periph * periph, unsigned int val, void __iomem * reg)
 {
 	(((unsigned long)periph->priv_regops)?periph->priv_regops->reg_writel(val,reg):writel(val,reg));
 }
-struct clk *sunxi_clk_register_periph(const char *name, const char **parent_names,
-			int num_parents, unsigned long flags, void __iomem  *base, struct sunxi_clk_periph *periph);
+
+struct clk *sunxi_clk_register_periph(struct periph_init_data *pd,
+					void __iomem  *base);
+
 int sunxi_periph_reset_deassert(struct clk *c);
 int sunxi_periph_reset_assert(struct clk *c);
 extern void sunxi_clk_get_periph_ops(struct clk_ops* ops);
+
 #define to_clk_periph(_hw) container_of(_hw, struct sunxi_clk_periph, hw)
 
 
@@ -183,4 +196,4 @@ static struct sunxi_clk_periph sunxi_clk_periph_##name ={       \
 	.com_gate_off = _com_gate_off,                          \
 }
 
-#endif
+#endif /* __MACH_SUNXI_CLK_PERIPH_H */

@@ -42,7 +42,6 @@
 
 #include "sunxi-uart.h"
 
-#define CONFIG_SW_UART_FORCE_LCR
 //#define CONFIG_SW_UART_DUMP_DATA
 /*
  * ********************* Note **********************
@@ -115,12 +114,12 @@ static void sw_uart_dump_data(struct sw_uart_port *sw_uport, char* prompt)
 
 static inline unsigned char serial_in(struct uart_port *port, int offs)
 {
-	return __raw_readb(port->membase + offs);
+	return readb(port->membase + offs);
 }
 
 static inline void serial_out(struct uart_port *port, unsigned char value, int offs)
 {
-	__raw_writeb(value, port->membase + offs);
+	writeb(value, port->membase + offs);
 }
 
 static inline bool sw_is_console_port(struct uart_port *port)
@@ -317,6 +316,45 @@ static void sw_uart_force_lcr(struct sw_uart_port *sw_uport, unsigned msecs)
 	serial_out(port, SUNXI_UART_HALT_FORCECFG, SUNXI_UART_HALT);
 }
 
+static void sw_uart_force_idle(struct sw_uart_port *sw_uport)
+{
+	struct uart_port *port = &sw_uport->port;
+
+	if (sw_uport->fcr & SUNXI_UART_FCR_FIFO_EN) {
+		serial_out(port, SUNXI_UART_FCR_FIFO_EN, SUNXI_UART_FCR);
+		serial_out(port, SUNXI_UART_FCR_TXFIFO_RST
+				| SUNXI_UART_FCR_RXFIFO_RST
+				| SUNXI_UART_FCR_FIFO_EN, SUNXI_UART_FCR);
+		serial_out(port, 0, SUNXI_UART_FCR);
+	}
+
+	serial_out(port, sw_uport->fcr, SUNXI_UART_FCR);
+	(void)serial_in(port, SUNXI_UART_FCR);
+}
+
+/*
+ * We should clear busy interupt, busy state and reset lcr,
+ * but we should be careful not to introduce a new busy interrupt.
+ */
+static void sw_uart_handle_busy(struct sw_uart_port *sw_uport)
+{
+	struct uart_port *port = &sw_uport->port;
+
+	(void)serial_in(port, SUNXI_UART_USR);
+
+	/*
+	 * Before reseting lcr, we should ensure than uart is not in busy
+	 * state. Otherwise, a new busy interrupt will be introduced.
+	 * It is wise to set uart into loopback mode, since it can cut down the
+	 * serial in, then we should reset fifo(in my test, busy state
+	 * (SUNXI_UART_USR_BUSY) can't be cleard until the fifo is empty).
+	 */
+	serial_out(port, sw_uport->mcr | SUNXI_UART_MCR_LOOP, SUNXI_UART_MCR);
+	sw_uart_force_idle(sw_uport);
+	serial_out(port, sw_uport->lcr, SUNXI_UART_LCR);
+	serial_out(port, sw_uport->mcr, SUNXI_UART_MCR);
+}
+
 static irqreturn_t sw_uart_irq(int irq, void *dev_id)
 {
 	struct uart_port *port = dev_id;
@@ -331,15 +369,7 @@ static irqreturn_t sw_uart_irq(int irq, void *dev_id)
 	SERIAL_DBG("irq: iir %x lsr %x\n", iir, lsr);
 
 	if (iir == SUNXI_UART_IIR_IID_BUSBSY) {
-		/* handle busy */
-		//SERIAL_MSG("uart%d busy...\n", sw_uport->id);
-		serial_in(port, SUNXI_UART_USR);
-
-		#ifdef CONFIG_SW_UART_FORCE_LCR
-		sw_uart_force_lcr(sw_uport, 10);
-		#else
-		serial_out(port, sw_uport->lcr, SUNXI_UART_LCR);
-		#endif
+		sw_uart_handle_busy(sw_uport);
 	} else {
 		if (lsr & (SUNXI_UART_LSR_DR | SUNXI_UART_LSR_BI))
 			lsr = sw_uart_handle_rx(sw_uport, lsr);
@@ -477,6 +507,33 @@ static inline void wait_for_xmitr(struct sw_uart_port *sw_uport)
 	}
 }
 
+/* Enable or disable the RS485 support */
+static void sw_uart_config_rs485(struct uart_port *port, struct serial_rs485 *rs485conf)
+{
+	struct sw_uart_port *sw_uport = UART_TO_SPORT(port);
+
+	sw_uport->rs485conf = *rs485conf;
+
+	sw_uport->mcr &= ~SUNXI_UART_MCR_MODE_MASK;
+	if (rs485conf->flags & SER_RS485_ENABLED) {
+		SERIAL_DBG("setting to rs485\n");
+		sw_uport->mcr |= SUNXI_UART_MCR_MODE_RS485;
+
+		/*
+		 * In NMM mode and no 9th bit(default RS485 mode), uart receive
+		 * all the bytes into FIFO before receveing an address byte
+		 */
+		sw_uport->rs485 |= SUNXI_UART_RS485_RXBFA;
+	} else {
+		SERIAL_DBG("setting to uart\n");
+		sw_uport->mcr |= SUNXI_UART_MCR_MODE_UART;
+		sw_uport->rs485 = 0;
+	}
+
+	serial_out(port, sw_uport->mcr, SUNXI_UART_MCR);
+	serial_out(port, sw_uport->rs485, SUNXI_UART_RS485);
+}
+
 static unsigned int sw_uart_tx_empty(struct uart_port *port)
 {
 	struct sw_uart_port *sw_uport = UART_TO_SPORT(port);
@@ -591,6 +648,8 @@ static int sw_uart_startup(struct uart_port *port)
 	#ifdef CONFIG_SW_UART_PTIME_MODE
 	sw_uport->ier |= SUNXI_UART_IER_PTIME;
 	#endif
+
+	sw_uart_config_rs485(port, &sw_uport->rs485conf);
 
 	return 0;
 }
@@ -850,6 +909,38 @@ static int sw_uart_verify_port(struct uart_port *port, struct serial_struct *ser
 	return 0;
 }
 
+static int sw_uart_ioctl(struct uart_port *port, unsigned int cmd,
+			 unsigned long arg)
+{
+	struct serial_rs485 rs485conf;
+	unsigned long flags = 0;
+
+
+	switch (cmd) {
+	case TIOCSRS485:
+		if (copy_from_user(&rs485conf, (struct serial_rs485 *)arg,
+				   sizeof(rs485conf)))
+			return -EFAULT;
+
+		spin_lock_irqsave(&port->lock, flags);
+		sw_uart_config_rs485(port, &rs485conf);
+		spin_unlock_irqrestore(&port->lock, flags);
+		break;
+
+	case TIOCGRS485:
+		if (copy_to_user((struct serial_rs485 *) arg,
+				 &(UART_TO_SPORT(port)->rs485conf),
+				 sizeof(rs485conf)))
+			return -EFAULT;
+		break;
+
+	default:
+		return -ENOIOCTLCMD;
+	}
+
+	return 0;
+}
+
 static void sw_uart_pm(struct uart_port *port, unsigned int state,
 		      unsigned int oldstate)
 {
@@ -901,6 +992,7 @@ static struct uart_ops sw_uart_ops = {
 	.request_port = sw_uart_request_port,
 	.config_port = sw_uart_config_port,
 	.verify_port = sw_uart_verify_port,
+	.ioctl = sw_uart_ioctl,
 	.pm = sw_uart_pm,
 };
 
@@ -1180,7 +1272,7 @@ static struct console sw_console = {
 	.write = sw_console_write,
 	.device = uart_console_device,
 	.setup = sw_console_setup,
-	.flags = CON_PRINTBUFFER | CON_ANYTIME,
+	.flags = CON_PRINTBUFFER,
 	.index = -1,
 	.data = &sw_uart_driver,
 };
@@ -1323,6 +1415,9 @@ static int sw_uart_probe(struct platform_device *pdev)
 		return -EINVAL;
 	}
 
+	if (of_property_read_bool(np, "linux,rs485-enabled-at-boot-time"))
+		sw_uport->rs485conf.flags |= SER_RS485_ENABLED;
+
 	pdata->used = 1;
 	port->iotype = UPIO_MEM;
 	port->type = PORT_SUNXI;
@@ -1337,7 +1432,6 @@ static int sw_uart_probe(struct platform_device *pdev)
 			pdev->id, port->type, port->uartclk);
 	return uart_add_one_port(&sw_uart_driver, port);
 }
-
 
 static int sw_uart_remove(struct platform_device *pdev)
 {

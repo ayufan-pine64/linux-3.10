@@ -47,8 +47,8 @@ module_param(debug_mask, int, S_IRUGO | S_IWUSR | S_IWGRP);
 #define CPUFREQ_ERR(format,args...) \
 	printk(KERN_ERR "[cpufreq] error:"format,##args)
 
-#define SUNXI_CPUFREQ_MAX      (1536000000)
-#define SUNXI_CPUFREQ_MIN       (480000000)
+#define SUNXI_CPUFREQ_MAX      (1200000000)
+#define SUNXI_CPUFREQ_MIN       (240000000)
 #define PLL_CPU_CLK               "pll_cpu"
 #define CPU_CLK                       "cpu"
 #define CPU_VDD                  "vdd-cpua"
@@ -129,6 +129,10 @@ static int sunxi_cpufreq_verify(struct cpufreq_policy *policy)
  */
 int sunxi_cpufreq_getvolt(void)
 {
+	if (IS_ERR_OR_NULL(sunxi_cpufreq.vdd_cpu)) {
+		return 0xFFFFFFFF;
+	}
+
 	return regulator_get_voltage(sunxi_cpufreq.vdd_cpu) / 1000;
 }
 
@@ -248,7 +252,7 @@ unsigned int new_vdd;
 	/* get vdd value for new frequency */
 	new_vdd = __get_vdd_value(freq * 1000);
 	CPUFREQ_DBG(DEBUG_FREQ, "set cpu vdd to %dmv\n", new_vdd);
-	if (sunxi_cpufreq.vdd_cpu && (new_vdd > sunxi_cpufreq.last_vdd)) {
+	if (!IS_ERR_OR_NULL(sunxi_cpufreq.vdd_cpu) && (new_vdd > sunxi_cpufreq.last_vdd)) {
 		CPUFREQ_DBG(DEBUG_FREQ, "set cpu vdd to %dmv\n", new_vdd);
 		if (regulator_set_voltage(sunxi_cpufreq.vdd_cpu, new_vdd*1000, new_vdd*1000)) {
 			CPUFREQ_ERR("try to set cpu vdd failed!\n");
@@ -287,7 +291,7 @@ unsigned int new_vdd;
 		CPUFREQ_ERR("set cpu frequency to %uKHz failed!\n", freq);
 
 #ifdef CONFIG_CPU_VOLTAGE_SCALING
-		if (sunxi_cpufreq.vdd_cpu && (new_vdd > sunxi_cpufreq.last_vdd)) {
+		if (!IS_ERR_OR_NULL(sunxi_cpufreq.vdd_cpu) && (new_vdd > sunxi_cpufreq.last_vdd)) {
 			if (regulator_set_voltage(sunxi_cpufreq.vdd_cpu,
 					sunxi_cpufreq.last_vdd*1000, sunxi_cpufreq.last_vdd*1000)) {
 				CPUFREQ_ERR("try to set voltage failed!\n");
@@ -596,24 +600,24 @@ static int __init sunxi_cpufreq_initcall(void)
 	sunxi_cpufreq.last_freq = ~0;
 
 	sunxi_cpufreq.clk_pll = clk_get(NULL, PLL_CPU_CLK);
-	if (IS_ERR(sunxi_cpufreq.clk_pll)) {
+	if (IS_ERR_OR_NULL(sunxi_cpufreq.clk_pll)) {
 		CPUFREQ_ERR("Unable to get PLL CPU clock\n");
 		ret = PTR_ERR(sunxi_cpufreq.clk_pll);
 		goto out_err_clk_pll;
 	}
 
 	sunxi_cpufreq.clk_cpu = clk_get(NULL, CPU_CLK);
-	if (IS_ERR(sunxi_cpufreq.clk_cpu)) {
+	if (IS_ERR_OR_NULL(sunxi_cpufreq.clk_cpu)) {
 		CPUFREQ_ERR("Unable to get CPU clock\n");
 		ret = PTR_ERR(sunxi_cpufreq.clk_cpu);
 		goto out_err_clk_cpu;
 	}
 
 	sunxi_cpufreq.vdd_cpu = regulator_get(NULL, CPU_VDD);
-	if (IS_ERR(sunxi_cpufreq.vdd_cpu)) {
+	if (IS_ERR_OR_NULL(sunxi_cpufreq.vdd_cpu)) {
 		CPUFREQ_ERR("Unable to get CPU regulator\n");
 		ret = PTR_ERR(sunxi_cpufreq.vdd_cpu);
-		goto out_err_vdd_cpu;
+		/* do not return error even if error*/
 	}
 
 	/* init cpu frequency from dt */
@@ -647,8 +651,9 @@ static int __init sunxi_cpufreq_initcall(void)
 out_err_register:
 	mutex_destroy(&sunxi_cpufreq.lock);
 out_err_dt:
-	regulator_put(sunxi_cpufreq.vdd_cpu);
-out_err_vdd_cpu:
+	if (!IS_ERR_OR_NULL(sunxi_cpufreq.vdd_cpu)) {
+		regulator_put(sunxi_cpufreq.vdd_cpu);
+	}
 	clk_put(sunxi_cpufreq.clk_cpu);
 out_err_clk_cpu:
 	clk_put(sunxi_cpufreq.clk_pll);
@@ -667,7 +672,9 @@ module_init(sunxi_cpufreq_initcall);
 static void __exit sunxi_cpufreq_exitcall(void)
 {
 	mutex_destroy(&sunxi_cpufreq.lock);
-	regulator_put(sunxi_cpufreq.vdd_cpu);
+	if (!IS_ERR_OR_NULL(sunxi_cpufreq.vdd_cpu)) {
+		regulator_put(sunxi_cpufreq.vdd_cpu);
+	}
 	clk_put(sunxi_cpufreq.clk_pll);
 	clk_put(sunxi_cpufreq.clk_cpu);
 	cpufreq_unregister_driver(&sunxi_cpufreq_driver);

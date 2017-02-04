@@ -24,4 +24,4 @@ extern __s32 mem_ir_exit(void);
 extern __s32 mem_ir_detect(void);
 extern __s32 mem_ir_verify(void);
 
-#endif  /*__MEM_IR_H__*/
+#endif	/*__MEM_IR_H__*/

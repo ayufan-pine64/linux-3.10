@@ -31,8 +31,6 @@ enum {
 
 static u32 thermal_debug_mask = 0;
 
-#define THERMAL_DATA_DELAY	(500)
-
 static LIST_HEAD(controller_list);
 static DEFINE_MUTEX(controller_list_lock);
 
@@ -142,6 +140,7 @@ static ssize_t sunxi_ths_set_emu(struct device *dev,
 	int error;
 	struct sunxi_ths_sensor *sensor = dev_get_drvdata(dev);
 
+	pr_err("%s: obsolete interface.\n", __func__);
 	error = strict_strtoul(buf, 10, &data);
 	if (error)
 		return error;
@@ -158,6 +157,7 @@ static ssize_t sunxi_ths_set_emutemp(struct device *dev,
 	int error;
 	struct sunxi_ths_sensor *sensor = dev_get_drvdata(dev);
 
+	pr_err("%s: obsolete interface.\n", __func__);
 	error = strict_strtoul(buf, 10, &data);
 	if (error)
 		return error;
@@ -194,6 +194,7 @@ static void ths_combine_input_work_func(struct work_struct *work)
 			struct sunxi_ths_sensor, input_work);
 	unsigned long delay = msecs_to_jiffies(atomic_read(&sensor->input_delay));
 
+	pr_err("%s: obsolete interface.\n", __func__);
 	thermal_zone_get_temp(sensor->tz, &tempetature);
 	input_report_abs(sensor->ths_input_dev, ABS_MISC, tempetature);
 	input_sync(sensor->ths_input_dev);
@@ -267,7 +268,7 @@ static int sunxi_combine_get_temp(void *data, long *temperature)
 	struct sunxi_ths_controller *controller = sensor->combine->controller;
 	int i, ret, is_suspend, emulate;
 	u32 chn;
-	long temp = 0, taget;
+	long temp = 0, taget = 0;
 
 	emulate = sensor->emulate;
 	is_suspend = atomic_read(&sensor->is_suspend);
@@ -557,10 +558,9 @@ static void __exit sunxi_ths_combine_exit(void)
 	mutex_destroy(&controller_list_lock);
 }
 
-module_init(sunxi_ths_combine_init);
+subsys_initcall_sync(sunxi_ths_combine_init);
 module_exit(sunxi_ths_combine_exit);
 module_param_named(debug_mask, thermal_debug_mask, int, 0644);
 MODULE_DESCRIPTION("SUNXI combine thermal sensor driver");
 MODULE_AUTHOR("QIn");
 MODULE_LICENSE("GPL v2");
-

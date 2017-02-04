@@ -77,6 +77,7 @@ struct mxc622x_data_s {
 #endif
 } mxc622x_data;
 
+static int filter_flag;
 
 /* Addresses to scan */
 static const unsigned short normal_i2c[] = {0x15,I2C_CLIENT_END};
@@ -230,7 +231,7 @@ static ssize_t mxc622x_enable_store(struct device *dev,
 		error = i2c_smbus_write_byte_data(mxc622x_i2c_client, MXC622X_REG_CTRL,MXC622X_CTRL_PWRON);
 		atomic_set(&mxc622x_data.enable, 1);
 		assert(error==0);
-		
+		filter_flag = 0;
 		mxc622x_idev->input->open(mxc622x_idev->input);
 	} else {
 	        mxc622x_idev->input->close(mxc622x_idev->input);
@@ -282,17 +283,22 @@ static int report_abs(void)
 	x = ((xyz[0] ) << 8) >> 8;
 	y = ((xyz[1] ) << 8) >> 8;
     
-       // if((x == 0) || (y == 0)){   
-             //  return 0;    
-      //   }
-	//dprintk(DEBUG_DATA_INFO, "x= 0x%hx, y = 0x%hx, z = 0x%hx\n", x, y, z);
-	
+	if ((x == 0) || (y == 0)) {
+	    return 0;
+	}
+
+/* To filter some wrong data  */
+	if (filter_flag < 3) {
+		filter_flag++;
+		return 0;
+	}
+
+	dprintk(DEBUG_DATA_INFO, "x= 0x%hx, y = 0x%hx, z = 0x%hx\n", x, y, z);
 	input_report_abs(mxc622x_idev->input, ABS_X, x);
 	input_report_abs(mxc622x_idev->input, ABS_Y, y);
-	//input_report_abs(mxc622x_idev->input, ABS_Z, z);
+	/*input_report_abs(mxc622x_idev->input, ABS_Z, z);*/
      
 	input_sync(mxc622x_idev->input);
-	printk( "x= 0x%hx, y = 0x%hx, z = 0x%hx\n", x, y, z);
 	return 1;
 }
 
@@ -427,6 +433,7 @@ static struct i2c_driver mxc622x_driver = {
 	.driver = {
 		.name	= MXC622X_DRV_NAME,
 		.owner	= THIS_MODULE,
+		.of_match_table = "allwinner,mxc622x",
 	},
 	.probe	= mxc622x_probe,
 	.remove	= mxc622x_remove,

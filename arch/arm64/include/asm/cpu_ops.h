@@ -49,7 +49,6 @@ struct device_node;
 struct cpu_operations {
 	const char	*name;
 	int		(*cpu_init)(struct device_node *, unsigned int);
-	int		(*cpu_init_idle)(struct device_node *, unsigned int);
 	int		(*cpu_prepare)(unsigned int);
 	int		(*cpu_boot)(unsigned int);
 	void		(*cpu_postboot)(void);
@@ -58,8 +57,9 @@ struct cpu_operations {
 	void		(*cpu_die)(unsigned int cpu);
 	int		(*cpu_kill)(unsigned int cpu);
 #endif
-#ifdef CONFIG_ARM64_CPU_SUSPEND
+#ifdef CONFIG_CPU_IDLE
 	int		(*cpu_suspend)(unsigned long);
+	int             (*cpu_init_idle)(unsigned int);
 #endif
 };
 

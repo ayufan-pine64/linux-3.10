@@ -236,8 +236,6 @@ static s32 edid_parse_vsdb(u8 * pbuf,u8 size)
 		Device_Support_VIC[HDMI720P_50_3D_FP] = 1;
 		Device_Support_VIC[HDMI720P_60_3D_FP] = 1;
 		__inf("3D_present\n");
-	} else {
-		return 0;
 	}
 
 	if ( ((pbuf[index]&0x60) ==1) || ((pbuf[index]&0x60) ==2) )

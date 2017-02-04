@@ -11,8 +11,6 @@
 //#include <mach/system.h>
 
 //#include <mach/hardware.h>
-//we dont have this *.h in linux3.10, so define here directly
-#define IO_ADDRESS(x)            (void __iomem *)(((x) & 0x0fffffff) + (((x) >> 4) & 0x0f000000) + 0xf0000000)
 
 //this *.h already include in linux/sys_config.h
 //#include <mach/sys_config.h>
@@ -75,7 +73,7 @@ struct motor_config_info{
 	int motor_used;
 	int vibe_off;
 	u32 ldo_voltage;
-	char* ldo;
+	const char *ldo;
 	struct gpio_config motor_gpio;
 };
 

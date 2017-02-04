@@ -1,5 +1,5 @@
 /*
- * Allwinner A23 SoCs pinctrl driver.
+ * Allwinner sun8iw10p1 SoCs pinctrl driver.
  *
  * Copyright (C) 2014 Jackie Hwang
  *
@@ -31,6 +31,7 @@ static const struct sunxi_desc_pin sun8iw10p1_pins[] = {
 		  SUNXI_FUNCTION(0x1, "gpio_out"),
 		  SUNXI_FUNCTION(0x2, "uart2"),
 		  SUNXI_FUNCTION(0x3, "jtag0"),
+		  SUNXI_FUNCTION(0x5, "vdevice"),
 		  SUNXI_FUNCTION(0x7, "io_disabled"),
 		  SUNXI_FUNCTION_IRQ_BANK(0x6, 0, 0)),
 	SUNXI_PIN(SUNXI_PINCTRL_PIN(B, 1),
@@ -39,6 +40,7 @@ static const struct sunxi_desc_pin sun8iw10p1_pins[] = {
 		  SUNXI_FUNCTION(0x2, "uart2"),
 		  SUNXI_FUNCTION(0x3, "jtag0"),
 		  SUNXI_FUNCTION(0x4, "spdif0"),
+		  SUNXI_FUNCTION(0x5, "vdevice"),
 		  SUNXI_FUNCTION(0x7, "io_disabled"),
 		  SUNXI_FUNCTION_IRQ_BANK(0x6, 0, 1)),
 	SUNXI_PIN(SUNXI_PINCTRL_PIN(B, 2),
@@ -173,7 +175,7 @@ static const struct sunxi_desc_pin sun8iw10p1_pins[] = {
 		  SUNXI_FUNCTION(0x4, "twi1"),
 		  SUNXI_FUNCTION(0x5, "uart3"),
 		  SUNXI_FUNCTION(0x7, "io_disabled"),
-		  SUNXI_FUNCTION_IRQ_BANK(0x6, 0, 15)),
+		  SUNXI_FUNCTION_IRQ_BANK(0x6, 0, 16)),
 	/*Hole*/
 	SUNXI_PIN(SUNXI_PINCTRL_PIN(C, 0),
 		  SUNXI_FUNCTION(0x0, "gpio_in"),
@@ -686,7 +688,5 @@ MODULE_AUTHOR("Jackie Hwang <huangshr@allwinnertech.com>");
 MODULE_AUTHOR("Chen-Yu Tsai <wens@csie.org>");
 MODULE_AUTHOR("Boris Brezillon <boris.brezillon@free-electrons.com");
 MODULE_AUTHOR("Maxime Ripard <maxime.ripard@free-electrons.com");
-MODULE_DESCRIPTION("Allwinner A23 R_PIO pinctrl driver");
+MODULE_DESCRIPTION("Allwinner sun8iw10p1 PIO pinctrl driver");
 MODULE_LICENSE("GPL");
-
-

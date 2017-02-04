@@ -30,14 +30,6 @@
 #define CK32K_OUT_CTRL2  0xC2
 #define CK32K_OUT_CTRL3  0xC3
 
-struct periph_init_data {
-	const char              *name;
-	unsigned long           flags;
-	const char              **parent_names;
-	int                     num_parents;
-	struct sunxi_clk_periph *periph;
-};
-
 /*
 SUNXI_CLK_PERIPH(name,       mux_reg,         mux_shift, mux_width, div_reg,        div_mshift, div_mwidth, div_nshift, div_nwidth, gate_flags, enable_reg,     reset_reg, bus_gate_reg, drm_gate_reg, enable_shift, reset_shift, bus_gate_shift, dram_gate_shift,lock,com_gate,com_gate_off)
 */
@@ -191,7 +183,7 @@ static int __init sunxi_init_ac100_clocks(void)
 	struct clk *clk;
 	struct clk *parent;
 	int i;
-	struct periph_init_data *periph;
+	struct periph_init_data *pd;
 
 	if (arisc_rsb_set_rtsaddr(RSB_DEVICE_SADDR7, RSB_RTSADDR_AC100)) {
 		pr_err("%s err: config codec failed\n", __func__);
@@ -215,21 +207,19 @@ static int __init sunxi_init_ac100_clocks(void)
 	ac100_regops.reg_writel = ac100_writel;
 	ac100_regops.reg_readl = ac100_readl;
 	/* register AC100 clock */
-	for(i=0; i<ARRAY_SIZE(sunxi_ac100_init); i++)
-	{
-		periph = &sunxi_ac100_init[i];
-		periph->periph->priv_clkops = &ac100_clkops;
-		periph->periph->priv_regops = &ac100_regops;
-		clk = sunxi_clk_register_periph(periph->name, periph->parent_names,
-						periph->num_parents,periph->flags, NULL, periph->periph);
-		clk_register_clkdev(clk, periph->name, NULL);
+	for (i = 0; i < ARRAY_SIZE(sunxi_ac100_init); i++) {
+		pd = &sunxi_ac100_init[i];
+		pd->periph->priv_clkops = &ac100_clkops;
+		pd->periph->priv_regops = &ac100_regops;
+		clk = sunxi_clk_register_periph(pd,  NULL);
+		clk_register_clkdev(clk, pd->name, NULL);
 	}
 
 	//Sync enable count for Ac100
 	for(i=0; i<ARRAY_SIZE(sunxi_ac100_init); i++)
 	{
-		periph = &sunxi_ac100_init[i];
-		clk = clk_get(NULL,periph->name);
+		pd = &sunxi_ac100_init[i];
+		clk = clk_get(NULL, pd->name);
 		if(!clk || IS_ERR(clk))
 			continue;
 		if((!clk->prepare_count) && (!clk->enable_count) && clk->ops->is_enabled(clk->hw))

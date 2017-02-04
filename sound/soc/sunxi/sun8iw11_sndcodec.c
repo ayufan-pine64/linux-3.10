@@ -3,7 +3,8 @@
  * (C) Copyright 2014-2017
  * allwinner Technology Co., Ltd. <www.allwinnertech.com>
  * huangxin <huangxin@allwinnertech.com>
-  *
+ * wolfgang huang <huangjinhui@allwinnetech.com>
+ *
  * some simple description for this code
  *
  * This program is free software; you can redistribute it and/or
@@ -12,10 +13,12 @@
  * the License, or (at your option) any later version.
  *
  */
+
 #include <linux/module.h>
 #include <linux/clk.h>
 #include <linux/mutex.h>
 #include <linux/gpio.h>
+#include <linux/of_gpio.h>
 #include <linux/io.h>
 #include <linux/input.h>
 #include <sound/pcm.h>
@@ -24,208 +27,298 @@
 #include <linux/of.h>
 #include <sound/pcm_params.h>
 #include <sound/soc-dapm.h>
-#include "sun8iw11_codec.h"
 #include <linux/delay.h>
 
-#include "sunxi_rw_func.h"
+struct sunxi_card_priv {
+	int jack_gpio;
+	int jack_invert;	/* 0->high is plug_in, 1->high is plug_out */
+	struct snd_soc_jack jack_detect;
+};
 
-static const struct snd_kcontrol_new ac_pin_controls[] = {
-	SOC_DAPM_PIN_SWITCH("External Speaker"),
+/* Headphone jack detection DAPM pins */
+static struct snd_soc_jack_pin sunxi_jack_pins[] = {
+	{
+		.pin = "Headphone",
+		.mask = SND_JACK_HEADPHONE,
+	},
+};
+
+/* Headphone jack detection gpios */
+static struct snd_soc_jack_gpio sunxi_jack_gpios[] = {
+	{
+		.name = "jack-det",
+		.report = SND_JACK_HEADPHONE,
+		.debounce_time = 200,
+	},
+};
+
+/* we only support Headphone & PHONEOUT, so just left LINEOUT no used */
+static const struct snd_kcontrol_new sunxi_card_controls[] = {
 	SOC_DAPM_PIN_SWITCH("Headphone"),
+	SOC_DAPM_PIN_SWITCH("Phoneout Speaker"),
 };
 
-static const struct snd_soc_dapm_widget sunxi_ac_dapm_widgets[] = {
-	SND_SOC_DAPM_MIC("External MainMic", NULL),
-	SND_SOC_DAPM_MIC("HeadphoneMic", NULL),
+static const struct snd_soc_dapm_widget sunxi_card_dapm_widgets[] = {
+	SND_SOC_DAPM_MIC("Main Mic", NULL),
+	SND_SOC_DAPM_HP("Headphone", NULL),
+	SND_SOC_DAPM_LINE("Radio", NULL),
+	SND_SOC_DAPM_SPK("Phoneout Speaker", NULL),
+	SND_SOC_DAPM_LINE("LINEIN", NULL),
+	SND_SOC_DAPM_LINE("LINEOUT", NULL),
 };
 
-static const struct snd_soc_dapm_route audio_map[] = {
-	{"MainMic Bias", NULL, "External MainMic"},
-	{"MIC1P", NULL, "MainMic Bias"},
-	{"MIC1N", NULL, "MainMic Bias"},
-	{"MIC2", NULL, "HMic Bias"},
-	{"HMic Bias", NULL, "HeadphoneMic"},
+static const struct snd_soc_dapm_route sunxi_card_routes[] = {
+	{"MainMic Bias", NULL, "Main Mic"},
+	{"MIC1", NULL, "MainMic Bias"},
+	{"MIC2", NULL, "MainMic Bias"},
+	{"Headphone", NULL, "HPOUTL"},
+	{"Headphone", NULL, "HPOUTR"},
+	{"Phoneout Speaker", NULL, "PHONEOUTP"},
+	{"Phoneout Speaker", NULL, "PHONEOUTN"},
+	{"LINEINL", NULL, "LINEIN"},
+	{"LINEINR", NULL, "LINEIN"},
+	{"LINEOUT", NULL, "LINEOUTL"},
+	{"LINEOUT", NULL, "LINEOUTR"},
+	{"FML", NULL, "Radio"},
+	{"FMR", NULL, "Radio"},
 };
 
 /*
  * Card initialization
  */
-static int sunxi_audio_init(struct snd_soc_pcm_runtime *runtime)
+static int sunxi_card_init(struct snd_soc_pcm_runtime *rtd)
 {
-	struct snd_soc_codec *codec = runtime->codec;
-	struct snd_soc_dapm_context *dapm = &codec->dapm;
+	int ret;
+	struct snd_soc_codec *codec = rtd->codec;
+	struct snd_soc_card *card = codec->card;
+	struct sunxi_card_priv *priv = snd_soc_card_get_drvdata(card);
 
-	snd_soc_dapm_disable_pin(&codec->dapm,	"HPOUTR");
-	snd_soc_dapm_disable_pin(&codec->dapm,	"HPOUTL");
-	snd_soc_dapm_disable_pin(&codec->dapm,	"SPKL");
-	snd_soc_dapm_disable_pin(&codec->dapm,	"SPKR");
-	snd_soc_dapm_disable_pin(&codec->dapm,	"MIC1P");
-	snd_soc_dapm_disable_pin(&codec->dapm,	"MIC1N");
-	snd_soc_dapm_disable_pin(&codec->dapm,	"MIC2");
-	snd_soc_dapm_disable_pin(&codec->dapm,	"MIC3");
-	snd_soc_dapm_disable_pin(&runtime->card->dapm,	"External Speaker");
-	snd_soc_dapm_sync(dapm);
+	snd_soc_dapm_disable_pin(&codec->dapm, "Radio");
+	snd_soc_dapm_disable_pin(&codec->dapm, "Headphone");
+	snd_soc_dapm_disable_pin(&codec->dapm, "Phoneout Speaker");
+	snd_soc_dapm_disable_pin(&codec->dapm, "LINEIN");
+	snd_soc_dapm_disable_pin(&codec->dapm, "LINEOUT");
+
+	/* Headset jack detection only if it is supported */
+	if (priv->jack_gpio > 0) {
+		sunxi_jack_gpios[0].gpio = priv->jack_gpio;
+		sunxi_jack_gpios[0].invert = priv->jack_invert;
+
+		ret = snd_soc_jack_new(codec, "Headphone Jack",
+					SND_JACK_HEADPHONE,
+				       &priv->jack_detect);
+		if (ret)
+			return ret;
+
+		ret = snd_soc_jack_add_pins(&priv->jack_detect,
+					    ARRAY_SIZE(sunxi_jack_pins),
+					    sunxi_jack_pins);
+		if (ret)
+			return ret;
+
+		ret = snd_soc_jack_add_gpios(&priv->jack_detect,
+					     ARRAY_SIZE(sunxi_jack_gpios),
+					     sunxi_jack_gpios);
+		if (ret) {
+			dev_err(card->dev, "jack_add_gpios failed: %d,"
+				"maybe gpio has't external interrupt ability\n",
+				ret);
+			return ret;
+		}
+	}
+
+	snd_soc_dapm_sync(&codec->dapm);
 	return 0;
 }
 
-static int sunxi_sndpcm_hw_params(struct snd_pcm_substream *substream,
+static int sunxi_card_hw_params(struct snd_pcm_substream *substream,
                                        struct snd_pcm_hw_params *params)
 {
-	int ret  = 0;
-	u32 freq_in = 22579200;
 	struct snd_soc_pcm_runtime *rtd = substream->private_data;
-	struct snd_soc_dai *cpu_dai = rtd->cpu_dai;
 	struct snd_soc_dai *codec_dai = rtd->codec_dai;
-	unsigned long sample_rate = params_rate(params);
+	struct snd_soc_card *card = rtd->codec->card;
+	unsigned int freq;
+	int ret;
 
-	switch (sample_rate) {
-		case 8000:
-		case 16000:
-		case 32000:
-		case 64000:
-		case 128000:
-		case 12000:
-		case 24000:
-		case 48000:
-		case 96000:
-		case 192000:
-			freq_in = 24576000;
-			break;
-	}
-
-	/*set system clock source freq_in and set the mode as tdm or pcm*/
-	ret = snd_soc_dai_set_sysclk(codec_dai, 0, freq_in, 0);
-	if (ret < 0) {
-		pr_err("err:%s,set codec dai sysclk faided.\n", __func__);
-		return ret;
-	}
-	/*
-	* codec: slave. AP: master
-	*/
-	ret = snd_soc_dai_set_fmt(codec_dai, SND_SOC_DAIFMT_I2S |
-			SND_SOC_DAIFMT_NB_NF | SND_SOC_DAIFMT_CBS_CFS);
-	if (ret < 0) {
-		pr_err("%s,set codec dai fmt failed.\n", __func__);
-		return ret;
-	}
-
-	return 0;
-}
-
-static struct snd_soc_ops sunxi_sndpcm_ops = {
-       .hw_params              = sunxi_sndpcm_hw_params,
-};
-
-static struct snd_soc_dai_link sunxi_sndpcm_dai_link[] = {
-	{
-	.name 			= "audiocodec",
-	.stream_name 	= "SUNXI-CODEC",
-	.cpu_dai_name 	= "sunxi-internal-cpudai",
-	.codec_dai_name = "sun8iw11codec",
-	.platform_name 	= "sunxi-internal-cpudai",
-	.codec_name 	= "sunxi-internal-codec",
-	.init 			= sunxi_audio_init,
-    .ops 			= &sunxi_sndpcm_ops,
-	},
-};
-
-static struct snd_soc_card snd_soc_sunxi_sndpcm = {
-	.name 		= "audiocodec",
-	.owner 		= THIS_MODULE,
-	.dai_link 	= sunxi_sndpcm_dai_link,
-	.num_links 	= ARRAY_SIZE(sunxi_sndpcm_dai_link),
-	.dapm_widgets = sunxi_ac_dapm_widgets,
-	.num_dapm_widgets = ARRAY_SIZE(sunxi_ac_dapm_widgets),
-	.dapm_routes = audio_map,
-	.num_dapm_routes = ARRAY_SIZE(audio_map),
-	.controls = ac_pin_controls,
-	.num_controls = ARRAY_SIZE(ac_pin_controls),
-};
-
-static int sunxi_machine_probe(struct platform_device *pdev)
-{
-	int ret = 0;
-	struct device_node *np = pdev->dev.of_node;
-
-	if (!np) {
-		dev_err(&pdev->dev,
-			"can not get dt node for this device.\n");
+	switch (params_rate(params)) {
+	case	8000:
+	case	12000:
+	case	16000:
+	case	24000:
+	case	32000:
+	case	48000:
+	case	96000:
+	case	192000:
+		freq = 24576000;
+		break;
+	case	11025:
+	case	22050:
+	case	44100:
+		freq = 22579200;
+		break;
+	default:
+		dev_err(card->dev, "invalid rate setting\n");
 		return -EINVAL;
 	}
 
+	ret = snd_soc_dai_set_sysclk(codec_dai, 0, freq, 0);
+	if (ret < 0) {
+		dev_err(card->dev, "set codec dai sysclk faided.\n");
+		return ret;
+	}
+
+	return 0;
+}
+
+static struct snd_soc_ops sunxi_card_ops = {
+	.hw_params	= sunxi_card_hw_params,
+};
+
+static int sunxi_card_suspend(struct snd_soc_card *card)
+{
+	struct sunxi_card_priv *priv = snd_soc_card_get_drvdata(card);
+
+	if (priv->jack_gpio > 0)
+		snd_soc_jack_free_gpios(&priv->jack_detect,
+					ARRAY_SIZE(sunxi_jack_gpios),
+					sunxi_jack_gpios);
+	return 0;
+}
+
+static int sunxi_card_resume(struct snd_soc_card *card)
+{
+	struct sunxi_card_priv *priv = snd_soc_card_get_drvdata(card);
+	int ret;
+
+	if (priv->jack_gpio > 0) {
+		ret = snd_soc_jack_add_gpios(&priv->jack_detect,
+				ARRAY_SIZE(sunxi_jack_gpios), sunxi_jack_gpios);
+		if (ret < 0) {
+			dev_err(card->dev, "jack_add_gpios failed: %d,"
+				"maybe gpio has't external interrupt ability\n",
+				ret);
+			return ret;
+		}
+	}
+	return 0;
+}
+
+static struct snd_soc_dai_link sunxi_card_dai_link[] = {
+	{
+		.name		= "audiocodec",
+		.stream_name	= "SUNXI-CODEC",
+		.cpu_dai_name	= "sunxi-internal-cpudai",
+		.codec_dai_name = "sun8iw11codec",
+		.platform_name	= "sunxi-internal-cpudai",
+		.codec_name	= "sunxi-internal-codec",
+		.init		= sunxi_card_init,
+		.ops		= &sunxi_card_ops,
+	},
+};
+
+static struct snd_soc_card snd_soc_sunxi_card = {
+	.name		= "audiocodec",
+	.owner		= THIS_MODULE,
+	.dai_link	= sunxi_card_dai_link,
+	.num_links	= ARRAY_SIZE(sunxi_card_dai_link),
+	.controls	= sunxi_card_controls,
+	.num_controls	= ARRAY_SIZE(sunxi_card_controls),
+	.dapm_widgets	= sunxi_card_dapm_widgets,
+	.num_dapm_widgets = ARRAY_SIZE(sunxi_card_dapm_widgets),
+	.dapm_routes = sunxi_card_routes,
+	.num_dapm_routes = ARRAY_SIZE(sunxi_card_routes),
+	.suspend_post	= sunxi_card_suspend,
+	.resume_post	= sunxi_card_resume,
+};
+
+static int sunxi_card_dev_probe(struct platform_device *pdev)
+{
+	int ret = 0;
+	unsigned int temp_val = 0;
+	struct device_node *np = pdev->dev.of_node;
+	struct snd_soc_card *card = &snd_soc_sunxi_card;
+	struct sunxi_card_priv *priv;
+
 	/* register the soc card */
-	snd_soc_sunxi_sndpcm.dev = &pdev->dev;
-	platform_set_drvdata(pdev, &snd_soc_sunxi_sndpcm);
+	card->dev = &pdev->dev;
 
-	sunxi_sndpcm_dai_link[0].cpu_dai_name = NULL;
-	sunxi_sndpcm_dai_link[0].cpu_of_node = of_parse_phandle(np,
-				"sunxi,cpudai-controller", 0);
-	if (!sunxi_sndpcm_dai_link[0].cpu_of_node) {
-		dev_err(&pdev->dev,
-			"Property 'sunxi,cpudai-controller' missing or invalid\n");
-			ret = -EINVAL;
-			goto err1;
+	priv = devm_kzalloc(&pdev->dev,
+		sizeof(struct sunxi_card_priv), GFP_KERNEL);
+	if (!priv)
+		return -ENOMEM;
+
+	priv->jack_gpio = of_get_named_gpio(np,
+				"jack_det_gpio", 0);
+	ret = of_property_read_u32(np, "jack_invert", &temp_val);
+	if (ret < 0) {
+		dev_err(&pdev->dev, "jack_invert not setting, default setting 0\n");
+		priv->jack_invert = 0;
+	} else {
+		priv->jack_invert = temp_val;
 	}
-	sunxi_sndpcm_dai_link[0].platform_name = NULL;
-	sunxi_sndpcm_dai_link[0].platform_of_node = sunxi_sndpcm_dai_link[0].cpu_of_node;
 
-	sunxi_sndpcm_dai_link[0].codec_name = NULL;
-	sunxi_sndpcm_dai_link[0].codec_of_node = of_parse_phandle(np,"sunxi,audio-codec", 0);
-	if (!sunxi_sndpcm_dai_link[0].codec_of_node) {
-		dev_err(&pdev->dev,
-			"Property 'sunxi,audio-codec' missing or invalid\n");
+	sunxi_card_dai_link[0].cpu_dai_name = NULL;
+	sunxi_card_dai_link[0].cpu_of_node = of_parse_phandle(np,
+					"sunxi,cpudai-controller", 0);
+	if (!sunxi_card_dai_link[0].cpu_of_node) {
+		dev_err(&pdev->dev, "Property 'sunxi,cpudai-controller' missing or invalid\n");
 		ret = -EINVAL;
-		goto err1;
+		goto err_devm_kfree;
+	} else {
+		sunxi_card_dai_link[0].platform_name = NULL;
+		sunxi_card_dai_link[0].platform_of_node =
+				sunxi_card_dai_link[0].cpu_of_node;
+	}
+	sunxi_card_dai_link[0].codec_name = NULL;
+	sunxi_card_dai_link[0].codec_of_node = of_parse_phandle(np,
+						"sunxi,audio-codec", 0);
+	if (!sunxi_card_dai_link[0].codec_of_node) {
+		dev_err(&pdev->dev, "Property 'sunxi,audio-codec' missing or invalid\n");
+		ret = -EINVAL;
+		goto err_devm_kfree;
 	}
 
-	ret = snd_soc_register_card(&snd_soc_sunxi_sndpcm);
+	snd_soc_card_set_drvdata(card, priv);
+	ret = snd_soc_register_card(card);
 	if (ret) {
-		pr_err("snd_soc_register_card failed %d\n", ret);
-		goto err1;
+		dev_err(&pdev->dev, "snd_soc_register_card failed %d\n", ret);
+		goto err_devm_kfree;
 	}
 
 	return 0;
 
-err1:
-	snd_soc_unregister_component(&pdev->dev);
+err_devm_kfree:
+	devm_kfree(&pdev->dev, priv);
 	return ret;
 }
 
-static const struct of_device_id sunxi_machine_of_match[] = {
+static int __exit sunxi_card_dev_remove(struct platform_device *pdev)
+{
+	struct sunxi_card_priv *priv = dev_get_drvdata(&pdev->dev);
+
+	devm_kfree(&pdev->dev, priv);
+	return 0;
+}
+
+static const struct of_device_id sunxi_card_of_match[] = {
 	{ .compatible = "allwinner,sunxi-codec-machine", },
 	{},
 };
 
-/*method relating*/
 static struct platform_driver sunxi_machine_driver = {
 	.driver = {
 		.name = "sunxi-codec-machine",
 		.owner = THIS_MODULE,
 		.pm = &snd_soc_pm_ops,
-		.of_match_table = sunxi_machine_of_match,
+		.of_match_table = sunxi_card_of_match,
 	},
-	.probe = sunxi_machine_probe,
+	.probe = sunxi_card_dev_probe,
+	.remove = __exit_p(sunxi_card_dev_remove),
 };
 
-static int __init sunxi_machine_init(void)
-{
-	int err = 0;
+module_platform_driver(sunxi_machine_driver);
 
-	if ((err = platform_driver_register(&sunxi_machine_driver)) < 0)
-		return err;
-
-	return 0;
-}
-module_init(sunxi_machine_init);
-
-static void __exit sunxi_machine_exit(void)
-{
-	platform_driver_unregister(&sunxi_machine_driver);
-}
-
-module_exit(sunxi_machine_exit);
-
-MODULE_AUTHOR("huangxin");
-MODULE_DESCRIPTION("SUNXI_sndpcm ALSA SoC audio driver");
+MODULE_AUTHOR("wolfgang huang <huangjinhui@allwinnertech.com>");
+MODULE_DESCRIPTION("SUNXI Codec Machine ASoC driver");
 MODULE_LICENSE("GPL");
-
+MODULE_ALIAS("platform:sunxi-codec-machine");

@@ -20,6 +20,8 @@
 #include "bsp_cci.h"
 #include "../vfe_os.h"
 #include "../platform_cfg.h"
+#include "../device/sensor_helper.h"
+
 int cci_dbg_en = 0;
 int cci_dbg_lv = 1;
 #ifdef USE_SPECIFIC_CCI
@@ -94,7 +96,9 @@ static ssize_t cci_sys_store(struct device *dev,
 	struct cci_driver *cci_drv = dev_get_drvdata(dev); 
 	struct v4l2_subdev *sd = cci_drv->sd;
 	val = simple_strtoul(buf, NULL, 16);
+#ifdef USE_SPECIFIC_CCI
 	csi_cci_init_helper(cci_drv->cci_id);
+#endif
 	reg = (val >> 16) & 0xFFFF;
 	value =  val & 0xFFFF;
 	if(0 == cci_drv->read_flag)
@@ -862,3 +866,82 @@ int cci_read(struct v4l2_subdev *sd, addr_type addr, data_type *value)
 	}
 }
 EXPORT_SYMBOL_GPL(cci_read);
+
+/*
+ * On most platforms, we'd rather do straight i2c I/O.
+ */
+int sensor_read(struct v4l2_subdev *sd, addr_type reg, data_type *value)
+{
+	int ret=0, cnt=0;
+#ifdef USE_SPECIFIC_CCI
+	struct cci_driver *cci_drv = v4l2_get_subdevdata(sd);
+#else
+	struct cci_driver *cci_drv = v4l2_get_subdev_hostdata(sd);
+#endif
+	
+	ret = cci_read(sd,reg,value);
+	while((ret != 0) && (cnt < 2))
+	{
+		ret = cci_read(sd,reg,value);
+		cnt++;
+	}
+	if(cnt > 0)
+		printk("%s sensor read retry=%d\n",cci_drv->name, cnt);
+
+	return ret;
+}
+EXPORT_SYMBOL_GPL(sensor_read);
+
+int sensor_write(struct v4l2_subdev *sd, addr_type reg, data_type value)
+{
+	int ret=0, cnt=0;
+#ifdef USE_SPECIFIC_CCI
+	struct cci_driver *cci_drv = v4l2_get_subdevdata(sd);
+#else
+	struct cci_driver *cci_drv = v4l2_get_subdev_hostdata(sd);
+#endif
+
+	ret = cci_write(sd,reg,value);
+	while((ret != 0) && (cnt < 2))
+	{
+		ret = cci_write(sd,reg,value);
+		cnt++;
+	}	
+	if(cnt > 0)
+		printk("%s sensor write retry=%d\n",cci_drv->name, cnt);
+
+	return ret;
+}
+EXPORT_SYMBOL_GPL(sensor_write);
+
+/*
+ * Write a list of register settings;
+ */
+int sensor_write_array(struct v4l2_subdev *sd, struct regval_list *regs, int array_size)
+{
+	int ret = 0, i = 0;
+#ifdef USE_SPECIFIC_CCI
+	struct cci_driver *cci_drv = v4l2_get_subdevdata(sd);
+#else
+	struct cci_driver *cci_drv = v4l2_get_subdev_hostdata(sd);
+#endif
+
+	if(!regs)
+		return -EINVAL;
+
+	while(i < array_size)
+	{
+		if(regs->addr == REG_DLY) {
+			msleep(regs->data);
+		} else {  
+			ret = sensor_write(sd, regs->addr, regs->data);
+			if(ret < 0)
+				printk("%s sensor write array error!!\n",cci_drv->name);
+		}
+		i++;
+		regs++;
+	}
+	return 0;
+}
+EXPORT_SYMBOL_GPL(sensor_write_array);
+

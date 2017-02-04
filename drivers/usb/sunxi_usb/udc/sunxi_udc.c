@@ -110,27 +110,26 @@ static ssize_t ed_test(struct device *dev, struct device_attribute *attr,
 
 	if(!strncmp(buf, "test_j_state", 12)){
 		USBC_EnterMode_Test_J(g_sunxi_udc_io.usb_bsp_hdle);
-		DMSG_INFO_UDC("test_mode:%s\n", "test_j_state");
+		DMSG_INFO("test_mode:%s\n", "test_j_state");
 	}else if(!strncmp(buf, "test_k_state", 12)){
 		USBC_EnterMode_Test_K(g_sunxi_udc_io.usb_bsp_hdle);
-		DMSG_INFO_UDC("test_mode:%s\n", "test_k_state");
+		DMSG_INFO("test_mode:%s\n", "test_k_state");
 	}else if(!strncmp(buf, "test_se0_nak", 12)){
 		USBC_EnterMode_Test_SE0_NAK(g_sunxi_udc_io.usb_bsp_hdle);
-		DMSG_INFO_UDC("test_mode:%s\n", "test_se0_nak");
+		DMSG_INFO("test_mode:%s\n", "test_se0_nak");
 	}else if(!strncmp(buf, "test_pack", 9)){
-		DMSG_INFO_UDC("test_mode___:%s\n", "test_pack");
+		DMSG_INFO("test_mode___:%s\n", "test_pack");
 		fifo = USBC_SelectFIFO(g_sunxi_udc_io.usb_bsp_hdle, 0);
 		USBC_WritePacket(g_sunxi_udc_io.usb_bsp_hdle, fifo, 54, (u32 *)TestPkt);
 		USBC_EnterMode_TestPacket(g_sunxi_udc_io.usb_bsp_hdle);
 		USBC_Dev_WriteDataStatus(g_sunxi_udc_io.usb_bsp_hdle, USBC_EP_TYPE_EP0, 0);
 	}else if(!strncmp(buf, "disable_test_mode", 17)){
-		DMSG_INFO_UDC("start disable_test_mode\n");
+		DMSG_INFO("start disable_test_mode\n");
 		USBC_EnterMode_Idle(g_sunxi_udc_io.usb_bsp_hdle);
 	}else {
 		DMSG_PANIC("ERR: test_mode Argment is invalid\n");
 	}
 
-	DMSG_INFO_UDC("end test\n");
 	return count;
 
 }
@@ -362,8 +361,8 @@ __acquires(ep->dev->lock)
 	unsigned halted = ep->halted;
 
 	if(g_queue_debug){
-		//DMSG_INFO("d: (0x%p, %d, %d)\n\n\n", &(req->req), req->req.length, req->req.actual);
-		DMSG_INFO_UDC("d: (%s, %p, %d, %d)\n\n\n", ep->ep.name, &(req->req), req->req.length, req->req.actual);
+		DMSG_INFO("d: (%s, %p, %d, %d)\n\n\n", ep->ep.name,
+				&(req->req), req->req.length, req->req.actual);
 	}
 
 	list_del_init(&req->queue);
@@ -476,7 +475,8 @@ static int pio_write_fifo(struct sunxi_udc_ep *ep, struct sunxi_udc_request *req
 		is_last = 2;
 
 	if (g_write_debug) {
-		DMSG_INFO_UDC("pw: (0x%p, %d, %d)\n", &(req->req), req->req.length, req->req.actual);
+		DMSG_INFO("pw: (0x%p, %d, %d)\n",
+				&(req->req), req->req.length, req->req.actual);
 	}
 
 	if (idx) { /* ep1~4 */
@@ -648,7 +648,8 @@ static int pio_read_fifo(struct sunxi_udc_ep *ep, struct sunxi_udc_request *req)
 	}
 
 	if (g_read_debug) {
-		DMSG_INFO_UDC("pr: (0x%p, %d, %d)\n", &(req->req), req->req.length, req->req.actual);
+		DMSG_INFO("pr: (0x%p, %d, %d)\n",
+				&(req->req), req->req.length, req->req.actual);
 	}
 
 	if (idx) {
@@ -705,7 +706,8 @@ static int dma_read_fifo(struct sunxi_udc_ep *ep, struct sunxi_udc_request *req)
 	left_len = left_len - (left_len % ep->ep.maxpacket);
 
 	if (g_dma_debug) {
-		DMSG_INFO_UDC("dr: (0x%p, %d, %d)\n", &(req->req), req->req.length, req->req.actual);
+		DMSG_INFO("dr: (0x%p, %d, %d)\n", &(req->req),
+				req->req.length, req->req.actual);
 	}
 
 	ep->dma_working	= 1;
@@ -1220,9 +1222,11 @@ static void sunxi_udc_handle_ep(struct sunxi_udc_ep *ep)
 	}
 
 	if(g_irq_debug){
-		DMSG_INFO_UDC("e: (%s), tx_csr=0x%x\n", ep->ep.name, USBC_Readw(USBC_REG_TXCSR(g_sunxi_udc_io.usb_vbase)));
+		DMSG_INFO("e: (%s), tx_csr=0x%x\n", ep->ep.name,
+			USBC_Readw(USBC_REG_TXCSR(g_sunxi_udc_io.usb_vbase)));
 		if(req){
-			DMSG_INFO_UDC("req: (0x%p, %d, %d)\n", &(req->req), req->req.length, req->req.actual);
+			DMSG_INFO("req: (0x%p, %d, %d)\n", &(req->req),
+				req->req.length, req->req.actual);
 		}
 	}
 
@@ -1411,7 +1415,9 @@ void sunxi_udc_dma_completion(struct sunxi_udc *dev, struct sunxi_udc_ep *ep, st
 	}
 
 	if (g_dma_debug) {
-		DMSG_INFO_UDC("di: (0x%p, %d, %d),(%d,%d)\n", &(req->req), req->req.length, req->req.actual, ep->bEndpointAddress,USB_DIR_IN);
+		DMSG_INFO("di: (0x%p, %d, %d),(%d,%d)\n",
+				&(req->req), req->req.length, req->req.actual,
+				ep->bEndpointAddress, USB_DIR_IN);
 	}
 
 	ep->dma_working = 0;
@@ -1503,7 +1509,8 @@ static irqreturn_t sunxi_udc_irq(int dummy, void *_dev)
 	usb_irq = filtrate_irq_misc(usb_irq);
 
 	if(g_irq_debug){
-		DMSG_INFO_UDC("\nirq: usb_irq=%02x, tx_irq=%02x, rx_irq=%02x, dma_irq:%x\n", usb_irq, tx_irq, rx_irq, dma_irq);
+		DMSG_INFO("\nirq: %02x,tx_irq=%02x,rx_irq=%02x, dma_irq:%x\n",
+				usb_irq, tx_irq, rx_irq, dma_irq);
 	}
 
 	/*
@@ -2047,7 +2054,7 @@ static int sunxi_udc_queue(struct usb_ep *_ep, struct usb_request *_req, gfp_t g
 	}
 
 	if(g_queue_debug){
-		DMSG_INFO_UDC("q: (0x%p, %d, %d)\n", _req,_req->length, _req->actual);
+		DMSG_INFO("q:(0x%p,%d,%d)\n", _req, _req->length, _req->actual);
 	}
 
 	old_ep_index = USBC_GetActiveEp(g_sunxi_udc_io.usb_bsp_hdle);
@@ -2297,7 +2304,7 @@ static int sunxi_udc_get_frame(struct usb_gadget *_gadget)
 		return 0;
 	}
 
-	DMSG_INFO("sunxi_udc_get_frame is no susport\n");
+	DMSG_INFO_UDC("sunxi_udc_get_frame is no susport\n");
 
 	//ret = USBC_REG_FRNUM(g_sunxi_udc_io.usb_bsp_hdle);
 
@@ -2720,7 +2727,7 @@ static struct sunxi_udc sunxi_udc = {
 		.bmAttributes	    = USB_ENDPOINT_XFER_INT,
 	},
 
-#if defined (CONFIG_ARCH_SUN50I)
+#if defined(CONFIG_ARCH_SUN50IW1)
 	.ep[7] = {
 		.num			= 5,
 		.ep = {
@@ -3071,7 +3078,7 @@ static int sunxi_udc_suspend(struct device *dev)
 	}
 
 	if (!is_peripheral_active()) {
-		DMSG_INFO_UDC("udc is disable, need not enter to suspend\n");
+		DMSG_INFO("udc is disable, need not enter to suspend\n");
 		return 0;
 	}
 
@@ -3087,10 +3094,6 @@ static int sunxi_udc_suspend(struct device *dev)
 	cfg_udc_command(SW_UDC_P_DISABLE);
 
 	/* disable usb controller */
-	if (udc->driver && udc->driver->disconnect) {
-		udc->driver->disconnect(&udc->gadget);
-	}
-
 	sunxi_udc_disable(udc);
 
 	/* close USB clock */
@@ -3115,7 +3118,7 @@ static int sunxi_udc_resume(struct device *dev)
 	}
 
 	if (!is_peripheral_active()) {
-		DMSG_INFO_UDC("udc is disable, need not enter to resume\n");
+		DMSG_INFO("udc is disable, need not enter to resume\n");
 		return 0;
 	}
 
@@ -3127,7 +3130,6 @@ static int sunxi_udc_resume(struct device *dev)
 		/* soft connect */
 		cfg_udc_command(SW_UDC_P_ENABLE);
 	}
-
 
 	DMSG_INFO_UDC("sunxi_udc_resume end\n");
 	return 0;

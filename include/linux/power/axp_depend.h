@@ -38,20 +38,20 @@ typedef enum AXP19X_POWER_LDO
 	AXP19X_LDO4 = 1U << 6,
 } axp19X_ldo_e;
 
-typedef enum AXP152_POWER_LDO
+typedef enum AXP15X_POWER_LDO
 {
-	AXP152_DCDC1 = 1U << 0,
-	AXP152_DCDC2 = 1U << 1,
-	AXP152_DCDC3 = 1U << 2,
-	AXP152_DCDC4 = 1U << 3,
-	AXP152_ALDO1 = 1U << 4,
-	AXP152_ALDO2 = 1U << 5,
-	AXP152_DLDO1 = 1U << 6,
-	AXP152_DLDO2 = 1U << 7,
-	AXP152_LDOIO0 = 1U << 8,
-	AXP152_LDO0 = 1U << 9,
-	AXP152_RTC   = 1U << 10,
-} axp152_ldo_e;
+	AXP15X_DCDC1  = 1U << 0,
+	AXP15X_DCDC2  = 1U << 1,
+	AXP15X_DCDC3  = 1U << 2,
+	AXP15X_DCDC4  = 1U << 3,
+	AXP15X_LDO0   = 1U << 4,
+	AXP15X_RTC    = 1U << 5,
+	AXP15X_ALDO1  = 1U << 6,
+	AXP15X_ALDO2  = 1U << 7,
+	AXP15X_DLDO1  = 1U << 8,
+	AXP15X_DLDO2  = 1U << 9,
+	AXP15X_LDOIO0 = 1U << 10,
+} axp15x_ldo_e;
 
 typedef enum AXP22X_POWER_LDO
 {
@@ -147,16 +147,39 @@ typedef enum AXP803_813_POWER_LDO
 	AXP803_813_RTC   = 1U << 22,
 } axp803_813_ldo_e;
 
-typedef enum AXP209_POWER_LDO
+typedef enum AXP20X_POWER_LDO
 {
-	AXP209_DCDC2 = 1U << 0,
-	AXP209_DCDC3 = 1U << 1,
-	AXP209_LDO1 = 1U << 2,
-	AXP209_LDO2 = 1U << 3,
-	AXP209_LDO3 = 1U << 4,
-	AXP209_LDO4 = 1U << 5,
-	AXP209_LDOIO0 = 1U << 6,
-} axp209_ldo_e;
+	AXP20X_DCDC2  = 1U << 0,
+	AXP20X_DCDC3  = 1U << 1,
+	AXP20X_LDO2   = 1U << 2,
+	AXP20X_LDO3   = 1U << 3,
+	AXP20X_LDO4   = 1U << 4,
+	AXP20X_LDOIO0 = 1U << 5,
+	AXP20X_RTC    = 1U << 6,
+} axp20x_ldo_e;
+
+typedef enum AXPDUMMY_POWER_LDO {
+	AXPDUMMY_LDO1  = 1U << 0,
+	AXPDUMMY_LDO2  = 1U << 1,
+	AXPDUMMY_LDO3  = 1U << 2,
+	AXPDUMMY_LDO4  = 1U << 3,
+	AXPDUMMY_LDO5  = 1U << 4,
+	AXPDUMMY_LDO6  = 1U << 5,
+	AXPDUMMY_LDO7  = 1U << 6,
+	AXPDUMMY_LDO8  = 1U << 7,
+	AXPDUMMY_LDO9  = 1U << 8,
+	AXPDUMMY_LDO10 = 1U << 9,
+	AXPDUMMY_LDO11 = 1U << 10,
+	AXPDUMMY_LDO12 = 1U << 11,
+	AXPDUMMY_LDO13 = 1U << 12,
+	AXPDUMMY_LDO14 = 1U << 13,
+	AXPDUMMY_LDO15 = 1U << 14,
+	AXPDUMMY_LDO16 = 1U << 15,
+	AXPDUMMY_LDO17 = 1U << 16,
+	AXPDUMMY_LDO18 = 1U << 17,
+	AXPDUMMY_LDO19 = 1U << 18,
+	AXPDUMMY_LDO20 = 1U << 19,
+} axpdummy_ldo_e;
 
 /* FIXME: if you modify this struct, you should
  * sync this change with cpus source,
@@ -183,7 +206,11 @@ enum VDD_BIT
 	VDD_TEST_BIT,
 	VDD_RES1_BIT,
 	VDD_RES2_BIT,
+#if (defined(CONFIG_ARCH_SUN8IW10) || defined(CONFIG_ARCH_SUN8IW11))
+	VCC_PC_BIT,
+#else
 	VDD_RES3_BIT,
+#endif
 	VCC_MAX_INDEX,
 };
 
@@ -192,6 +219,16 @@ typedef struct {
 	char id_name[20];
 }bitmap_name_mapping_t;
 
+#define AXP_GPIO_IRQF_TRIGGER_RISING	0x00000001
+#define AXP_GPIO_IRQF_TRIGGER_FALLING	0x00000002
+
+extern int axp_gpio_irq_request(int gpio_no,
+		u32 (*handler)(int, void *), void *data);
+extern int axp_gpio_irq_enable(int gpio_no);
+extern int axp_gpio_irq_disable(int gpio_no);
+extern int axp_gpio_irq_set_type(int gpio_no, unsigned long type);
+extern int axp_gpio_irq_free(int gpio_no);
+
 extern const bitmap_name_mapping_t pwr_dm_bitmap_name_mapping[VCC_MAX_INDEX];
 extern signed int pwr_dm_bitmap_name_mapping_cnt;
 
@@ -199,7 +236,12 @@ extern signed int pwr_dm_bitmap_name_mapping_cnt;
 void set_pwr_regu_tree(unsigned int value, unsigned int bitmap);
 signed int axp_check_sys_id(const char *supply_id);
 char *axp_get_sys_id(unsigned int bitmap);
-signed int get_ldo_dependence(const char *ldo_name, signed int count);
+#if defined(CONFIG_AW_AXP81X)
+s32 get_ldo_dependence(const char *ldo_name, signed int count);
+#else
+s32 get_ldo_dependence(const char *ldo_name, signed int count,
+				s32 (*get_dep_cb)(const char *));
+#endif
 void set_sys_pwr_dm_mask(unsigned int bitmap, unsigned int enable);
 
 /* external interface*/

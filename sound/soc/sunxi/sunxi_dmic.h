@@ -13,9 +13,8 @@
  *
  */
 
-#ifndef SUNXI_DMIC_H_
-#define SUNXI_DMIC_H_
-#include "sunxi_dma.h"
+#ifndef __SUNXI_DMIC_H
+#define __SUNXI_DMIC_H
 
 /*------------------DMIC register definition--------------------*/
 #define SUNXI_DMIC_EN 			0x00
@@ -29,8 +28,11 @@
 #define SUNXI_DMIC_CH_NUM		0x24
 #define SUNXI_DMIC_CH_MAP		0x28
 #define SUNXI_DMIC_CNT			0x2c
-#define SUNXI_DMIC_DATA0_1_VOL	0x30
-#define SUNXI_DMIC_DATA2_3_VOL	0x34
+#define SUNXI_DMIC_DATA0_1_VOL		0x30
+#define SUNXI_DMIC_DATA2_3_VOL		0x34
+#define	SUNXI_DMIC_HPF_CTRL		0x38
+#define	SUNXI_DMIC_HPF_COEF		0x3C
+#define	SUNXI_DMIC_HPF_GAIN		0x40
 
 /*0x00:SUNXI_DMIC_EN*/
 #define GLOBE_EN				8
@@ -104,18 +106,7 @@
 #define DATA3R_VOL				16
 #define DATA2L_VOL				8
 #define DATA2R_VOL				0
+#define	DMIC_DEFAULT_VOL		0xB0B0B0B0
 
-struct sunxi_dmic_info {
-	void __iomem   *regs;    /* dmic base */
-	struct clk *pllclk;
-	struct clk *moduleclk;
-	struct snd_soc_dai_driver dai;
-	struct sunxi_dma_params capture_dma_param;
-	struct pinctrl *pinctrl;
-	struct pinctrl_state  *pinstate;
-	struct pinctrl_state  *pinstate_sleep;
-	u32 clk_enable_cnt;
-};
-
-#endif
+#endif /* SUNXI_DMIC_H */
 
